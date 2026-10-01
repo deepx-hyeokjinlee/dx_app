@@ -3,7 +3,8 @@
  * @brief MediapipeHandDetectorFactory Abstract Factory implementation
  *
  * MediaPipe Palm/Hand Detector (192x192, UINT8 RGB):
- *   - Input:  uint8 RGB, direct resize (no letterbox)
+ *   - Input:  uint8 RGB, letterbox with zero padding (the palm detector is trained on
+ *             aspect-preserving input; a stretched 16:9 frame lost and misplaced hands)
  *   - Output: [1,2016,18] regression + [1,2016,1] score logits
  */
 
@@ -11,7 +12,7 @@
 #define MEDIAPIPE_HAND_DETECTOR_192X192_FACTORY_HPP
 
 #include "common/base/i_factory.hpp"
-#include "common/processors/simple_resize_preprocessor.hpp"
+#include "common/processors/letterbox_preprocessor.hpp"
 #include "common/processors/mediapipe_hand_postprocessor.hpp"
 #include "common/visualizers/face_visualizer.hpp"
 #include "common/config/model_config.hpp"
@@ -28,8 +29,8 @@ public:
         : score_threshold_(score_threshold), nms_threshold_(nms_threshold) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        // UINT8 RGB — default SimpleResizePreprocessor (BGR→RGB, no float conversion)
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // UINT8 RGB letterbox, pad 0 (MediaPipe convention) — the postprocessor undoes pad/scale
+        return std::make_unique<DetectionPreprocessor>(input_width, input_height, cv::COLOR_BGR2RGB, 0);
     }
 
     PostprocessorPtr<FaceDetectionResult> createPostprocessor(int input_width, int /*input_height*/, bool is_ort_configured = false) override {
