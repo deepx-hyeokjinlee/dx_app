@@ -42,6 +42,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "display_size.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -211,6 +213,14 @@ private:
                 return false;
             }
             window_created_ = true;
+            if (win_w_ <= 0 || win_h_ <= 0) {
+                // No hint (the async runners never pass one): same rule as the sync
+                // path's showOutput() -- half the screen, frame aspect kept.
+                const auto screen = screenResolution();
+                const auto fit = fitHalfScreen(frame.cols, frame.rows, screen.first, screen.second);
+                win_w_ = fit.first;
+                win_h_ = fit.second;
+            }
             if (win_w_ > 0 && win_h_ > 0) {
                 try { cv::resizeWindow(winname_, win_w_, win_h_); }
                 catch (const cv::Exception&) { /* non-fatal */ }

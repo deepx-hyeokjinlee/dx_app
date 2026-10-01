@@ -19,7 +19,10 @@ struct Counters {
     std::atomic<int> destroy_all{0};
     std::atomic<int> next_key{-1};        // value waitKey() returns
     std::atomic<double> window_visible{1.0};
+    std::atomic<int> last_resize_w{0};    // size of the last resizeWindow()
+    std::atomic<int> last_resize_h{0};
     void reset() {
+        last_resize_w = 0; last_resize_h = 0;
         named_window = 0; resize_window = 0; imshow = 0; wait_key = 0;
         get_window_prop = 0; destroy_all = 0; next_key = -1; window_visible = 1.0;
     }
@@ -65,7 +68,10 @@ private:
 };
 
 inline void namedWindow(const std::string&, int) { ++cvmock::counters().named_window; }
-inline void resizeWindow(const std::string&, int, int) { ++cvmock::counters().resize_window; }
+inline void resizeWindow(const std::string&, int w, int h) {
+    ++cvmock::counters().resize_window;
+    cvmock::counters().last_resize_w = w; cvmock::counters().last_resize_h = h;
+}
 inline void imshow(const std::string&, const Mat&) { ++cvmock::counters().imshow; }
 inline int  waitKey(int) { ++cvmock::counters().wait_key; return cvmock::counters().next_key.load(); }
 inline double getWindowProperty(const std::string&, int) {

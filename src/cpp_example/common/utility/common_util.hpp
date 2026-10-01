@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "display_size.hpp"
 #include <atomic>
 #include <array>
 #include <cstring>
@@ -335,30 +336,7 @@ inline void displayResize(const cv::Mat &src, cv::Mat &dst, int max_w = 960, int
  * Falls back to 1920×1080 if detection fails.
  */
 inline std::pair<int, int> getScreenResolution() {
-    // 1. Env override
-    const char* env_w = std::getenv("DXAPP_SCREEN_W");
-    const char* env_h = std::getenv("DXAPP_SCREEN_H");
-    if (env_w && env_h) {
-        int w = std::atoi(env_w);
-        int h = std::atoi(env_h);
-        if (w > 0 && h > 0) return {w, h};
-    }
-#ifndef _WIN32
-    // 2. xdpyinfo
-    FILE* pipe = popen("xdpyinfo 2>/dev/null | grep dimensions", "r");
-    if (pipe) {
-        char buf[256];
-        if (fgets(buf, sizeof(buf), pipe)) {
-            int w = 0, h = 0;
-            if (sscanf(buf, " dimensions: %dx%d", &w, &h) == 2 && w > 0 && h > 0) {
-                pclose(pipe);
-                return {w, h};
-            }
-        }
-        pclose(pipe);
-    }
-#endif
-    return {1920, 1080};
+    return screenResolution();   // display_size.hpp -- shared with DisplayPump
 }
 
 /**
@@ -432,15 +410,7 @@ inline void showOutput(const cv::Mat& frame) {
 
     if (!window_sized && !frame.empty()) {
         auto [screen_w, screen_h] = getScreenResolution();
-        int target_w = screen_w / 2;
-        int target_h = screen_h / 2;
-
-        // Fit frame aspect ratio within target_w × target_h
-        double scale = std::min(
-            static_cast<double>(target_w) / frame.cols,
-            static_cast<double>(target_h) / frame.rows);
-        int win_w = static_cast<int>(frame.cols * scale);
-        int win_h = static_cast<int>(frame.rows * scale);
+        auto [win_w, win_h] = fitHalfScreen(frame.cols, frame.rows, screen_w, screen_h);
 
         cv::resizeWindow("Output", win_w, win_h);
         window_sized = true;

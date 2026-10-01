@@ -2,6 +2,7 @@
 // Compiled against the mock OpenCV in tests/display/mock_include.
 #include <opencv2/opencv.hpp>
 #include "display_pump.hpp"
+#include "display_size.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -253,6 +254,38 @@ static void test_headless_is_inert_not_quit() {
     CHECK(dxapp::hasDisplay(), "hasDisplay() true again once DISPLAY is set");
 }
 
+// The async runners never called setInitialWindowSize, so their window opened at the
+// backend default (400x300 under Qt) while the sync runners sized theirs to half the
+// screen. Without a hint the pump now applies the same rule as showOutput().
+static void test_window_defaults_to_half_the_screen() {
+    std::cout << "[test] no hint -> half the screen, frame aspect kept\n";
+    auto a = dxapp::fitHalfScreen(1920, 1080, 1280, 720);
+    CHECK(a.first == 640 && a.second == 360, "16:9 frame on 1280x720 -> 640x360");
+    auto b = dxapp::fitHalfScreen(480, 640, 1280, 720);
+    CHECK(b.first == 270 && b.second == 360, "portrait frame keeps its aspect -> 270x360");
+
+    setenv("DXAPP_SCREEN_W", "1280", 1);
+    setenv("DXAPP_SCREEN_H", "720", 1);
+    cvmock::counters().reset();
+    {
+        DisplayPump pump("Output", 0.0);
+        pump.offer(cv::Mat(1080, 1920)); pump.pump();
+        CHECK(cvmock::counters().resize_window.load() == 1, "window sized once");
+        CHECK(cvmock::counters().last_resize_w.load() == 640 && cvmock::counters().last_resize_h.load() == 360,
+              "sized to 640x360");
+    }
+    cvmock::counters().reset();
+    {
+        DisplayPump pump("Output", 0.0);
+        pump.setInitialWindowSize(300, 200);
+        pump.offer(cv::Mat(1080, 1920)); pump.pump();
+        CHECK(cvmock::counters().last_resize_w.load() == 300 && cvmock::counters().last_resize_h.load() == 200,
+              "an explicit hint still wins");
+    }
+    unsetenv("DXAPP_SCREEN_W");
+    unsetenv("DXAPP_SCREEN_H");
+}
+
 int main() {
     // The GUI contract tests below exercise the display path, so pin DISPLAY
     // on: otherwise results would depend on whether the machine running the
@@ -269,6 +302,7 @@ int main() {
     test_slow_display_does_not_throttle_producer();
     test_run_pipeline_with_display();
     test_headless_is_inert_not_quit();
+    test_window_defaults_to_half_the_screen();
 
     if (g_failures) { std::cerr << "\n" << g_failures << " CHECK(s) FAILED\n"; return 1; }
     std::cout << "\nAll DisplayPump contract tests PASSED\n";
