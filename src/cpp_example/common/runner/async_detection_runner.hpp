@@ -27,6 +27,7 @@
 #include "common/base/i_factory.hpp"
 #include "common/config/model_config.hpp"
 #include "common/utility/common_util.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/run_dir.hpp"
@@ -677,6 +678,8 @@ private:
     /** Print detection results to stdout for pipeline parsing. */
     static void printDetectionResults(const std::vector<DetectionResult>& detections,
                                       int frame_width, int frame_height, bool verbose = false) {
+        if (!verbose) return;
+        std::lock_guard<std::mutex> out_lock(dxapp::stdoutMutex());   // whole lines, one frame together
         for (size_t di = 0; di < detections.size(); ++di) {
             const auto& det = detections[di];
             if (det.box.size() >= 4) {
@@ -706,6 +709,7 @@ private:
             metrics_.inflight_last_ts = now;
             metrics_.infer_last_ts = now;
             metrics_.infer_completed++;
+            dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
         }
         metrics_.notifySlot();
     }

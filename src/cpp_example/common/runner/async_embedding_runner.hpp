@@ -25,6 +25,7 @@
 
 #include "common/base/i_factory.hpp"
 #include "common/utility/common_util.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/run_dir.hpp"
 #include "common/utility/verify_serialize.hpp"
@@ -182,6 +183,7 @@ public:
                 metrics_.inflight_last_ts = now;
                 metrics_.infer_last_ts = now;
                 metrics_.infer_completed++;
+                dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             }
             metrics_.notifySlot();
 

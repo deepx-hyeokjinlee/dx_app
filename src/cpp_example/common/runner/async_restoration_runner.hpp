@@ -26,6 +26,7 @@
 #include "common/base/i_factory.hpp"
 #include "common/utility/colorspace.hpp"
 #include "common/utility/common_util.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/sr_tiling.hpp"
 #include "common/utility/frame_reorder.hpp"
@@ -241,6 +242,7 @@ public:
                 metrics_.inflight_last_ts = now;
                 metrics_.infer_last_ts = now;
                 metrics_.infer_completed++;
+                dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             }
             metrics_.notifySlot();
 
@@ -606,6 +608,7 @@ private:
             }
             metrics_.infer_last_ts = now;
             metrics_.infer_completed++;
+            dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             metrics_.sum_preprocess += std::chrono::duration<double,std::milli>(t_pre_end-t_pre_start).count();
             metrics_.sum_inference += std::chrono::duration<double,std::milli>(ti1-ti0).count();
             metrics_.sum_postprocess += std::chrono::duration<double,std::milli>(t_post_end-t_post_start).count();

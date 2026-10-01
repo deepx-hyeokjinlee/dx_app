@@ -25,6 +25,7 @@
 
 #include "common/base/i_factory.hpp"
 #include "common/utility/common_util.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/run_dir.hpp"
@@ -189,6 +190,7 @@ public:
 
             // Print face alignment results for pipeline parsing (verbose only)
             if (verbose_) {
+                std::lock_guard<std::mutex> out_lock(dxapp::stdoutMutex());   // whole lines, one frame together
                 for (const auto& fa : detections) {
                     if (fa.pose.size() >= 3) {
                         std::cout << "[ALIGN] " << std::fixed << std::setprecision(1)
@@ -211,6 +213,7 @@ public:
                 metrics_.inflight_last_ts = now;
                 metrics_.infer_last_ts = now;
                 metrics_.infer_completed++;
+                dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             }
             metrics_.notifySlot();
 
