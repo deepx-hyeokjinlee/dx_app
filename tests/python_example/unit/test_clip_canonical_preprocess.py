@@ -101,18 +101,25 @@ def _variant_for(model: str) -> str:
 
 def _custom_ops():
     """Load the clip family's custom_ops.py by path."""
-    spec = importlib.util.spec_from_file_location(
-        "clip_custom_ops", _CLIP_FAMILY / "custom_ops.py")
+    # 8d0b748 copied the family module into every variant folder (identical copies).
+    path = _CLIP_FAMILY / "custom_ops.py"
+    if not path.is_file():
+        path = next(_CLIP_FAMILY.glob("*/custom_ops.py"))
+    spec = importlib.util.spec_from_file_location("clip_custom_ops", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
 
-def _factory_cls():
-    """Load the family factory by path -- the family dir is not an importable package."""
-    path = next((_CLIP_FAMILY / "factory").glob("*_factory.py"))
-    spec = importlib.util.spec_from_file_location("clip_family_factory", path)
+def _factory_cls(variant: str = ""):
+    """Load the family factory by path -- the family dir is not an importable package.
+
+    Since 8d0b748 each variant folder carries its own copy, and that copy only knows its
+    own variant config -- so load the copy in the variant's folder."""
+    path = next((_CLIP_FAMILY / "factory").glob("*_factory.py"), None) \
+        or next((_CLIP_FAMILY / variant / "factory").glob("*_factory.py"))
+    spec = importlib.util.spec_from_file_location(f"clip_family_factory_{variant}", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -122,7 +129,8 @@ def _factory_cls():
 
 
 def _preprocessor(model: str, edge: int, config=None):
-    return _factory_cls()(config or {}, variant=_variant_for(model)) \
+    variant = _variant_for(model)
+    return _factory_cls(variant)(config or {}, variant=variant) \
         .create_preprocessor(edge, edge)
 
 
