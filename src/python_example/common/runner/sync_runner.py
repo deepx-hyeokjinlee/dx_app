@@ -717,14 +717,16 @@ class SyncRunner:
         _check_dxrt_version()
         _apply_default_input(args, self.factory)
         _reject_image_only_stream_input(args, self.factory)
+        # An image-only example given no image answers with the hint before anything
+        # else -- it needs no model to say "use --image" (a missing model used to win).
+        if _show_image_only_no_input_hint(args, self.factory):
+            return
         _validate_inputs(args, self.factory)
 
         self._verbose = getattr(args, "show_log", False)
         self._model_path = args.model
         self._fast_postprocess = getattr(args, "fast_postprocess", False)
         self._sr_halo_cli = getattr(args, "sr_tile_halo", None)
-        if _show_image_only_no_input_hint(args, self.factory):
-            return
         self._init_engine(args.model, _resolve_config_path(args))
 
         self._save = getattr(args, "save", False)
