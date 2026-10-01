@@ -27,6 +27,7 @@
 #include "common/base/i_factory.hpp"
 #include "common/processors/serialized_postprocessor.hpp"
 #include "common/utility/common_util.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/run_dir.hpp"
@@ -231,6 +232,7 @@ public:
 
             // Print classification results for pipeline parsing
             if (!results.empty() && verbose_) {
+                std::lock_guard<std::mutex> out_lock(dxapp::stdoutMutex());   // whole lines, one frame together
                 std::cout << "Top predictions:" << std::endl;
                 for (size_t i = 0; i < std::min(size_t(5), results.size()); ++i) {
                     std::cout << "  " << (i + 1) << ". " << results[i].class_name
@@ -256,6 +258,7 @@ public:
                 metrics_.inflight_last_ts = now;
                 metrics_.infer_last_ts = now;
                 metrics_.infer_completed++;
+                dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             }
 
             AsyncClassificationDisplayArgs display_args;

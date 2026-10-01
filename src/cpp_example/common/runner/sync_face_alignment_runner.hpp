@@ -21,6 +21,7 @@
 
 #include "common/base/i_factory.hpp"
 #include "common/utility/common_util.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/run_dir.hpp"
 #include "common/utility/verify_serialize.hpp"
@@ -359,6 +360,7 @@ private:
             metrics.sum_preprocess += t_preprocess;
             metrics.sum_inference += t_inference;
             metrics.infer_completed++;
+            dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             return true;
         }
 
@@ -451,6 +453,7 @@ private:
         metrics.sum_save += t_save;
         metrics.sum_display += t_display;
         metrics.infer_completed++;
+        dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
 
         return !quit_requested;
     }

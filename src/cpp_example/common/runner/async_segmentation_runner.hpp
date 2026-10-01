@@ -26,6 +26,7 @@
 #include "common/base/i_factory.hpp"
 #include "common/processors/serialized_postprocessor.hpp"
 #include "common/utility/common_util.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/run_dir.hpp"
@@ -213,6 +214,7 @@ public:
 
             // Print instance segmentation results for pipeline parsing
             if (verbose_) {
+                std::lock_guard<std::mutex> out_lock(dxapp::stdoutMutex());   // whole lines, one frame together
                 for (const auto& seg : detections) {
                     if (seg.box.size() >= 4) {
                         std::string iname = dxapp::sanitize_name(seg.class_name.empty() ? std::to_string(seg.class_id) : seg.class_name);
@@ -238,6 +240,7 @@ public:
                 metrics_.inflight_last_ts = now;
                 metrics_.infer_last_ts = now;
                 metrics_.infer_completed++;
+                dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             }
             metrics_.notifySlot();
 
