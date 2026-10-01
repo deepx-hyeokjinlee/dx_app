@@ -84,7 +84,13 @@ class Vit_b_32_256_datacomp_s34b_b86kFactory(IEmbeddingFactory):
     # build time into prompt_bank.json (scripts/build_clip_prompt_bank.py) and the
     # runtime does one numpy dot product against it. Every OTHER clip variant keeps
     # the embedding-comparison behaviour.
-    _BANK = Path(__file__).resolve().parent / "prompt_bank.json"
+    # The bank is built per family (scripts/build_clip_prompt_bank.py writes it next to the
+    # variant folders), while this module is copied into each variant folder -- look in the
+    # variant folder first, then the family folder.
+    _BANK = next((d / "prompt_bank.json" for d in (Path(__file__).resolve().parent,
+                                                   Path(__file__).resolve().parent.parent)
+                  if (d / "prompt_bank.json").is_file()),
+                 Path(__file__).resolve().parent / "prompt_bank.json")
 
     def _bank_labels(self):
         import json

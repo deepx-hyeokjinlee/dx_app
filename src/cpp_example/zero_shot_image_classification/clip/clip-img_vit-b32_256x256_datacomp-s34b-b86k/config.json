@@ -5,7 +5,7 @@
   "family": "clip",
   "input_width": 256,
   "input_height": 256,
-  "image_only": false,
+  "image_only": true,
   "registry_image_only": true,
   "default_image": "sample/img/sample_dog.jpg",
   "default_video": "assets/videos/dogs.mp4",
@@ -16,7 +16,7 @@
   "cli": {
     "include_kitti_paths": false,
     "include_output": false,
-    "include_stream_inputs": true
+    "include_stream_inputs": false
   },
   "preprocessor": {
     "args": [
