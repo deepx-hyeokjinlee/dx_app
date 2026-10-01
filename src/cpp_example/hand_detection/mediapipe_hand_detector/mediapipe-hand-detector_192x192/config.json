@@ -30,9 +30,15 @@
         "token": "input_height"
       }
     ],
-    "class": "SimpleResizePreprocessor",
+    "class": "LetterboxPreprocessor",
     "config_overrides": {},
-    "kwargs": {}
+    "kwargs": {
+      "pad_color": [
+        0,
+        0,
+        0
+      ]
+    }
   },
   "postprocessor": {
     "args": [

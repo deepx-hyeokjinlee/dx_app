@@ -69,6 +69,23 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-np.clip(x, -100.0, 100.0)))
 
 
+def _to_original(nx: np.ndarray, ny: np.ndarray, ctx: PreprocessContext, input_size: int):
+    """Map points normalized to the model input back onto the original frame.
+
+    Right for either preprocessor: a stretch resize (``scale_x != scale_y``) maps
+    ``x = n * W_in / scale_x``; a letterbox maps ``x = (n * W_in - pad_x) / scale``.
+    The palm detector is fed letterboxed frames -- it is trained on aspect-preserving
+    input (tests/python_example/unit/test_mediapipe_hand_letterbox.py).
+    """
+    w_in = float(ctx.input_width or input_size)
+    h_in = float(ctx.input_height or input_size)
+    sx, sy = float(ctx.scale_x or 0.0), float(ctx.scale_y or 0.0)
+    if sx > 0 and sy > 0 and abs(sx - sy) > 1e-9:
+        return nx * w_in / sx, ny * h_in / sy
+    scale = float(ctx.scale or 1.0)
+    return (nx * w_in - ctx.pad_x) / scale, (ny * h_in - ctx.pad_y) / scale
+
+
 class MediaPipeHandPostprocessor(IPostprocessor):
     """
     Postprocessor for MediaPipe Palm/Hand Detector.
@@ -181,19 +198,18 @@ class MediaPipeHandPostprocessor(IPostprocessor):
         keep = np.array(indices).reshape(-1)
 
         # Back to pixel coords. Palm-detection boxes are normalized to [0, 1]
-        # against the input tensor, and the preprocessor stretch-resizes the
-        # whole frame (no letterbox padding), so [0, 1] maps directly onto the
-        # original image — scaling by (ow, oh) needs no scale_x/scale_y
-        # compensation.
+        # against the input tensor; undo the preprocessor (letterbox or stretch).
         ow = ctx.original_width
         oh = ctx.original_height
+        ox1, oy1 = _to_original(x1, y1, ctx, self.input_size)
+        ox2, oy2 = _to_original(x2, y2, ctx, self.input_size)
 
         results = []
         for i in keep:
-            bx1 = float(np.clip(x1[i] * ow, 0, ow - 1))
-            by1 = float(np.clip(y1[i] * oh, 0, oh - 1))
-            bx2 = float(np.clip(x2[i] * ow, 0, ow - 1))
-            by2 = float(np.clip(y2[i] * oh, 0, oh - 1))
+            bx1 = float(np.clip(ox1[i], 0, ow - 1))
+            by1 = float(np.clip(oy1[i], 0, oh - 1))
+            bx2 = float(np.clip(ox2[i], 0, ow - 1))
+            by2 = float(np.clip(oy2[i], 0, oh - 1))
             results.append(FaceResult(
                 box=[bx1, by1, bx2, by2],
                 confidence=float(scores_f[i]),
