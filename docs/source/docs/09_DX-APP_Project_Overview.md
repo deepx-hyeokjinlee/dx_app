@@ -64,11 +64,10 @@ Download the required models and sample media files.
 ## Download specific models by name
 ./setup.sh --models yolov8n yolov9s efficientnet_lite0
 
-## Internal/air-gapped — copy from local mount instead of downloading from S3
-./setup.sh --all --internal
-
-## Internal mode with a custom local path
-./setup.sh --all --internal --internal-path=/path/to/local/models
+## Internal/air-gapped — copy from a local mount instead of downloading from S3
+## (--internal has no default paths: name the model directory and the video archive)
+./setup.sh --all --internal --internal-path=/path/to/local/models \
+    --internal-video-path=/path/to/sample_videos.tar.gz
 ```
 
 **`setup.sh` Options**  
@@ -87,6 +86,9 @@ Download the required models and sample media files.
 | `--no-force` | Skip download if the file already exists |
 | `--force-remove-models` | Force remove models if they exist |
 | `--force-remove-videos` | Force remove videos if they exist |
+| `--internal` | Copy from a local mount instead of downloading from S3 (internal/air-gapped network) |
+| `--internal-path=<dir>` | Local model directory to copy from (required with `--internal`) |
+| `--internal-video-path=<file>` | Local sample video archive (`.tar.gz`) to extract (required with `--internal`, except with `--list`/`--dry-run`) |
 | `--verbose` | Enable verbose logging |
 
 - **Models:** Saved to `assets/models/`. By default, an interactive menu lets you select which model categories and models to download. Use `--all` to skip the menu and download everything automatically.

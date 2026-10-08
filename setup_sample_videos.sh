@@ -15,8 +15,7 @@ SYMLINK_TARGET_PATH=""
 SYMLINK_ARGS=""
 FORCE_ARGS="--force"
 INTERNAL_FLAG=""
-DEFAULT_INTERNAL_VIDEO_PATH="/mnt/regression_storage/atd/sample_videos_${VIDEO_VERSION}.tar.gz"
-INTERNAL_VIDEO_PATH="$DEFAULT_INTERNAL_VIDEO_PATH"
+INTERNAL_VIDEO_PATH=""
 
 # Function to display help message
 show_help() {
@@ -25,8 +24,7 @@ show_help() {
   echo "  [--force]                  Force overwrite if the file already exists (default)"
   echo "  [--no-force]               Skip download if the file already exists"
   echo "  [--internal]               Use local mount instead of S3 (internal/air-gapped network)"
-  echo "  [--internal-path=<path>]   Local video archive for --internal mode"
-  echo "                             (default: $DEFAULT_INTERNAL_VIDEO_PATH)"
+  echo "  [--internal-path=<file>]   Local video archive (.tar.gz) to extract (required with --internal)"
   echo "  [--help]                   Show this help message"
 
   if [ "$1" == "error" ]; then
@@ -109,12 +107,6 @@ main_internal() {
 
 main() {
     SCRIPT_DIR=$(realpath "$(dirname "$0")")
-
-    # Auto-detect internal mode if the local archive exists
-    if [ -z "$INTERNAL_FLAG" ] && [ -f "$INTERNAL_VIDEO_PATH" ]; then
-        print_colored "Local video archive detected ($INTERNAL_VIDEO_PATH) — switching to internal mode automatically" "INFO"
-        INTERNAL_FLAG="--internal"
-    fi
 
     if [ -n "$INTERNAL_FLAG" ]; then
         main_internal
@@ -207,6 +199,16 @@ for i in "$@"; do
     esac
     shift
 done
+
+# --internal is passed on purpose and names its archive; there is no default.
+if [ -n "$INTERNAL_FLAG" ] && [ -z "$INTERNAL_VIDEO_PATH" ]; then
+    print_colored "--internal requires --internal-path=<video archive>" "ERROR"
+    exit 1
+fi
+if [ -z "$INTERNAL_FLAG" ] && [ -n "$INTERNAL_VIDEO_PATH" ]; then
+    print_colored "--internal-path requires --internal" "ERROR"
+    exit 1
+fi
 
 main
 

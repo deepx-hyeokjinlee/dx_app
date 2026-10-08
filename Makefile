@@ -7,6 +7,9 @@ GH_BRANCH?=main
 GH_USER?=
 GH_TOKEN?=
 MODEL_PATH?=
+# Local sources for run_tc: setup.sh --internal has no default paths
+INTERNAL_MODEL_PATH?=/mnt/regression_storage/atd/models_v3.2.0
+INTERNAL_VIDEO_PATH?=/mnt/regression_storage/atd/sample_videos_v3.2.2.tar.gz
 
 .PHONY: all build_app_image container
 
@@ -76,7 +79,8 @@ run_tc:
 	pip install -r tests/cpp_example/requirements.txt; \
 	pip install -r tests/python_example/requirements.txt; \
 	echo "Setup dxnn models and videos"; \
-	./setup.sh --force-remove-models --internal; \
+	./setup.sh --force-remove-models --internal \
+		--internal-path=$(INTERNAL_MODEL_PATH) --internal-video-path=$(INTERNAL_VIDEO_PATH); \
 	echo "Run cpp test script (quick version)"; \
 	./run_tc.sh --cpp --cli --e2e-quick --loop 2; \
 	echo "Run python test script (quick version)"; \

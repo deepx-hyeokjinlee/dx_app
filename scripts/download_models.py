@@ -62,7 +62,6 @@ X509_STRICT_ONLY_ERRORS = (
     "Basic Constraints of CA cert not marked critical",
     "CA cert does not include key usage extension",
 )
-DEFAULT_INTERNAL_PATH = Path("/mnt/regression_storage/atd/models_v3.2.0")
 
 # ANSI colors
 _G = "\033[92m"; _Y = "\033[93m"; _R = "\033[91m"; _C = "\033[96m"; _RST = "\033[0m"
@@ -648,10 +647,14 @@ environment:
     src = parser.add_argument_group("source")
     src.add_argument("--internal", action="store_true",
                      help="use local mount instead of S3 (internal/air-gapped network)")
-    src.add_argument("--internal-path", type=str, default=str(DEFAULT_INTERNAL_PATH),
-                     metavar="DIR",
-                     help=f"local model directory for --internal mode (default: {DEFAULT_INTERNAL_PATH})")
-    return parser.parse_args()
+    src.add_argument("--internal-path", type=str, default=None, metavar="DIR",
+                     help="local model directory to copy from (required with --internal)")
+    args = parser.parse_args()
+    if args.internal and not args.internal_path:
+        parser.error("--internal requires --internal-path=<model directory>")
+    if args.internal_path and not args.internal:
+        parser.error("--internal-path requires --internal")
+    return args
 
 
 def _resolve_ca_bundle(environ=None, system_bundles=None) -> str | None:
@@ -831,13 +834,6 @@ def main():
     # --no-force overrides --force default
     if args.no_force:
         args.force = False
-
-    # Auto-detect internal mode: if the local model path exists and --internal
-    # was not explicitly requested, switch automatically (e.g. on CI runners
-    # that have the internal mount available).
-    if not args.internal and Path(args.internal_path).is_dir():
-        info(f"Local model path detected ({args.internal_path}) — switching to internal mode automatically")
-        args.internal = True
 
     manifest_path = Path(args.manifest) if args.manifest else DEFAULT_MANIFEST
     output_dir = Path(args.output)

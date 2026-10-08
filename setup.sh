@@ -27,6 +27,7 @@ MODELS_ARG=""
 MODELS_ARGS=()
 INTERNAL_ARG=""
 INTERNAL_PATH_ARG=""
+INTERNAL_VIDEO_PATH_ARG=""
 
 # If the user only asked for downloader help, forward to the inner setup_sample_models helper
 if [ "$#" -eq 1 ]; then
@@ -59,8 +60,9 @@ show_help() {
     print_colored "  [--force-remove-models]        Force remove models if they exist" "GREEN"
     print_colored "  [--force-remove-videos]        Force remove videos if they exist" "GREEN"
     print_colored "  [--internal]                   Use local mount instead of S3 (internal/air-gapped network)" "GREEN"
-    print_colored "  [--internal-path=<path>]       Local model directory for --internal mode" "GREEN"
-    print_colored "                                 (default: /mnt/regression_storage/atd/models_v3.2.0)" "GREEN"
+    print_colored "  [--internal-path=<dir>]        Local model directory to copy from (required with --internal)" "GREEN"
+    print_colored "  [--internal-video-path=<file>] Local sample video archive (.tar.gz) to extract" "GREEN"
+    print_colored "                                 (required with --internal, except with --list/--dry-run)" "GREEN"
     print_colored "  [--verbose]                    Enable verbose (debug) logging." "GREEN"
     print_colored "  [--help]                       Show this help message" "GREEN"
     print_colored "Environment:" "GREEN"
@@ -112,6 +114,14 @@ while [ $# -gt 0 ]; do
             ;;
         --internal-path)
             INTERNAL_PATH_ARG="--internal-path=$2"
+            shift 2
+            ;;
+        --internal-video-path=*)
+            INTERNAL_VIDEO_PATH_ARG="--internal-path=${1#*=}"
+            shift
+            ;;
+        --internal-video-path)
+            INTERNAL_VIDEO_PATH_ARG="--internal-path=$2"
             shift 2
             ;;
         --all)
@@ -204,6 +214,24 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# --internal is passed on purpose and names its sources; there are no default
+# paths. Check before anything is downloaded.
+if [ -n "$INTERNAL_ARG" ]; then
+    if [ -z "$INTERNAL_PATH_ARG" ]; then
+        show_help "error" "--internal requires --internal-path=<model directory>"
+    fi
+    if [ -z "$INTERNAL_VIDEO_PATH_ARG" ] && [ -z "$LIST_ARG" ] && [ -z "$DRY_RUN_ARG" ]; then
+        show_help "error" "--internal requires --internal-video-path=<video archive>"
+    fi
+else
+    if [ -n "$INTERNAL_PATH_ARG" ]; then
+        show_help "error" "--internal-path requires --internal"
+    fi
+    if [ -n "$INTERNAL_VIDEO_PATH_ARG" ]; then
+        show_help "error" "--internal-video-path requires --internal"
+    fi
+fi
+
 print_colored "======== PATH INFO =========" "DEBUG"
 print_colored "RUNTIME_PATH($RUNTIME_PATH)" "DEBUG"
 print_colored "DX_AS_PATH($DX_AS_PATH)" "DEBUG"
@@ -277,8 +305,8 @@ setup_assets() {
     if [ -n "$INTERNAL_ARG" ]; then
         SETUP_VIDEO_ARGS="$SETUP_VIDEO_ARGS $INTERNAL_ARG"
     fi
-    if [ -n "$INTERNAL_PATH_ARG" ]; then
-        SETUP_VIDEO_ARGS="$SETUP_VIDEO_ARGS $INTERNAL_PATH_ARG"
+    if [ -n "$INTERNAL_VIDEO_PATH_ARG" ]; then
+        SETUP_VIDEO_ARGS="$SETUP_VIDEO_ARGS $INTERNAL_VIDEO_PATH_ARG"
     fi
 
     print_colored " MODEL_PATH: ${MODEL_PATH}" "INFO"

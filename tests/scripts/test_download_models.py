@@ -50,7 +50,6 @@ def _dry_run(tmp_path: Path, *models: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(DOWNLOADER), "--dry-run", "--no-json",
          "--output", str(tmp_path / "models"),
-         "--internal-path", str(tmp_path / "no_internal_mount"),
          "--models", *models],
         cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
     )
@@ -249,7 +248,7 @@ def _run_main(dm, monkeypatch, tmp_path, session, *extra):
     monkeypatch.setattr(dm, "_setup_session", lambda: session)
     monkeypatch.setattr(sys, "argv", [
         "download_models.py", "--manifest", str(_write_manifest(tmp_path, ["good", "bad"])),
-        "--output", str(tmp_path / "out"), "--internal-path", str(tmp_path / "no_mount"),
+        "--output", str(tmp_path / "out"),
         "--no-json", "--workers", "1", *extra])
     try:
         dm.main()
@@ -298,7 +297,7 @@ def test_a_pending_row_403_is_pending_not_a_failure(dm, monkeypatch, tmp_path, c
     monkeypatch.setattr(dm, "_setup_session", lambda: session)
     monkeypatch.setattr(sys, "argv", [
         "download_models.py", "--manifest", str(manifest), "--all", "--no-json",
-        "--output", str(tmp_path / "out"), "--internal-path", str(tmp_path / "no_mount"),
+        "--output", str(tmp_path / "out"),
         "--workers", "1"])
     try:
         dm.main()
@@ -364,6 +363,35 @@ def test_internal_copy_failure_exits_nonzero(dm, monkeypatch, tmp_path, capsys):
     assert "source not found" in combined
 
 
+# ── --internal is opt-in and names its own source ─────────────────────────────
+
+def _downloader(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(DOWNLOADER), "--dry-run", "--no-json",
+         "--output", str(tmp_path / "models"), "--models", "yolov8n", *args],
+        cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+
+
+def test_internal_without_internal_path_is_rejected(tmp_path):
+    result = _downloader(tmp_path, "--internal")
+    assert result.returncode != 0
+    assert "--internal requires --internal-path" in result.stderr
+
+
+def test_internal_path_without_internal_is_rejected(tmp_path):
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    result = _downloader(tmp_path, "--internal-path", str(mount))
+    assert result.returncode != 0
+    assert "--internal-path requires --internal" in result.stderr
+    assert "switching to internal mode" not in result.stdout
+
+
+def test_downloader_has_no_built_in_internal_path(dm):
+    assert not hasattr(dm, "DEFAULT_INTERNAL_PATH")
+    assert "/mnt/regression_storage" not in DOWNLOADER.read_text(encoding="utf-8")
+
+
 # ── Fix round 1 ───────────────────────────────────────────────────────────────
 
 def _run_demo_filenames() -> set[str]:
@@ -387,8 +415,7 @@ def test_demo_model_missing_from_manifest_fails(tmp_path):
 
     result = subprocess.run(
         [sys.executable, str(DOWNLOADER), "--demo-models", "--dry-run", "--no-json",
-         "--manifest", str(path), "--output", str(tmp_path / "models"),
-         "--internal-path", str(tmp_path / "no_internal_mount")],
+         "--manifest", str(path), "--output", str(tmp_path / "models")],
         cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     combined = result.stdout + result.stderr
     assert result.returncode == 1, combined[-2000:]
@@ -448,7 +475,7 @@ def _run_one(dm, monkeypatch, tmp_path, out: Path):
     monkeypatch.setattr(dm, "_setup_session", lambda: session)
     monkeypatch.setattr(sys, "argv", [
         "download_models.py", "--manifest", str(_write_one_model_manifest(tmp_path)),
-        "--output", str(out), "--internal-path", str(tmp_path / "no_mount"),
+        "--output", str(out),
         "--no-json", "--workers", "1", "--all"])
     try:
         dm.main()
