@@ -26,6 +26,7 @@
 
 #include "common/utility/interrupt_flag.hpp"
 #include "common/utility/display_pump.hpp"
+#include "common/utility/camera.hpp"
 
 #if __cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
 #include <filesystem>

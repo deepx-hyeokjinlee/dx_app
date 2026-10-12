@@ -884,7 +884,8 @@ private:
 
     bool openVideoCapture(cv::VideoCapture& video, const CommandLineArgs& args) {
         if (args.cameraIndex >= 0) {
-            video.open(args.cameraIndex);
+            // Handles USB webcams and the Raspberry Pi CSI camera (via libcamera).
+            dxapp::openCameraCapture(video, args.cameraIndex);
         } else if (!args.rtspUrl.empty()) {
             video.open(args.rtspUrl);
         } else {

@@ -69,6 +69,7 @@
 #include "common/processors/pose_postprocessor.hpp"
 #include "common/processors/serialized_postprocessor.hpp"
 #include "common/third_party/nlohmann_json.hpp"
+#include "common/utility/camera.hpp"
 #include "common/utility/common_util.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/labels.hpp"
@@ -2197,6 +2198,74 @@ void TestModelConfigAgreesWithAJsonParserOnEveryShippedConfig() {
     COMMON_CHECK(files == variant_files);
 }
 
+// =====================================================================
+// Camera capture: USB webcam + Raspberry Pi CSI camera (utility/camera.hpp)
+// =====================================================================
+
+const char* const kRpicamListTwoCameras =
+    "Available cameras\n"
+    "-----------------\n"
+    "0 : imx708_wide [4608x2592 10-bit RGGB] (/base/axi/pcie@120000/rp1/i2c@88000/imx708@1a)\n"
+    "    Modes: 'SRGGB10_CSI2P' : 1536x864 [120.13 fps - (768, 432)/3072x1728 crop]\n"
+    "                             2304x1296 [56.03 fps - (0, 0)/4608x2592 crop]\n"
+    "\n"
+    "1 : imx219 [3280x2464 8-bit RGGB] (/base/axi/pcie@120000/rp1/i2c@80000/imx219@10)\n"
+    "    Modes: 'SRGGB8' : 640x480 [103.33 fps - (1000, 752)/1280x960 crop]\n";
+
+void TestCameraRaspberryPiModelString() {
+    COMMON_CHECK(dxapp::isRaspberryPiModel(std::string("Raspberry Pi 5 Model B Rev 1.0") + '\0'));
+    COMMON_CHECK(dxapp::isRaspberryPiModel("raspberry pi 4 model b"));
+    COMMON_CHECK(!dxapp::isRaspberryPiModel("Radxa ROCK 5B"));
+    COMMON_CHECK(!dxapp::isRaspberryPiModel(""));
+}
+
+void TestCameraCsiNodeNames() {
+    COMMON_CHECK(dxapp::isRpiCsiDeviceName("rp1-cfe"));
+    COMMON_CHECK(dxapp::isRpiCsiDeviceName("unicam"));
+    COMMON_CHECK(dxapp::isRpiCsiDeviceName("pispbe"));
+    COMMON_CHECK(dxapp::isRpiCsiDeviceName("bcm2835-isp"));
+    COMMON_CHECK(!dxapp::isRpiCsiDeviceName("UVC Camera (046d:0825)"));
+    COMMON_CHECK(!dxapp::isRpiCsiDeviceName(""));
+}
+
+void TestCameraLibcameraIdComesFromTheCameraList() {
+    COMMON_CHECK(dxapp::parseLibcameraCameraId(kRpicamListTwoCameras, 0) ==
+                 "/base/axi/pcie@120000/rp1/i2c@88000/imx708@1a");
+    COMMON_CHECK(dxapp::parseLibcameraCameraId(kRpicamListTwoCameras, 1) ==
+                 "/base/axi/pcie@120000/rp1/i2c@80000/imx219@10");
+    COMMON_CHECK(dxapp::parseLibcameraCameraId(kRpicamListTwoCameras, 2).empty());
+    COMMON_CHECK(dxapp::parseLibcameraCameraId("No cameras available!\n", 0).empty());
+    COMMON_CHECK(dxapp::parseLibcameraCameraId("", 0).empty());
+}
+
+void TestCameraLibcameraPipelineString() {
+    COMMON_CHECK(dxapp::buildLibcameraPipeline("", 1280, 720) ==
+                 "libcamerasrc ! video/x-raw,width=1280,height=720"
+                 " ! videoconvert ! video/x-raw,format=BGR"
+                 " ! appsink drop=true max-buffers=2");
+    COMMON_CHECK(dxapp::buildLibcameraPipeline("/base/soc/i2c0mux/i2c@1/imx477@1a", 640, 480) ==
+                 "libcamerasrc camera-name=\"/base/soc/i2c0mux/i2c@1/imx477@1a\""
+                 " ! video/x-raw,width=640,height=480"
+                 " ! videoconvert ! video/x-raw,format=BGR"
+                 " ! appsink drop=true max-buffers=2");
+}
+
+void TestCameraGStreamerFromBuildInformation() {
+    COMMON_CHECK(dxapp::buildInfoHasGStreamer("  Video I/O:\n    GStreamer:                   YES (1.26.0)\n"));
+    COMMON_CHECK(!dxapp::buildInfoHasGStreamer("  Video I/O:\n    GStreamer:                   NO\n"));
+    COMMON_CHECK(!dxapp::buildInfoHasGStreamer("  Video I/O:\n    FFMPEG:                      YES\n"));
+}
+
+void TestCameraOffAPiOpensLikeVideoCapture() {
+    if (dxapp::isRaspberryPi()) {
+        Skip("TestCameraOffAPiOpensLikeVideoCapture", "running on a Raspberry Pi");
+        return;
+    }
+    cv::VideoCapture video;
+    COMMON_CHECK(!dxapp::openCameraCapture(video, 9999));
+    COMMON_CHECK(!video.isOpened());
+}
+
 }  // namespace
 
 int main() {
@@ -2265,6 +2334,13 @@ int main() {
     TestLoadOptionalConfigIsSilentWithoutAFile();
     TestRetrievalThumbnailsResolveAgainstTheRepository();
     TestLoadOptionalConfigWarnsOnAnUnreadableFile();
+
+    TestCameraRaspberryPiModelString();
+    TestCameraCsiNodeNames();
+    TestCameraLibcameraIdComesFromTheCameraList();
+    TestCameraLibcameraPipelineString();
+    TestCameraGStreamerFromBuildInformation();
+    TestCameraOffAPiOpensLikeVideoCapture();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

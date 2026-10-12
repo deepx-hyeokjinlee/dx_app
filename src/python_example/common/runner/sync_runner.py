@@ -29,6 +29,7 @@ import cv2
 from ..base.i_processor import SuperResolutionResult
 from ..config import load_config
 from ..utility import print_image_processing_summary, print_sync_performance_summary
+from ..utility.camera import open_camera_capture
 from ..utility.common_util import window_exists
 from ..utility.video_io import write_video_frame
 from ..utility.colorspace import bgr_to_y_limited, bgr_to_ycrcb_limited, ycrcb_limited_to_bgr
@@ -1452,7 +1453,7 @@ class SyncRunner:
     def _stream_inference_once(self, source: Union[str, int],
                                display: bool, save_enabled: bool,
                                run_dir: Optional[Path]) -> dict:
-        cap = cv2.VideoCapture(source)
+        cap = open_camera_capture(source)
         if not cap.isOpened():
             raise RuntimeError(f"Failed to open source: {source}")
 

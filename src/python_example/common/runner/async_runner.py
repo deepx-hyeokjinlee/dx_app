@@ -45,6 +45,7 @@ from ..base.i_processor import SuperResolutionResult
 from ..inputs import InputFactory
 from ..utility import print_async_performance_summary_legacy, SafeQueue
 from ..utility import print_image_processing_summary, print_sync_performance_summary
+from ..utility.camera import open_camera_capture
 from ..utility.video_io import write_video_frame
 from ..utility.colorspace import bgr_to_y_limited, bgr_to_ycrcb_limited, ycrcb_limited_to_bgr
 from .interrupts import interrupt_scope
@@ -1051,7 +1052,7 @@ class AsyncRunner:
     def _run_stream_sr_once(self, source, source_label: str, display: bool,
                             save_enabled: bool) -> Optional[dict]:
         """One pass over the SR stream. None when the source cannot be opened."""
-        cap = cv2.VideoCapture(source)
+        cap = open_camera_capture(source)
         if not cap.isOpened():
             logger.error(f"Cannot open {source_label}")
             return None
@@ -1419,7 +1420,7 @@ class AsyncRunner:
         self._input_path = source_label  # same label as the sync runner
         if self._verbose:
             logger.info(f"Input: {source_label}")
-            probe_cap = cv2.VideoCapture(source)
+            probe_cap = open_camera_capture(source)
             if probe_cap.isOpened():
                 w = int(probe_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 h = int(probe_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))

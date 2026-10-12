@@ -616,7 +616,7 @@ private:
     }
 
     bool openVideoCapture(cv::VideoCapture& video, const CommandLineArgs& args) {
-        if (args.cameraIndex >= 0) video.open(args.cameraIndex);
+        if (args.cameraIndex >= 0) dxapp::openCameraCapture(video, args.cameraIndex);
         else if (!args.rtspUrl.empty()) video.open(args.rtspUrl);
         else video.open(args.videoFile);
         return video.isOpened();

@@ -141,6 +141,7 @@ All Python examples use `argparse` via `common/runner/args.py` and share a consi
 | `--help` | `-h` | — | Show usage |
 
 - **Input source:** `--image`, `--video`, `--camera`, and `--rtsp` form a mutually exclusive group. If none is specified, a **default sample image** is automatically selected based on the task type.
+- **Raspberry Pi camera:** on a Raspberry Pi, `--camera N` opens the CSI camera through a libcamera GStreamer pipeline (`libcamerasrc`) and camera `N` is camera `N` of `rpicam-hello --list-cameras`; a USB webcam node keeps the V4L2 path. This needs `gstreamer1.0-libcamera` (installed by `install.sh` when it detects a Pi camera) and a `cv2` built with GStreamer (`python -c "import cv2; print(cv2.getBuildInformation())"` shows `GStreamer: YES`; the pip `opencv-python` wheel does not).
 
 !!! note "NOTE"
 

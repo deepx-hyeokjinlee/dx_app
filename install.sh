@@ -336,6 +336,55 @@ function install_python() {
     print_colored "[OK] Completed to setup python" "INFO"
 }
 
+# Auto-install the libcamera GStreamer plugin on a Raspberry Pi that has a
+# CSI/libcamera camera connected, so the "-c" camera option works out of the box.
+# No-op on non-Raspberry-Pi hosts and when no Pi camera is detected.
+function install_rpi_camera() {
+    local model_file=""
+    for f in /proc/device-tree/model /sys/firmware/devicetree/base/model; do
+        [ -r "$f" ] && { model_file="$f"; break; }
+    done
+    if [ -z "$model_file" ] || ! tr -d '\0' < "$model_file" 2>/dev/null | grep -qi "raspberry pi"; then
+        return 0  # Not a Raspberry Pi — nothing to do.
+    fi
+    print_colored "[INFO] Raspberry Pi detected — checking for a CSI/libcamera camera" "INFO"
+
+    # Detect a Pi camera via rpicam/libcamera tooling, or a CSI sensor on I2C.
+    local cam_present=false
+    local list_cmd=""
+    command -v rpicam-hello  >/dev/null 2>&1 && list_cmd="rpicam-hello"
+    [ -z "$list_cmd" ] && command -v libcamera-hello >/dev/null 2>&1 && list_cmd="libcamera-hello"
+    if [ -n "$list_cmd" ]; then
+        if "$list_cmd" --list-cameras 2>/dev/null | grep -qiE "^[[:space:]]*[0-9]+[[:space:]]*:"; then
+            cam_present=true
+        fi
+    fi
+    if [ "$cam_present" == false ]; then
+        # Fallback: an imx*/ov* CSI sensor bound on the I2C bus.
+        if ls -d /sys/bus/i2c/drivers/imx*/*-* 2>/dev/null | grep -q . \
+           || ls -d /sys/bus/i2c/drivers/ov*/*-* 2>/dev/null | grep -q .; then
+            cam_present=true
+        fi
+    fi
+    if [ "$cam_present" == false ]; then
+        print_colored "[INFO] No Raspberry Pi camera detected — skipping libcamera GStreamer plugin install" "INFO"
+        return 0
+    fi
+
+    if gst-inspect-1.0 libcamerasrc >/dev/null 2>&1; then
+        print_colored "[OK] libcamerasrc GStreamer plugin already installed" "INFO"
+        return 0
+    fi
+
+    print_colored "[INFO] Installing gstreamer1.0-libcamera for Raspberry Pi camera support" "INFO"
+    sudo apt-get update && sudo apt-get -y install gstreamer1.0-libcamera gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+    if gst-inspect-1.0 libcamerasrc >/dev/null 2>&1; then
+        print_colored "[OK] libcamerasrc installed — the '-c' option will use the Raspberry Pi camera" "INFO"
+    else
+        print_colored "Failed to install gstreamer1.0-libcamera. The '-c' option may not work with a CSI camera." "WARNING"
+    fi
+}
+
 # parse args
 [ $# -gt 0 ] && \
 while (( $# )); do
@@ -394,5 +443,6 @@ fi
 
 install_dep
 install_opencv
+install_rpi_camera
 
 popd >&2
