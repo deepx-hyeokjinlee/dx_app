@@ -233,14 +233,14 @@ See the common conflict patterns in the parent project's instructions.
 8. **No dotted-relative imports**: never `from ..common import ...`; import `common` as a top-level package (`from common.base import ...`)
 9. **No hardcoded model paths**: All model paths from CLI args or model_registry.json
 10. **4 variants**: Python apps have sync, async, sync_cpp_postprocess, async_cpp_postprocess
-11. **PPU model auto-detection**: Auto-detect PPU models by checking model name `_ppu` suffix, `model_registry.json` `csv_task: "PPU"`, or compiler session context. PPU models go under `src/python_example/ppu/` with simplified postprocessing (no separate NMS needed).
-12. **Existing example search**: Before generating code, search `src/python_example/<task>/<model>/` for existing examples. If found, ask user: (a) explain existing only, or (b) create new example based on existing. Never silently skip or overwrite.
+11. **PPU model auto-detection**: Auto-detect PPU models by checking model name `_ppu` suffix, `model_registry.json` `csv_task: "PPU"`, or compiler session context. PPU models live under their task like any other variant (e.g. `src/python_example/object_detection/yolo_ppu/<variant>/`) and use simplified postprocessing (no separate NMS needed).
+12. **Existing example search**: Before generating code, search `src/python_example/<task>/<family>/<variant>/` for existing examples. If found, ask user: (a) explain existing only, or (b) create new example based on existing. Never silently skip or overwrite.
 13. **PPU example generation is MANDATORY**: If the compiled .dxnn model is PPU, the agent MUST generate a working example — never skip example generation for PPU models.
 14. **Cross-validation with reference model**: When a precompiled DXNN exists in `assets/models/` or an existing verified example exists in `src/python_example/`, run the Level 5.5 differential diagnosis to isolate app code vs compilation issues. See `dx-validate.md` Level 5.5.
 15. **Mandatory output artifacts**: Every session MUST produce ALL 13 artifacts (factory, config, 4 variants, __init__.py, session.json, README.md, setup.sh, run.sh, session.log). See agent's MANDATORY OUTPUT REQUIREMENTS section. Run self-verification check before claiming completion.
 16. **Skeleton-first development** — Read `.deepx/skills/dx-agent-app-build-python/SKILL.md` skeleton
     template BEFORE writing any code. Copy the closest existing example from
-    `src/python_example/<task>/<model>/` and modify ONLY model-specific parts (factory,
+    `src/python_example/<task>/<family>/<variant>/` and modify ONLY model-specific parts (factory,
     postprocessor). NEVER write demo scripts from scratch. NEVER propose standalone
     scripts that bypass the framework (e.g., direct `InferenceEngine` usage without
     factory/runner pattern).
@@ -272,24 +272,23 @@ logger = logging.getLogger(__name__)
 
 ```
 src/python_example/{task}/{family}/
-├── factory/{family}_factory.py
-├── {family}_sync.py                 # family entry; --variant
-├── {family}_async.py
-├── {family}_sync_cpp_postprocess.py
-├── {family}_async_cpp_postprocess.py
+├── __init__.py
 └── {variant}/                       # directory name is the .dxnn stem
     ├── config.json
-    ├── {variant}_sync.py            # thin entry; variant is fixed
+    ├── factory/
+    │   ├── __init__.py
+    │   └── {variant}_factory.py
+    ├── {variant}_sync.py
     ├── {variant}_async.py
     ├── {variant}_sync_cpp_postprocess.py
     └── {variant}_async_cpp_postprocess.py
 
 src/cpp_example/{task}/{family}/
-├── factory/{family}_factory.hpp
-├── {family}_sync.cpp                # variant comes from the .dxnn stem
-├── {family}_async.cpp
-└── {variant}/
-    └── config.json
+└── {variant}/                       # directory name is the .dxnn stem
+    ├── config.json
+    ├── factory/{variant}_factory.hpp
+    ├── {variant}_sync.cpp
+    └── {variant}_async.cpp
 ```
 
 ## No Placeholder Code (MANDATORY)

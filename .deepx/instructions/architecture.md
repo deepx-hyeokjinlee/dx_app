@@ -16,10 +16,10 @@ preprocessors, postprocessors, and visualizers.
 ```
 +===================================================================+
 |  Layer 3: Application Layer                                        |
-|  src/python_example/<task>/<family>/   factory + family entries    |
-|    <variant>/                          config.json + thin scripts  |
-|  src/cpp_example/<task>/<family>/      factory + family entries    |
-|    <variant>/                          config.json only            |
+|  src/python_example/<task>/<family>/<variant>/                     |
+|      config.json + factory/ + 4 entry scripts                      |
+|  src/cpp_example/<task>/<family>/<variant>/                        |
+|      config.json + factory/ + sync/async entries                   |
 +===================================================================+
         |                                       |
         | uses                                  | uses
@@ -158,24 +158,20 @@ Per-task visualization:
 
 ### Python Applications
 
-Located in `src/python_example/<task>/<family>/`. One factory serves every
-variant of the family. Per-variant settings live in
-`<family>/<variant>/config.json`, loaded by `common.variant_config.load_variant_config`.
+Located in `src/python_example/<task>/<family>/<variant>/`, one directory per
+variant. Each variant has its own factory and entry scripts; its settings live in
+`config.json`, loaded by `common.variant_config.load_variant_config`.
 The variant directory name is the `.dxnn` stem.
 
 ```
 <family>/
     __init__.py
-    factory/
-        __init__.py
-        <family>_factory.py              # One IFactory for the family
-    <family>_sync.py                     # Family entry; selects --variant
-    <family>_async.py
-    <family>_sync_cpp_postprocess.py
-    <family>_async_cpp_postprocess.py
     <variant>/                           # e.g. yolov8-n_640x640
         config.json                      # Thresholds and processor spec
-        <variant>_sync.py                # Thin entry; variant is fixed
+        factory/
+            __init__.py
+            <variant>_factory.py         # IFactory for this variant
+        <variant>_sync.py                # Entry; variant is fixed
         <variant>_async.py
         <variant>_sync_cpp_postprocess.py
         <variant>_async_cpp_postprocess.py
@@ -186,18 +182,17 @@ instead of a nested variant directory.
 
 ### C++ Applications
 
-Located in `src/cpp_example/<task>/<family>/`. The family entry takes the
-variant from the `.dxnn` stem (`variantFromArgs`). The variant directory
-holds `config.json` only.
+Located in `src/cpp_example/<task>/<family>/<variant>/`, one directory per
+variant. The variant is the `.dxnn` stem, so the model path alone identifies it.
 
 ```
 <family>/
-    factory/
-        <family>_factory.hpp
-    <family>_sync.cpp
-    <family>_async.cpp
     <variant>/
         config.json
+        factory/
+            <variant>_factory.hpp
+        <variant>_sync.cpp
+        <variant>_async.cpp
 ```
 
 ## Sync vs Async Execution

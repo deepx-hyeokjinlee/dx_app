@@ -136,13 +136,13 @@ SyncRunner/AsyncRunner, Output Isolation)과 충돌할 때, 에이전트는 반�
 8. **상대 임포트 금지**: 항상 패키지 루트에서 절대 임포트 사용
 9. **하드코딩된 모델 경로 금지**: 모든 모델 경로는 CLI 인자 또는 model_registry.json에서
 10. **4개 변형**: Python 앱은 sync, async, sync_cpp_postprocess, async_cpp_postprocess
-11. **PPU 모델 자동 감지**: 모델 이름 `_ppu` 접미사, `model_registry.json`의 `csv_task: "PPU"`, 또는 compiler session 컨텍스트로 PPU 모델을 자동 감지. PPU 모델은 `src/python_example/ppu/`에 배치하며 간소화된 후처리(별도 NMS 불필요).
-12. **기존 예제 검색**: 코드 생성 전 `src/python_example/<task>/<model>/`에서 기존 예제를 검색. 발견 시 사용자에게 질문: (a) 기존 예제만 설명, 또는 (b) 기존 예제 기반으로 새 예제 생성. 조용히 건너뛰거나 덮어쓰지 말 것.
+11. **PPU 모델 자동 감지**: 모델 이름 `_ppu` 접미사, `model_registry.json`의 `csv_task: "PPU"`, 또는 compiler session 컨텍스트로 PPU 모델을 자동 감지. PPU 모델도 다른 variant 처럼 해당 task 아래에 배치하며(예: `src/python_example/object_detection/yolo_ppu/<variant>/`) 간소화된 후처리를 사용(별도 NMS 불필요).
+12. **기존 예제 검색**: 코드 생성 전 `src/python_example/<task>/<family>/<variant>/`에서 기존 예제를 검색. 발견 시 사용자에게 질문: (a) 기존 예제만 설명, 또는 (b) 기존 예제 기반으로 새 예제 생성. 조용히 건너뛰거나 덮어쓰지 말 것.
 13. **PPU 예제 생성은 필수**: 컴파일된 .dxnn 모델이 PPU인 경우 에이전트는 반드시 동작하는 예제를 생성해야 함 — PPU 모델에 대해 예제 생성을 건너뛰지 말 것.
 14. **참조 모델과 교차 검증**: `assets/models/`에 사전 컴파일된 DXNN이 있거나 `src/python_example/`에 기존 검증된 예제가 있을 때, Level 5.5 감별 진단을 실행하여 앱 코드 vs 컴파일 문제를 분리. `dx-validate.md` Level 5.5 참조.
 15. **필수 출력 아티팩트**: 모든 세션은 반드시 13개 아티팩트 모두 생성 (factory, config, 4개 변형, __init__.py, session.json, README.md, setup.sh, run.sh, session.log). 에이전트의 MANDATORY OUTPUT REQUIREMENTS 섹션 참조. 완료 선언 전 자체 검증 체크 실행.
 16. **Skeleton 우선 개발** — 코드 작성 전 `.deepx/skills/dx-agent-app-build-python/SKILL.md` skeleton
-    템플릿을 먼저 읽으세요. `src/python_example/<task>/<model>/`에서 가장 유사한 기존 예제를
+    템플릿을 먼저 읽으세요. `src/python_example/<task>/<family>/<variant>/`에서 가장 유사한 기존 예제를
     복사하고 모델별 부분만 수정(factory, postprocessor). 데모 스크립트를 처음부터 작성하지 마세요.
     프레임워크를 우회하는 독립형 스크립트를 제안하지 마세요 (예: factory/runner 패턴 없이 직접
     `InferenceEngine` 사용).
@@ -181,24 +181,23 @@ logger = logging.getLogger(__name__)
 
 ```
 src/python_example/{task}/{family}/
-├── factory/{family}_factory.py
-├── {family}_sync.py                 # family entry; --variant
-├── {family}_async.py
-├── {family}_sync_cpp_postprocess.py
-├── {family}_async_cpp_postprocess.py
+├── __init__.py
 └── {variant}/                       # directory name is the .dxnn stem
     ├── config.json
-    ├── {variant}_sync.py            # thin entry; variant is fixed
+    ├── factory/
+    │   ├── __init__.py
+    │   └── {variant}_factory.py
+    ├── {variant}_sync.py
     ├── {variant}_async.py
     ├── {variant}_sync_cpp_postprocess.py
     └── {variant}_async_cpp_postprocess.py
 
 src/cpp_example/{task}/{family}/
-├── factory/{family}_factory.hpp
-├── {family}_sync.cpp                # variant comes from the .dxnn stem
-├── {family}_async.cpp
-└── {variant}/
-    └── config.json
+└── {variant}/                       # directory name is the .dxnn stem
+    ├── config.json
+    ├── factory/{variant}_factory.hpp
+    ├── {variant}_sync.cpp
+    └── {variant}_async.cpp
 ```
 
 {{FRAGMENT:no-placeholder-code}}

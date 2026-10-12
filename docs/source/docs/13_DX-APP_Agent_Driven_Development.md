@@ -376,29 +376,31 @@ dx-agent-dev/<session_id>/
 ├── setup.sh               # Environment setup script (mandatory)
 ├── run.sh                 # App launch script (mandatory)
 ├── session.log            # Agent session log (mandatory)
-└── src/python_example/{task}/{model}/
-    ├── __init__.py
-    ├── config.json
-    ├── {model}_factory.py
-    ├── {model}_sync.py
-    ├── {model}_async.py
-    ├── {model}_sync_cpp_postprocess.py
-    └── {model}_async_cpp_postprocess.py
+├── __init__.py
+├── config.json
+├── factory/
+│   ├── __init__.py
+│   └── {model}_factory.py
+├── {model}_sync.py
+├── {model}_async.py
+├── {model}_sync_cpp_postprocess.py
+└── {model}_async_cpp_postprocess.py
 ```
 
-Session ID format: `YYYYMMDD-HHMMSS_<agent>_<model>_<task>` where `<agent>` is `claude`, `copilot`, `cursor`, or `opencode` (e.g., `20260403-143022_claude_yolo26n_detection`).
+Session ID format: `YYYYMMDD-HHMMSS_<agent>_<coding_model>_<target_model>_<task>` where `<agent>` is `claude`, `codex`, `copilot`, `cursor`, or `opencode` (e.g., `20260403-143022_claude_sonnet46_yolo26n_detection`). The timestamp is the system local time.
 
 ### Production Output (src/)
 
 When you explicitly request production placement, files are written directly to
-`src/python_example/{task}/{model}/` — the standard source tree.
+`src/python_example/{task}/{family}/{variant}/` — the standard source tree
+(`{variant}` is the `.dxnn` stem).
 
 ### File Descriptions
 
 | File | Purpose |
 |---|---|
 | `config.json` | Model path, task type, input dimensions, label map |
-| `{model}_factory.py` | Implements `IFactory` — the 5-method interface for pre/post processing |
+| `{model}_factory.py` | Implements `IFactory`: `create_preprocessor`, `create_postprocessor`, `create_visualizer`, `get_model_name`, `get_task_type` |
 | `{model}_sync.py` | Synchronous single-threaded inference entry point |
 | `{model}_async.py` | Asynchronous pipelined inference entry point |
 | `{model}_sync_cpp_postprocess.py` | Sync inference with C++ post-processing via pybind |
@@ -441,10 +443,10 @@ When you explicitly request production placement, files are written directly to
 
 ```bash
 # Static checks (11 checks across Level 1 and Level 2)
-python .deepx/scripts/validate_app.py src/python_example/{task}/{model}/
+python .deepx/scripts/validate_app.py src/python_example/{task}/{family}/{variant}/
 
 # Include smoke tests (Levels 1–3)
-python .deepx/scripts/validate_app.py src/python_example/{task}/{model}/ --smoke-test
+python .deepx/scripts/validate_app.py src/python_example/{task}/{family}/{variant}/ --smoke-test
 
 # Framework integrity — verify .deepx/ directory structure
 python .deepx/scripts/validate_framework.py
@@ -505,12 +507,12 @@ Rules:
 - **Problem:** Agent writes relative imports (`from .factory import ...`)  
     **Cause:** Default LLM behavior  
     **Solution:** Use absolute imports only.  
-    Example: `from dx_app.python_example.detection.yolo26n.yolo26n_factory import ...`
+    Example: `from common.processors import YOLOv8Postprocessor`
 
 - **Problem:** Factory class missing methods  
     **Cause:** Incomplete `IFactory` implementation  
     **Solution:** Implement all 5 required methods:  
-    `create_preprocessor`, `create_postprocessor`, `create_label_map`, `create_input_config`, `create_visualizer`
+    `create_preprocessor`, `create_postprocessor`, `create_visualizer`, `get_model_name`, `get_task_type`
 
 - **Problem:** Model not found at runtime  
     **Cause:** `.dxnn` file path not registered  

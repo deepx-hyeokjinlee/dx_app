@@ -176,7 +176,7 @@ E2E_DISPLAY=1 pytest -m e2e
 
     Display is only supported for `sync` variants due to thread-safety constraints.  
 
-- **Performance Reporting:** After E2E tests finish, a performance summary is printed to the console. Detailed logs, including FPS and Latency per model variant, are automatically saved to: `tests/python_example/performance_reports/performance_report.csv`  
+- **Performance Reporting:** After E2E tests finish, a performance summary is printed to the console. Detailed logs, including FPS and Latency per model variant, are automatically saved to `tests/python_example/performance_reports/performance_report_{e2e|e2e_short}_YYYYMMDD_HHMMSS.csv`. The label is `e2e_short` when the run selects that marker, and `e2e` otherwise.  
 
 ---
 

@@ -62,9 +62,9 @@ from common.runner import SyncRunner    # from _v3_dir
 
 ## Per-variant config.json
 
-Each `<family>/<variant>/` directory MUST contain a `config.json`. The family
-directory holds the shared factory and the family entry scripts. A single-model
-extract may place one `config.json` beside the entry script.
+Each `<family>/<variant>/` directory MUST contain a `config.json`, next to the
+variant's `factory/` and entry scripts. A single-model extract may place one
+`config.json` beside the entry script.
 
 Minimum keys:
 
@@ -74,24 +74,20 @@ Minimum keys:
 }
 ```
 
-Detection models also include `"nms_threshold"`. Family factories load the
-selected variant through `common.variant_config.load_variant_config`.
+Detection models also include `"nms_threshold"`. Each variant's factory loads
+its settings through `common.variant_config.load_variant_config`.
 
 ## Directory Structure
 
 ```
 src/python_example/<task>/<family>/
     __init__.py                          # Required (empty)
-    factory/
-        __init__.py                      # Exports the family factory
-        <family>_factory.py              # One IFactory for every variant
-    <family>_sync.py                     # Family entry; selects --variant
-    <family>_async.py
-    <family>_sync_cpp_postprocess.py     # Optional
-    <family>_async_cpp_postprocess.py    # Optional
     <variant>/                           # Directory name is the .dxnn stem
         config.json                      # Required
-        <variant>_sync.py                # Thin entry; variant is fixed
+        factory/
+            __init__.py                  # Exports the factory
+            <variant>_factory.py         # IFactory for this variant
+        <variant>_sync.py                # Entry; variant is fixed
         <variant>_async.py
         <variant>_sync_cpp_postprocess.py
         <variant>_async_cpp_postprocess.py

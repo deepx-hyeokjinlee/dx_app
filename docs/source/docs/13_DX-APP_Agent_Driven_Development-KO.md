@@ -372,29 +372,30 @@ dx-agent-dev/<session_id>/
 ├── setup.sh               # 환경 설정 스크립트 (필수)
 ├── run.sh                 # 앱 실행 스크립트 (필수)
 ├── session.log            # 에이전트 세션 로그 (필수)
-└── src/python_example/{task}/{model}/
-    ├── __init__.py
-    ├── config.json
-    ├── {model}_factory.py
-    ├── {model}_sync.py
-    ├── {model}_async.py
-    ├── {model}_sync_cpp_postprocess.py
-    └── {model}_async_cpp_postprocess.py
+├── __init__.py
+├── config.json
+├── factory/
+│   ├── __init__.py
+│   └── {model}_factory.py
+├── {model}_sync.py
+├── {model}_async.py
+├── {model}_sync_cpp_postprocess.py
+└── {model}_async_cpp_postprocess.py
 ```
 
-세션 ID 형식: `YYYYMMDD-HHMMSS_<agent>_<model>_<task>` — `<agent>`는 `claude`, `copilot`, `cursor`, `opencode` 중 하나 (예: `20260403-143022_claude_yolo26n_detection`).
+세션 ID 형식: `YYYYMMDD-HHMMSS_<agent>_<coding_model>_<target_model>_<task>` — `<agent>`는 `claude`, `codex`, `copilot`, `cursor`, `opencode` 중 하나 (예: `20260403-143022_claude_sonnet46_yolo26n_detection`). timestamp는 시스템 로컬 시간입니다.
 
 ### 프로덕션 출력 (src/)
 
 프로덕션 배치를 명시적으로 요청하면 파일이 표준 소스 트리인
-`src/python_example/{task}/{model}/`에 직접 작성됩니다.
+`src/python_example/{task}/{family}/{variant}/`에 직접 작성됩니다 (`{variant}`는 `.dxnn` stem).
 
 ### 파일 설명
 
 | 파일 | 용도 |
 |---|---|
 | `config.json` | 모델 경로, 작업 유형, 입력 차원, 레이블 맵 |
-| `{model}_factory.py` | `IFactory` 구현 — 전/후처리를 위한 5개 메서드 인터페이스 |
+| `{model}_factory.py` | `IFactory` 구현: `create_preprocessor`, `create_postprocessor`, `create_visualizer`, `get_model_name`, `get_task_type` |
 | `{model}_sync.py` | 동기식 단일 스레드 추론 진입점 |
 | `{model}_async.py` | 비동기 파이프라인 추론 진입점 |
 | `{model}_sync_cpp_postprocess.py` | pybind를 통한 C++ 후처리 동기 추론 |
@@ -437,10 +438,10 @@ dx-agent-dev/<session_id>/
 
 ```bash
 # 정적 검사 (1, 2단계에 걸친 11개 검사)
-python .deepx/scripts/validate_app.py src/python_example/{task}/{model}/
+python .deepx/scripts/validate_app.py src/python_example/{task}/{family}/{variant}/
 
 # 스모크 테스트 포함 (1~3단계)
-python .deepx/scripts/validate_app.py src/python_example/{task}/{model}/ --smoke-test
+python .deepx/scripts/validate_app.py src/python_example/{task}/{family}/{variant}/ --smoke-test
 
 # 프레임워크 무결성 — .deepx/ 디렉토리 구조 검증
 python .deepx/scripts/validate_framework.py
@@ -502,12 +503,12 @@ python .deepx/scripts/validate_framework.py
 - **문제:** 에이전트가 상대 임포트 작성 (`from .factory import ...`)  
     **원인:** LLM 기본 동작  
     **해결 방법:** 절대 임포트만 사용해야 합니다.  
-    예: `from dx_app.python_example.detection.yolo26n.yolo26n_factory import ...`
+    예: `from common.processors import YOLOv8Postprocessor`
 
 - **문제:** Factory 클래스 메서드 누락  
     **원인:** 불완전한 `IFactory` 구현  
     **해결 방법:** 5개 필수 메서드를 모두 구현하세요.  
-    `create_preprocessor`, `create_postprocessor`, `create_label_map`, `create_input_config`, `create_visualizer`
+    `create_preprocessor`, `create_postprocessor`, `create_visualizer`, `get_model_name`, `get_task_type`
 
 - **문제:** 런타임에 모델 미발견  
     **원인:** `.dxnn` 파일 경로 미등록  

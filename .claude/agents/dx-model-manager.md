@@ -222,4 +222,4 @@ for i, o in enumerate(out_info):
 | panoptic_driving_perception | 1 | yolopv2 |
 | person_reid **(2_5_0 new)** | 1 | repvgg_reid |
 | zero_shot_instance_segmentation | 1 | fastsam |
-| **Total** | **500** | across 28 tasks |
+| **Total** | **497** | across 28 tasks |

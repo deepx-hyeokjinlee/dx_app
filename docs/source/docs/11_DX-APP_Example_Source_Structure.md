@@ -113,14 +113,13 @@ src/cpp_example/common/
 ├── config/
 │   └── model_config.hpp           # ModelConfig — loads config.json
 ├── processors/                    # Shared processors
-│   ├── yolov5_postprocessor.hpp
-│   ├── yolov8_postprocessor.hpp
-│   ├── scrfd_postprocessor.hpp
+│   ├── yolo_detection_postprocessor.hpp     # YOLOv5/v7/v8 and the later YOLO detectors
+│   ├── scrfd_face_postprocessor.hpp
 │   ├── nanodet_postprocessor.hpp
 │   ├── damoyolo_postprocessor.hpp
 │   ├── ssd_postprocessor.hpp
 │   ├── segmentation_postprocessor.hpp       # DeepLabV3 plus FastSegmentationPostprocessor
-│   ├── instance_seg_postprocessor.hpp
+│   ├── anchorless_instance_seg_postprocessor.hpp
 │   ├── depth_postprocessor.hpp
 │   └── ...
 ├── runner/                        # Task-specific runner pairs
@@ -276,7 +275,7 @@ The factory imports shared components from `common/`:
 
 ```cpp
 // C++ factory example
-#include "common/processors/yolov8_postprocessor.hpp"
+#include "common/processors/yolo_detection_postprocessor.hpp"
 #include "common/visualizers/detection_visualizer.hpp"
 ```
 

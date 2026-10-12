@@ -184,7 +184,7 @@ pytest test_e2e.py::test_stream_inference_e2e[yolov7_async] \
 After running E2E tests, a performance report is automatically generated to provide deep insights into the inference pipeline efficiency.  
 
 - **Console Output**: A formatted table with real-time FPS metrics.  
-- **CSV File**: A detailed log saved as `performance_report_YYYYMMDD_HHMMSS.csv` in `tests/cpp_example/`.  
+- **CSV File**: A detailed log saved as `tests/cpp_example/performance_reports/performance_report_YYYYMMDD_HHMMSS.csv`.  
 
 The report includes  
 

@@ -113,10 +113,10 @@ Only create files under `src/python_example/` when the user EXPLICITLY says:
 
 Default behavior: ALWAYS use `dx-agent-dev/`.
 
-Production layout: the shared factory and `<family>_*.py` entries go in
-`src/python_example/<task>/<family>/`. `config.json` and the thin
-`<variant>_*.py` scripts go in `<family>/<variant>/`. The variant directory
-name is the `.dxnn` stem.
+Production layout: each variant gets its own directory
+`src/python_example/<task>/<family>/<variant>/` holding `config.json`,
+`factory/<variant>_factory.py` and the `<variant>_*.py` entries. The variant
+directory name is the `.dxnn` stem; the family directory holds `__init__.py`.
 
 > **NEVER reuse previous session artifacts.** Do NOT check, list, browse, or
 > reference files from previous sessions in `dx-agent-dev/`. Each build
@@ -170,14 +170,11 @@ else:
 Existing examples are the best reference for correct postprocessor selection.
 
 ```bash
-# Check standard location
-ls src/python_example/<TASK>/<MODEL>/factory/ 2>/dev/null
-
-# Check PPU location
-ls src/python_example/ppu/<MODEL>/factory/ 2>/dev/null
+# Find the variant directory (name = .dxnn stem; PPU variants live under their task too)
+ls -d src/python_example/*/*/<VARIANT>/ 2>/dev/null
 
 # If found, inspect the factory to see which postprocessor is used
-grep -n "Postprocessor\|PostProcess" src/python_example/<TASK>/<MODEL>/factory/*_factory.py
+grep -n "Postprocessor\|PostProcess" src/python_example/<TASK>/<FAMILY>/<VARIANT>/factory/*_factory.py
 ```
 
 **If an existing example is found:**
@@ -194,9 +191,9 @@ grep -n "Postprocessor\|PostProcess" src/python_example/<TASK>/<MODEL>/factory/*
 ## Step 3: Create Directory Structure
 
 ```bash
-mkdir -p src/python_example/<TASK>/<MODEL>/factory
-touch src/python_example/<TASK>/<MODEL>/__init__.py
-touch src/python_example/<TASK>/<MODEL>/factory/__init__.py
+mkdir -p src/python_example/<TASK>/<FAMILY>/<VARIANT>/factory
+touch src/python_example/<TASK>/<FAMILY>/__init__.py
+touch src/python_example/<TASK>/<FAMILY>/<VARIANT>/factory/__init__.py
 ```
 
 ## Step 4: Select IFactory Interface
@@ -358,7 +355,7 @@ import sys
 from pathlib import Path
 
 # Dynamic root finder (standalone, no PYTHONPATH). Resolves the shared `common`
-# package from ANY location: src/python_example/<task>/<model>/, dx-agent-dev/
+# package from ANY location: src/python_example/<task>/<family>/<variant>/, dx-agent-dev/
 # <session>/, AND when relocated outside dx_app (e.g. a showcase dir at the suite
 # root — then it falls back to <suite>/dx-runtime/dx_app/src/python_example).
 # NEVER use static parent.parent — depth differs.
@@ -430,7 +427,7 @@ import sys
 from pathlib import Path
 
 # Dynamic root finder (standalone, no PYTHONPATH). Resolves the shared `common`
-# package from ANY location: src/python_example/<task>/<model>/, dx-agent-dev/
+# package from ANY location: src/python_example/<task>/<family>/<variant>/, dx-agent-dev/
 # <session>/, AND when relocated outside dx_app (e.g. a showcase dir at the suite
 # root — then it falls back to <suite>/dx-runtime/dx_app/src/python_example).
 # NEVER use static parent.parent — depth differs.
@@ -493,7 +490,7 @@ import sys
 from pathlib import Path
 
 # Dynamic root finder (standalone, no PYTHONPATH). Resolves the shared `common`
-# package from ANY location: src/python_example/<task>/<model>/, dx-agent-dev/
+# package from ANY location: src/python_example/<task>/<family>/<variant>/, dx-agent-dev/
 # <session>/, AND when relocated outside dx_app (e.g. a showcase dir at the suite
 # root — then it falls back to <suite>/dx-runtime/dx_app/src/python_example).
 # NEVER use static parent.parent — depth differs.
@@ -574,7 +571,7 @@ import sys
 from pathlib import Path
 
 # Dynamic root finder (standalone, no PYTHONPATH). Resolves the shared `common`
-# package from ANY location: src/python_example/<task>/<model>/, dx-agent-dev/
+# package from ANY location: src/python_example/<task>/<family>/<variant>/, dx-agent-dev/
 # <session>/, AND when relocated outside dx_app (e.g. a showcase dir at the suite
 # root — then it falls back to <suite>/dx-runtime/dx_app/src/python_example).
 # NEVER use static parent.parent — depth differs.
@@ -738,7 +735,7 @@ print('PASS: Inference completed with detections')
 ### 7. Cross-validation with reference model (if available)
 
 If a precompiled DXNN for the same model exists in `assets/models/` or an existing
-verified example exists in `src/python_example/<task>/<model>/`, run a differential
+verified example exists in `src/python_example/<task>/<family>/<variant>/`, run a differential
 diagnosis to isolate app code vs compilation issues. See `dx-agent-app-validate.md` Level 5.5.
 
 ```bash
@@ -874,12 +871,8 @@ class IFactory(ABC):
 Before declaring the app complete, verify all files exist:
 
 - [ ] `src/python_example/<task>/<family>/__init__.py`
-- [ ] `src/python_example/<task>/<family>/factory/__init__.py`
-- [ ] `src/python_example/<task>/<family>/factory/<family>_factory.py`
-- [ ] `src/python_example/<task>/<family>/<family>_sync.py`
-- [ ] `src/python_example/<task>/<family>/<family>_async.py`
-- [ ] `src/python_example/<task>/<family>/<family>_sync_cpp_postprocess.py` (if applicable)
-- [ ] `src/python_example/<task>/<family>/<family>_async_cpp_postprocess.py` (if applicable)
+- [ ] `src/python_example/<task>/<family>/<variant>/factory/__init__.py`
+- [ ] `src/python_example/<task>/<family>/<variant>/factory/<variant>_factory.py`
 - [ ] `src/python_example/<task>/<family>/<variant>/config.json`
 - [ ] `src/python_example/<task>/<family>/<variant>/<variant>_sync.py`
 - [ ] `src/python_example/<task>/<family>/<variant>/<variant>_async.py`
@@ -1094,8 +1087,8 @@ echo "[INFO] Setup complete. Run: bash run.sh"
 
 **Customization rules:**
 - Adjust `pip install` line to include model-specific dependencies if needed
-- The 5-level upward search covers both `dx-agent-dev/<session>/` (3 levels up)
-  and `src/python_example/<task>/<model>/` (4 levels up) paths
+- The 6-level upward search covers both `dx-agent-dev/<session>/` (3 levels up)
+  and `src/python_example/<task>/<family>/<variant>/` (6 levels up) paths
 - NEVER remove or skip the venv detection/creation section (Section 1). This is non-negotiable.
 - NEVER use bare `pip install` outside the venv — PEP 668 will block it on Ubuntu 24.04+.
 - NEVER use `--break-system-packages` flag — it corrupts the system Python.

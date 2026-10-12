@@ -53,13 +53,12 @@ OPTIONS: Runner framework (recommended) | Raw InferenceEngine API -->
 
 ### Phase 2: Build
 
-In the source tree, put the factory and family entries in
-`src/cpp_example/<task>/<family>/`, and put `config.json` in
-`src/cpp_example/<task>/<family>/<variant>/`. C++ variant folders hold
-`config.json` only. The family entry selects the variant from the `.dxnn`
-stem. A `dx-agent-dev/` session for one model stays flat.
+In the source tree, each variant gets its own directory
+`src/cpp_example/<task>/<family>/<variant>/` holding `config.json`, the factory
+and the `<variant>_sync.cpp` / `<variant>_async.cpp` entries. The variant
+directory name is the `.dxnn` stem. A `dx-agent-dev/` session for one model stays flat.
 
-Create production files under `src/cpp_example/<task>/<family>/`:
+Create production files under `src/cpp_example/<task>/<family>/<variant>/`:
 
 #### 2a. CMakeLists.txt
 
@@ -244,12 +243,11 @@ private:
 
 ```
 Created files:
-  src/cpp_example/<task>/<family>/
-    factory/<family>_factory.hpp
-    <family>_sync.cpp
-    <family>_async.cpp
-    <variant>/
-      config.json
+  src/cpp_example/<task>/<family>/<variant>/
+    config.json
+    factory/<variant>_factory.hpp
+    <variant>_sync.cpp
+    <variant>_async.cpp
 
 Build:
     cd build && cmake .. && make <model>_sync

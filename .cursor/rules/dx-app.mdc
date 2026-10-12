@@ -29,7 +29,7 @@ dx_app provides 497 model variants across 28 AI tasks with Python (4 variants) a
 6. C++14 only, RAII with std::unique_ptr
 7. `dxrt-cli -s` before NPU operations
 8. **Registry key ≠ Python class** — `yolov26` → `YOLOv8Postprocessor` (NOT Yolo26Postprocessor). See `.deepx/skills/dx-agent-app-build-python/SKILL.md` Step 5
-9. **Search existing examples first** — before generating new code, check `src/python_example/<task>/<model>/`
+9. **Search existing examples first** — before generating new code, check `src/python_example/<task>/<family>/<variant>/` (`<variant>` = `.dxnn` stem)
 10. **Output accuracy validation** — after smoke test, verify detection count > 0. See `.deepx/skills/dx-agent-app-validate/SKILL.md` Level 5
 
 ## Interactive Workflow (MUST FOLLOW)
