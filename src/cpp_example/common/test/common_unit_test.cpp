@@ -2224,6 +2224,8 @@ void TestCameraCsiNodeNames() {
     COMMON_CHECK(dxapp::isRpiCsiDeviceName("unicam"));
     COMMON_CHECK(dxapp::isRpiCsiDeviceName("pispbe"));
     COMMON_CHECK(dxapp::isRpiCsiDeviceName("bcm2835-isp"));
+    // The legacy V4L2 capture driver opens through OpenCV's V4L2 backend.
+    COMMON_CHECK(!dxapp::isRpiCsiDeviceName("bcm2835-v4l2"));
     COMMON_CHECK(!dxapp::isRpiCsiDeviceName("UVC Camera (046d:0825)"));
     COMMON_CHECK(!dxapp::isRpiCsiDeviceName(""));
 }
@@ -2254,6 +2256,21 @@ void TestCameraGStreamerFromBuildInformation() {
     COMMON_CHECK(dxapp::buildInfoHasGStreamer("  Video I/O:\n    GStreamer:                   YES (1.26.0)\n"));
     COMMON_CHECK(!dxapp::buildInfoHasGStreamer("  Video I/O:\n    GStreamer:                   NO\n"));
     COMMON_CHECK(!dxapp::buildInfoHasGStreamer("  Video I/O:\n    FFMPEG:                      YES\n"));
+}
+
+// A hung or unrunnable rpicam-hello (`timeout` exits 124-127) is "no listing",
+// like camera.py's None, so camera 0 still opens libcamerasrc's first camera.
+void TestCameraListingNeedsTheToolToFinish() {
+#ifdef _WIN32
+    Skip("TestCameraListingNeedsTheToolToFinish", "libcamera listing is POSIX only");
+#else
+    COMMON_CHECK(dxapp::cameraListingCompleted(std::system("exit 0")));
+    COMMON_CHECK(dxapp::cameraListingCompleted(std::system("exit 1")));
+    COMMON_CHECK(!dxapp::cameraListingCompleted(std::system("timeout 1 sleep 5")));
+    COMMON_CHECK(!dxapp::cameraListingCompleted(std::system("exit 126")));
+    COMMON_CHECK(!dxapp::cameraListingCompleted(std::system("exit 127")));
+    COMMON_CHECK(!dxapp::cameraListingCompleted(-1));  // pclose() failed
+#endif
 }
 
 void TestCameraOffAPiOpensLikeVideoCapture() {
@@ -2340,6 +2357,7 @@ int main() {
     TestCameraLibcameraIdComesFromTheCameraList();
     TestCameraLibcameraPipelineString();
     TestCameraGStreamerFromBuildInformation();
+    TestCameraListingNeedsTheToolToFinish();
     TestCameraOffAPiOpensLikeVideoCapture();
 
     std::printf("%d checks, %d failures, %d skipped\n",

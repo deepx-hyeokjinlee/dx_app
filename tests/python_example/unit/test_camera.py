@@ -4,6 +4,7 @@ Mirrors the camera cases in src/cpp_example/common/test/common_unit_test.cpp.
 """
 
 import logging
+import subprocess
 
 import cv2
 import pytest
@@ -45,6 +46,8 @@ def test_is_raspberry_pi_reads_the_device_tree(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("name, csi", [
     ("rp1-cfe", True), ("unicam", True), ("pispbe", True), ("bcm2835-isp", True),
+    # The legacy V4L2 capture driver opens through OpenCV's V4L2 backend.
+    ("bcm2835-v4l2", False),
     ("UVC Camera (046d:0825)", False), ("", False),
 ])
 def test_csi_node_names(name, csi):
@@ -212,6 +215,20 @@ def test_pi_camera_not_in_the_list_is_refused(captures, on_pi, caplog):
     assert all(len(args) < 2 for args in captures.calls)
 
 
+@pytest.mark.parametrize("error", [subprocess.TimeoutExpired("rpicam-hello", 30),
+                                   OSError("exec format error")])
+def test_a_list_tool_that_cannot_answer_gives_no_listing(monkeypatch, error):
+    """A hung or unrunnable rpicam-hello is "no listing" (None), not an empty
+    one, so camera 0 still opens libcamerasrc's first camera."""
+    monkeypatch.setattr(camera.shutil, "which", lambda tool: "/usr/bin/" + tool)
+
+    def fail(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(camera.subprocess, "run", fail)
+    assert camera.list_libcamera_cameras() is None
+
+
 def test_pi_without_a_list_tool(captures, on_pi, monkeypatch, caplog):
     monkeypatch.setattr(camera, "list_libcamera_cameras", lambda: None)
     assert camera.open_camera_capture(0).isOpened()
@@ -306,3 +323,9 @@ def test_camera_source_opens_through_the_helper(monkeypatch):
     monkeypatch.setattr(camera_source, "open_camera_capture", fake_open)
     camera_source.CameraSource(1, 640, 480)
     assert seen == [(1, 640, 480)]
+
+
+def test_the_helper_is_exported_from_common_utility():
+    from common import utility
+    assert utility.open_camera_capture is camera.open_camera_capture
+    assert "open_camera_capture" in utility.__all__

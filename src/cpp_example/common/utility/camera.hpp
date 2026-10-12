@@ -27,6 +27,7 @@
 
 #ifndef _WIN32
 #include <sys/stat.h>
+#include <sys/wait.h>
 #endif
 
 namespace dxapp {
@@ -83,6 +84,9 @@ inline std::string v4l2DeviceName(int index) {
  */
 inline bool isRpiCsiDeviceName(const std::string& name) {
     const std::string lowered = camera_detail::toLower(name);
+    // The legacy bcm2835-v4l2 capture driver works through OpenCV's V4L2
+    // backend, so it is NOT a libcamera-only node despite the bcm2835 prefix.
+    if (lowered.find("bcm2835-v4l2") != std::string::npos) return false;
     const char* tags[] = {"rp1-cfe", "unicam", "pispbe", "bcm2835"};
     for (const char* tag : tags) {
         if (lowered.find(tag) != std::string::npos) return true;
@@ -168,8 +172,23 @@ inline std::string buildLibcameraPipeline(const std::string& cameraId,
 #ifndef _WIN32
 
 /**
+ * True when `timeout 30 <tool> --list-cameras` gave a listing: the pclose() /
+ * system() status of a run that was neither killed by the timeout (124) nor
+ * unable to start (125-127). Mirrors camera.py, where TimeoutExpired / OSError
+ * make list_libcamera_cameras() return None.
+ */
+inline bool cameraListingCompleted(int status) {
+    if (status == -1) return false;
+    if (!WIFEXITED(status)) return true;
+    const int code = WEXITSTATUS(status);
+    return code < 124 || code > 127;
+}
+
+/**
  * Output of `rpicam-hello --list-cameras` (`libcamera-hello` on older
- * Raspberry Pi OS) in @p listing. False when neither tool is installed.
+ * Raspberry Pi OS) in @p listing. False when the listing is unavailable (no
+ * tool installed, or the tool could not run / timed out), so the caller falls
+ * back to libcamerasrc's first camera for index 0 instead of failing hard.
  */
 inline bool listLibcameraCameras(std::string& listing) {
     listing.clear();
@@ -177,12 +196,17 @@ inline bool listLibcameraCameras(std::string& listing) {
     for (const char* tool : tools) {
         const std::string probe = std::string("command -v ") + tool + " > /dev/null 2>&1";
         if (std::system(probe.c_str()) != 0) continue;
-        const std::string cmd = std::string(tool) + " --list-cameras 2>&1";
+        // Wrap in `timeout` so a stuck tool cannot block popen() indefinitely
+        // (the Python mirror uses subprocess timeout=30).
+        const std::string cmd = std::string("timeout 30 ") + tool + " --list-cameras 2>&1";
         FILE* pipe = popen(cmd.c_str(), "r");
-        if (pipe == nullptr) return true;  // the tool is there; nothing listed
+        if (pipe == nullptr) return false;
         char buf[512];
         while (std::fgets(buf, sizeof(buf), pipe) != nullptr) listing += buf;
-        pclose(pipe);
+        if (!cameraListingCompleted(pclose(pipe))) {
+            listing.clear();
+            return false;
+        }
         return true;
     }
     return false;
@@ -190,7 +214,9 @@ inline bool listLibcameraCameras(std::string& listing) {
 
 /** True when the libcamerasrc GStreamer element is installed. */
 inline bool hasLibcameraGstElement() {
-    return std::system("gst-inspect-1.0 libcamerasrc > /dev/null 2>&1") == 0;
+    // `timeout` guards against gst-inspect-1.0 hanging on a broken registry
+    // (same 30 s bound as the Python mirror).
+    return std::system("timeout 30 gst-inspect-1.0 libcamerasrc > /dev/null 2>&1") == 0;
 }
 
 /** Open camera @p cameraIndex through libcamerasrc; prints why on failure. */

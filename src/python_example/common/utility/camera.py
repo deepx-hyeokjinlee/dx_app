@@ -70,6 +70,10 @@ def is_rpi_csi_device_name(name: str) -> bool:
     USB webcams (uvcvideo, etc.) report other names.
     """
     lowered = name.lower()
+    # The legacy bcm2835-v4l2 capture driver works through OpenCV's V4L2
+    # backend, so it is NOT a libcamera-only node despite the bcm2835 prefix.
+    if "bcm2835-v4l2" in lowered:
+        return False
     return any(tag in lowered for tag in _RPI_CSI_NODE_TAGS)
 
 
@@ -127,7 +131,9 @@ def build_libcamera_pipeline(camera_id: str = "",
 
 def list_libcamera_cameras() -> Optional[str]:
     """Output of ``rpicam-hello --list-cameras`` (``libcamera-hello`` on older
-    Raspberry Pi OS). None when neither tool is installed."""
+    Raspberry Pi OS). None when the listing is unavailable (no tool installed,
+    or the tool could not run / timed out) so the caller falls back to
+    libcamerasrc's first camera for index 0 instead of failing hard."""
     for tool in _CAMERA_LIST_TOOLS:
         if shutil.which(tool) is None:
             continue
@@ -136,7 +142,7 @@ def list_libcamera_cameras() -> Optional[str]:
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                   text=True, timeout=30)
         except (OSError, subprocess.TimeoutExpired):
-            return ""
+            return None
         return proc.stdout
     return None
 
