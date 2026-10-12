@@ -1310,12 +1310,10 @@ class AsyncRunner:
             for t in threads:
                 t.start()
             if display:
+                # Image mode holds each result inside the display loop until q
+                # or the window is closed (as SyncRunner does); a second hold
+                # here made the run need one more q.
                 self._run_display_loop(queues, display)
-                # Image mode: keep window open until user closes it.
-                # Only in a real GUI environment (headless: skip).
-                if not is_video and _has_display():
-                    while not _window_should_close("Output"):
-                        time.sleep(0.01)
             else:
                 self._drain_display_queue(queues)
             finished = True

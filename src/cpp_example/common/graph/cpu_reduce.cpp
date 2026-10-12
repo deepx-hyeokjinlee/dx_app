@@ -203,9 +203,23 @@ CpuReduction ReduceHeadPose(const std::vector<StageDataPtr>& inputs, const cv::S
         0.0, 0.0, 1.0);
     cv::Mat rotation;
     cv::Mat translation;
+    const cv::Mat no_distortion = cv::Mat::zeros(4, 1, CV_64F);
+#if CV_VERSION_MAJOR * 10000 + CV_VERSION_MINOR * 100 + CV_VERSION_REVISION >= 40501
     const bool solved = cv::solvePnP(
-        object_points, image_points, camera, cv::Mat::zeros(4, 1, CV_64F),
+        object_points, image_points, camera, no_distortion,
         rotation, translation, false, cv::SOLVEPNP_SQPNP);
+#else
+    // SQPnP needs OpenCV 4.5.1 (Ubuntu 20.04 ships 4.2.0). ITERATIVE alone needs six
+    // points for a non-planar model, so seed it with EPnP and refine.
+    bool solved = cv::solvePnP(
+        object_points, image_points, camera, no_distortion,
+        rotation, translation, false, cv::SOLVEPNP_EPNP);
+    if (solved) {
+        solved = cv::solvePnP(
+            object_points, image_points, camera, no_distortion,
+            rotation, translation, true, cv::SOLVEPNP_ITERATIVE);
+    }
+#endif
     if (!solved) return out;
     cv::Mat matrix;
     cv::Rodrigues(rotation, matrix);

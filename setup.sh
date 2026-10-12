@@ -27,6 +27,7 @@ MODELS_ARG=""
 MODELS_ARGS=()
 INTERNAL_ARG=""
 INTERNAL_PATH_ARG=""
+INTERNAL_PATH_IGNORED=0
 INTERNAL_VIDEO_PATH_ARG=""
 
 # If the user only asked for downloader help, forward to the inner setup_sample_models helper
@@ -59,8 +60,9 @@ show_help() {
     print_colored "  [--no-force]                   Skip download if the file already exists" "GREEN"
     print_colored "  [--force-remove-models]        Force remove models if they exist" "GREEN"
     print_colored "  [--force-remove-videos]        Force remove videos if they exist" "GREEN"
-    print_colored "  [--internal]                   Use local mount instead of S3 (internal/air-gapped network)" "GREEN"
-    print_colored "  [--internal-path=<dir>]        Local model directory to copy from (required with --internal)" "GREEN"
+    print_colored "  [--internal]                   Extract sample videos from a local archive instead of S3" "GREEN"
+    print_colored "                                 (internal/air-gapped network); models still come from S3" "GREEN"
+    print_colored "  [--internal-path=<dir>]        Deprecated and ignored; removed in the next release" "GREEN"
     print_colored "  [--internal-video-path=<file>] Local sample video archive (.tar.gz) to extract" "GREEN"
     print_colored "                                 (required with --internal, except with --list/--dry-run)" "GREEN"
     print_colored "  [--verbose]                    Enable verbose (debug) logging." "GREEN"
@@ -108,12 +110,16 @@ while [ $# -gt 0 ]; do
             INTERNAL_ARG="--internal"
             shift
             ;;
+        # --internal-path is kept only so existing command lines still parse.
+        # Its value is dropped; the option goes away in the next release.
         --internal-path=*)
-            INTERNAL_PATH_ARG="--internal-path=${1#*=}"
+            INTERNAL_PATH_ARG=""
+            INTERNAL_PATH_IGNORED=1
             shift
             ;;
         --internal-path)
-            INTERNAL_PATH_ARG="--internal-path=$2"
+            INTERNAL_PATH_ARG=""
+            INTERNAL_PATH_IGNORED=1
             shift 2
             ;;
         --internal-video-path=*)
@@ -214,19 +220,17 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# --internal is passed on purpose and names its sources; there are no default
-# paths. Check before anything is downloaded.
+if [ "$INTERNAL_PATH_IGNORED" -eq 1 ]; then
+    print_colored "--internal-path is ignored and will be removed in the next release; models are downloaded from S3." "WARNING"
+fi
+
+# --internal is passed on purpose and names its video archive; there is no
+# default path. Check before anything is downloaded.
 if [ -n "$INTERNAL_ARG" ]; then
-    if [ -z "$INTERNAL_PATH_ARG" ]; then
-        show_help "error" "--internal requires --internal-path=<model directory>"
-    fi
     if [ -z "$INTERNAL_VIDEO_PATH_ARG" ] && [ -z "$LIST_ARG" ] && [ -z "$DRY_RUN_ARG" ]; then
         show_help "error" "--internal requires --internal-video-path=<video archive>"
     fi
 else
-    if [ -n "$INTERNAL_PATH_ARG" ]; then
-        show_help "error" "--internal-path requires --internal"
-    fi
     if [ -n "$INTERNAL_VIDEO_PATH_ARG" ]; then
         show_help "error" "--internal-video-path requires --internal"
     fi
@@ -296,12 +300,8 @@ setup_assets() {
     if [ -n "$MODELS_ARG" ]; then
         SETUP_MODEL_ARGS="$SETUP_MODEL_ARGS $MODELS_ARG"
     fi
-    if [ -n "$INTERNAL_ARG" ]; then
-        SETUP_MODEL_ARGS="$SETUP_MODEL_ARGS $INTERNAL_ARG"
-    fi
-    if [ -n "$INTERNAL_PATH_ARG" ]; then
-        SETUP_MODEL_ARGS="$SETUP_MODEL_ARGS $INTERNAL_PATH_ARG"
-    fi
+    # --internal is not forwarded to the model setup: without --internal-path
+    # it has no model directory to copy from, so models come from S3.
     if [ -n "$INTERNAL_ARG" ]; then
         SETUP_VIDEO_ARGS="$SETUP_VIDEO_ARGS $INTERNAL_ARG"
     fi
