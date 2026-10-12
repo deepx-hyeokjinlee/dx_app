@@ -52,6 +52,10 @@ public:
 
         CommandLineArgs args = parseCommandLine(argc, argv);
         verbose_ = args.verbose;
+        // No display server: run as --no-display. The first window would end the
+        // process (Qt: qFatal on the xcb plugin; GTK on OpenCV < 4.5: exit(1)
+        // in gtk_init()), and neither can be caught.
+        if (!dxapp::hasDisplay()) args.no_display = true;
 
         if (verbose_) {
             std::cout << "[DXAPP] [INFO] --show-log: This task produces image-based output. "

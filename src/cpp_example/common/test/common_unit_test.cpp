@@ -969,6 +969,16 @@ void TestFailedInstallWarnsOnce() {
     CHILD_CHECK(outcome, CountOccurrences(outcome.child_stderr, needle) == 1);
 }
 
+/// True when the child ended in gtk_init(): without a display the GTK backend
+/// of OpenCV < 4.5 (apt 4.2 on Ubuntu 20.04) prints "cannot open display" and
+/// exit(1)s on the first window, before showOutput() can report kNoWindow.
+/// Newer GTK builds throw instead, and Qt has the offscreen platform.
+bool GtkCouldNotOpenDisplay(const ChildOutcome& outcome) {
+    return outcome.forked && !outcome.reported && !outcome.timed_out &&
+           WIFEXITED(outcome.status) && WEXITSTATUS(outcome.status) == 1 &&
+           outcome.child_stderr.find("cannot open display") != std::string::npos;
+}
+
 /// R5. The sync runners' image mode shows the result and then waits
 ///     while (!dxapp::windowShouldClose("Output")) sleep(10 ms);
 /// With QT_QPA_PLATFORM=offscreen (or any window nobody closes) that wait
@@ -1010,6 +1020,11 @@ void CheckImageHoldLoopEnds(const char* label, void (*send)(pid_t)) {
              "no OpenCV GUI backend could open an offscreen window");
         return;
     }
+    if (GtkCouldNotOpenDisplay(outcome)) {
+        Skip("CheckImageHoldLoopEnds",
+             "OpenCV's GTK backend exits in gtk_init() without a display");
+        return;
+    }
     CHILD_CHECK(outcome, outcome.reported && outcome.report == kReady);
     CHILD_CHECK(outcome, ExitedCleanly(outcome));
 }
@@ -1032,6 +1047,35 @@ void TestImageHoldLoopEndsOnOneRequest() {
     CheckImageHoldLoopEnds("3 SIGINTs within 40 ms", SendSigintBurst);
 }
 
+/// The hold-loop skip recognises gtk_init()'s exit and nothing else. The
+/// child does what gtk_init() does without a display.
+void TestGtkExitWithoutADisplayIsRecognised() {
+    ChildOutcome gtk = RunInChild(
+        [](int) {
+            const char kMessage[] =
+                "Unable to init server: Could not connect: Connection refused\n"
+                "(Output:1): Gtk-WARNING **: 07:15:53.621: cannot open display: \n";
+            ssize_t written = write(2, kMessage, sizeof(kMessage) - 1);
+            (void)written;
+            _exit(1);
+        },
+        NoAction, 5000);
+    COMMON_CHECK(GtkCouldNotOpenDisplay(gtk));
+    // Any other early exit stays a failure of the case, not a skip.
+    ChildOutcome other = RunInChild([](int) { _exit(1); }, NoAction, 5000);
+    COMMON_CHECK(!GtkCouldNotOpenDisplay(other));
+    ChildOutcome reported = RunInChild(
+        [](int fd) {
+            WriteByte(fd, 'R');
+            const char kMessage[] = "cannot open display: \n";
+            ssize_t written = write(2, kMessage, sizeof(kMessage) - 1);
+            (void)written;
+            _exit(1);
+        },
+        NoAction, 5000);
+    COMMON_CHECK(!GtkCouldNotOpenDisplay(reported));
+}
+
 #endif  // !_WIN32
 
 void TestInterrupts() {
@@ -1044,6 +1088,7 @@ void TestInterrupts() {
     TestRepeatedSigtermStaysGraceful();
     TestFailedInstallWarnsOnce();
     TestImageHoldLoopEndsOnOneRequest();
+    TestGtkExitWithoutADisplayIsRecognised();
 #endif
 }
 

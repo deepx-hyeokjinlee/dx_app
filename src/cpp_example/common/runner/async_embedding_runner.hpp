@@ -75,6 +75,9 @@ public:
 
         CommandLineArgs args = parseCommandLine(argc, argv);
         verbose_ = args.verbose;
+        // No display server: run as --no-display. Nothing can be shown, and the
+        // render thread would otherwise queue preview frames nobody takes.
+        if (!dxapp::hasDisplay()) args.no_display = true;
 
         if (verbose_) {
             std::cout << "[DXAPP] [INFO] --show-log: This task produces image-based output. "

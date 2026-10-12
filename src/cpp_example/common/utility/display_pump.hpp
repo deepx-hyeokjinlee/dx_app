@@ -61,12 +61,14 @@ namespace dxapp {
 /**
  * @brief Is a graphical display server available to this process?
  *
- * Needed because HighGUI's failure mode is backend-dependent and one of them is
- * fatal: with the GTK backend `cv::namedWindow()` throws a catchable
- * `cv::Exception` when there is no display, but with the **Qt** backend Qt fails
- * to load its `xcb` platform plugin and calls `qFatal()`, which `abort()`s the
- * process. No try/catch can rescue that, so the only safe option is to look
- * before we leap.
+ * Needed because HighGUI's failure mode is backend-dependent and can be fatal
+ * when there is no display. With the GTK backend of OpenCV >= 4.5
+ * `cv::namedWindow()` throws a catchable `cv::Exception`, but OpenCV < 4.5
+ * (apt 4.2 on Ubuntu 20.04) calls `gtk_init()`, which prints "cannot open
+ * display" and `exit(1)`s. With the **Qt** backend Qt fails to load its `xcb`
+ * platform plugin and calls `qFatal()`, which `abort()`s the process. No
+ * try/catch can rescue either, so the only safe option is to look before we
+ * leap.
  *
  * Mirrors `_has_display()` in the Python runners.
  */
