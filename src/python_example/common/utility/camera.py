@@ -110,15 +110,17 @@ def build_libcamera_pipeline(camera_id: str = "",
                              height: int = LIBCAMERA_DEFAULT_HEIGHT) -> str:
     """libcamerasrc pipeline string for OpenCV (BGR appsink).
 
-    An empty ``camera_id`` lets libcamerasrc take its first camera.
-    libcamerasrc negotiates its native raw format at this size; videoconvert
-    then produces the BGR frames OpenCV's appsink expects.
+    An empty ``camera_id`` lets libcamerasrc take its first camera. The caps
+    ask for a processed (ISP) NV12 stream: without an explicit format
+    libcamerasrc negotiates a raw Bayer stream that videoconvert cannot consume
+    ("Internal data stream error", seen on a Raspberry Pi). videoconvert then
+    produces the BGR frames OpenCV's appsink expects.
     """
     pipeline = "libcamerasrc"
     if camera_id:
         # camera-name takes the libcamera ID, not an index.
         pipeline += f' camera-name="{camera_id}"'
-    return (f"{pipeline} ! video/x-raw,width={width},height={height}"
+    return (f"{pipeline} ! video/x-raw,width={width},height={height},format=NV12"
             " ! videoconvert ! video/x-raw,format=BGR"
             " ! appsink drop=true max-buffers=2")
 

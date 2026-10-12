@@ -74,13 +74,13 @@ def test_libcamera_id_comes_from_the_camera_list():
 
 def test_libcamera_pipeline_string():
     assert camera.build_libcamera_pipeline("", 1280, 720) == (
-        "libcamerasrc ! video/x-raw,width=1280,height=720"
+        "libcamerasrc ! video/x-raw,width=1280,height=720,format=NV12"
         " ! videoconvert ! video/x-raw,format=BGR"
         " ! appsink drop=true max-buffers=2")
     assert camera.build_libcamera_pipeline(
         "/base/soc/i2c0mux/i2c@1/imx477@1a", 640, 480) == (
         'libcamerasrc camera-name="/base/soc/i2c0mux/i2c@1/imx477@1a"'
-        " ! video/x-raw,width=640,height=480"
+        " ! video/x-raw,width=640,height=480,format=NV12"
         " ! videoconvert ! video/x-raw,format=BGR"
         " ! appsink drop=true max-buffers=2")
 

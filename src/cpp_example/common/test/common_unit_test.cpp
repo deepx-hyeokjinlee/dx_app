@@ -2240,12 +2240,12 @@ void TestCameraLibcameraIdComesFromTheCameraList() {
 
 void TestCameraLibcameraPipelineString() {
     COMMON_CHECK(dxapp::buildLibcameraPipeline("", 1280, 720) ==
-                 "libcamerasrc ! video/x-raw,width=1280,height=720"
+                 "libcamerasrc ! video/x-raw,width=1280,height=720,format=NV12"
                  " ! videoconvert ! video/x-raw,format=BGR"
                  " ! appsink drop=true max-buffers=2");
     COMMON_CHECK(dxapp::buildLibcameraPipeline("/base/soc/i2c0mux/i2c@1/imx477@1a", 640, 480) ==
                  "libcamerasrc camera-name=\"/base/soc/i2c0mux/i2c@1/imx477@1a\""
-                 " ! video/x-raw,width=640,height=480"
+                 " ! video/x-raw,width=640,height=480,format=NV12"
                  " ! videoconvert ! video/x-raw,format=BGR"
                  " ! appsink drop=true max-buffers=2");
 }
