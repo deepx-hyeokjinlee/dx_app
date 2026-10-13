@@ -27,6 +27,7 @@ if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
 from test_helpers import utils  # noqa: E402
+from test_helpers.constants import EXCLUDED_EXAMPLE_VARIANTS  # noqa: E402
 
 
 def _variant_configs(root: Path) -> list:
@@ -78,11 +79,20 @@ def test_cpp_exe_task_map_matches_every_variant_config():
     mapping = utils.cpp_exe_task_map()
     wrong = []
     for variant_dir, task in CPP_VARIANTS:
+        # Kept on disk as source only, never built: cpp_exe_task_map skips them.
+        if variant_dir.name in EXCLUDED_EXAMPLE_VARIANTS:
+            continue
         for suffix in ("_sync", "_async"):
             exe = variant_dir.name + suffix
             if mapping.get(exe) != task:
                 wrong.append(f"{exe}: {mapping.get(exe)!r} != {task!r}")
     assert not wrong, f"{len(wrong)} executables:\n" + "\n".join(wrong[:20])
+
+
+def test_cpp_exe_task_map_leaves_out_the_source_only_examples():
+    listed = sorted(exe for exe in utils.cpp_exe_task_map()
+                    if exe.rsplit("_", 1)[0] in EXCLUDED_EXAMPLE_VARIANTS)
+    assert not listed, listed
 
 
 # ---------------------------------------------------------------------------
