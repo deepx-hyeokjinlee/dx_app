@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `unet_mobilenetv2_256x256` · DX-APP Python example
 
-U-Net (MobileNetV2) — semantic segmentation model, trained on OxfordIIITPet.
+Semantic Segmentation model, evaluated on OxfordIIITPet.
 
 **Input** 256 × 256 × 3 · **Dataset** OxfordIIITPet · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![U-Net (MobileNetV2) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/unet/unet_mobilenetv2_256x256/un
 
 ## Performance
 
-**216 FPS** and **848.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**216 FPS** and **848.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

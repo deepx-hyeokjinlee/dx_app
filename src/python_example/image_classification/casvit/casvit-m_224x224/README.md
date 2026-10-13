@@ -4,13 +4,13 @@
 
 Classification · `casvit-m_224x224` · DX-APP Python example
 
-CAS-ViT-M — classification model, trained on ImageNet.
+Classification model, evaluated on ImageNet.
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![CAS-ViT-M output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/casvit/casvit-m_224x224/casvit-m_
 
 ## Performance
 
-**504 FPS** and **557.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**504 FPS** and **557.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

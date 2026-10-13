@@ -4,13 +4,13 @@
 
 Object Detection · `yolov9-e_640x640_pre-optimized` · DX-APP Python example
 
-YOLOv9-e (Pre-Optimized) — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** GPL-3.0 · **Quantization** Q-Lite
 
 ![YOLOv9-e (Pre-Optimized) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

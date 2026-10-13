@@ -4,13 +4,13 @@
 
 Classification · `efficientnet-lite2_260x260` · DX-APP C++ example
 
-EfficientNet-Lite2 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 260 × 260 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![EfficientNet-Lite2 output](../../../../python_example/image_classification/efficientnet/efficientnet-lite2_260x260/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/efficientnet/efficientnet-lite2_260x260/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/efficientnet/efficientnet-lite2_260x260/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/efficientnet/efficientnet-lite2_2
 
 ## Performance
 
-**1,639 FPS** and **1,326.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,639 FPS** and **1,326.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

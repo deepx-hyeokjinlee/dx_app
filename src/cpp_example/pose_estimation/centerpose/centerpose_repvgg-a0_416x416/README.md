@@ -4,13 +4,13 @@
 
 Pose Estimation · `centerpose_repvgg-a0_416x416` · DX-APP C++ example
 
-CenterPose (RepVGG-A0) — pose estimation model, trained on COCOPose.
+Pose Estimation model, evaluated on COCOPose.
 
 **Input** 416 × 416 × 3 · **Dataset** COCOPose · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![CenterPose (RepVGG-A0) output](../../../../python_example/pose_estimation/centerpose/centerpose_repvgg-a0_416x416/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/pose_estimation/centerpose/centerpose_repvgg-a0_416x416/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/pose_estimation/centerpose/centerpose_repvgg-a0_416x416/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/pose_estimation/centerpose/centerpose_repvgg-a0_416x41
 
 ## Performance
 
-**326 FPS** and **135.5 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**326 FPS** and **135.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

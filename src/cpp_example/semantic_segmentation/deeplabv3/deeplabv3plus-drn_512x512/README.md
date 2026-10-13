@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `deeplabv3plus-drn_512x512` · DX-APP C++ example
 
-DeepLabV3+ (DRN) — semantic segmentation model, trained on PascalVOC2012.
+Semantic Segmentation model, evaluated on PascalVOC2012.
 
 **Input** 512 × 512 × 3 · **Dataset** PascalVOC2012 · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![DeepLabV3+ (DRN) output](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3plus-drn_512x512/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3plus-drn_512x512/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3plus-drn_512x512/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/deeplabv3/deeplabv3plus-drn_512x
 
 ## Performance
 
-**30 FPS** and **11.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**30 FPS** and **11.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `fcn8_resnet50_512x512` · DX-APP C++ example
 
-FCN-8s (ResNet-50) — semantic segmentation model, trained on PascalVOC2012.
+Semantic Segmentation model, evaluated on PascalVOC2012.
 
 **Input** 512 × 512 × 3 · **Dataset** PascalVOC2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![FCN-8s (ResNet-50) output](../../../../python_example/semantic_segmentation/fcn/fcn8_resnet50_512x512/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/fcn/fcn8_resnet50_512x512/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/fcn/fcn8_resnet50_512x512/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/fcn/fcn8_resnet50_512x512/fcn8_r
 
 ## Performance
 
-**31 FPS** and **14.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**31 FPS** and **14.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

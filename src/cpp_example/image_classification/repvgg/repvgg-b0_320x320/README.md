@@ -4,13 +4,13 @@
 
 Classification · `repvgg-b0_320x320` · DX-APP C++ example
 
-RepVGG-B0 — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 320 × 320 × 3 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite, Q-Pro, Q-Master
 
 ![RepVGG-B0 output](../../../../python_example/image_classification/repvgg/repvgg-b0_320x320/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/repvgg/repvgg-b0_320x320/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/repvgg/repvgg-b0_320x320/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/repvgg/repvgg-b0_320x320/repvgg-b
 
 ## Performance
 
-**1,326 FPS** and **454.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,326 FPS** and **454.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

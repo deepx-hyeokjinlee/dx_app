@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `segformer_mit-b0_512x1024` · DX-APP C++ example
 
-SegFormer (MiT-B0) — semantic segmentation model, trained on Cityscapes.
+Semantic Segmentation model, evaluated on Cityscapes.
 
 **Input** 1024 × 512 × 3 · **Dataset** Cityscapes · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![SegFormer (MiT-B0) output](../../../../python_example/semantic_segmentation/segformer/segformer_mit-b0_512x1024/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/segformer/segformer_mit-b0_512x1024/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/segformer/segformer_mit-b0_512x1024/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/segformer/segformer_mit-b0_512x1
 
 ## Performance
 
-**366 FPS** and **1,386.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**366 FPS** and **1,386.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

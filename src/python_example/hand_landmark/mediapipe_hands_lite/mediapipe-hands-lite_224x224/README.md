@@ -4,13 +4,13 @@
 
 Hand Landmark · `mediapipe-hands-lite_224x224` · DX-APP Python example
 
-MediaPipe Hands (Lite) — hand landmark model, trained on HandKeypoints.
+Hand Landmark model, evaluated on HandKeypoints.
 
 **Input** 224 × 224 × 3 · **Dataset** HandKeypoints · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![MediaPipe Hands (Lite) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/hand_landmark/mediapipe_hands_lite/mediapipe-hands-lit
 
 ## Performance
 
-**5,142 FPS** and **5,773.5 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**5,142 FPS** and **5,773.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

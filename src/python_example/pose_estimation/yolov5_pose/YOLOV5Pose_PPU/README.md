@@ -4,7 +4,7 @@
 
 Pose Estimation · `YOLOV5Pose_PPU` · DX-APP Python example
 
-YOLOV5Pose_PPU — pose estimation model, trained on COCO.
+Pose Estimation model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** GPL-3.0
 
@@ -12,7 +12,7 @@ YOLOV5Pose_PPU — pose estimation model, trained on COCO.
 
 ![YOLOV5Pose_PPU output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

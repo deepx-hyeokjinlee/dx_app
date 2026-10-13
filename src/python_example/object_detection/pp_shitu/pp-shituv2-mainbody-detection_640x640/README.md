@@ -4,13 +4,13 @@
 
 Object Detection · `pp-shituv2-mainbody-detection_640x640` · DX-APP Python example
 
-PP-ShiTuV2_mainbody_detection — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![PP-ShiTuV2_mainbody_detection output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

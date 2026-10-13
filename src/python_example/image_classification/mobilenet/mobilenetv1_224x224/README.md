@@ -4,13 +4,13 @@
 
 Classification · `mobilenetv1_224x224` · DX-APP Python example
 
-MobileNetV1 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![MobileNetV1 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/mobilenet/mobilenetv1_224x224/mob
 
 ## Performance
 
-**4,651 FPS** and **2,954.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**4,651 FPS** and **2,954.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

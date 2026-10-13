@@ -4,13 +4,13 @@
 
 Zero-Shot Classification · `clip-img_vit-l14-quickgelu_224x224_dfn2b` · DX-APP C++ example
 
-CLIP ViT-L/14 QuickGELU (DFN-2B) — zero-shot classification model, trained on ILSVRC2012.
+Zero-Shot Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![CLIP ViT-L/14 QuickGELU (DFN-2B) output](../../../../python_example/zero_shot_image_classification/clip/clip-img_vit-l14-quickgelu_224x224_dfn2b/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/zero_shot_image_classification/clip/clip-img_vit-l14-quickgelu_224x224_dfn2b/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/zero_shot_image_classification/clip/clip-img_vit-l14-quickgelu_224x224_dfn2b/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_vit-l14-q
 
 ## Performance
 
-**22 FPS** and **19.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**22 FPS** and **19.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

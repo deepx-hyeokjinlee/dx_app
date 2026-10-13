@@ -4,13 +4,13 @@
 
 OBB Detection · `yolo26-n-obb_1024x1024` · DX-APP Python example
 
-Ultralytics YOLO26-n-obb — obb detection model, trained on DOTAv1.
+OBB Detection model, evaluated on DOTAv1.
 
 **Input** 1024 × 1024 × 3 · **Dataset** DOTAv1 · **License** AGPL-3.0 · **Quantization** Q-Lite, Q-Pro, Q-Master
 
 ![Ultralytics YOLO26-n-obb output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/oriented_object_detection/yolo26_obb/yolo26-n-obb_1024
 
 ## Performance
 
-**104 FPS** and **150.5 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**104 FPS** and **150.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

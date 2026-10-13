@@ -4,13 +4,13 @@
 
 Depth Estimation · `yolo26-depth-s_768x768` · DX-APP Python example
 
-Ultralytics YOLO26-s-depth — depth estimation model, trained on NYUDepthv2.
+Depth Estimation model, evaluated on NYUDepthv2.
 
 **Input** 768 × 768 · **Dataset** NYUDepthv2 · **License** AGPL-3.0 · **Quantization** Q-Lite
 
 ![Ultralytics YOLO26-s-depth output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/depth_estimation/yolo26_depth/yolo26-depth-s_768x768/y
 
 ## Performance
 
-**84 FPS** and **50.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**84 FPS** and **50.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

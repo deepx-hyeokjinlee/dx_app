@@ -4,13 +4,13 @@
 
 Zero-Shot Segmentation · `fastsam-s_1024x1024` · DX-APP C++ example
 
-FastSAM-s — zero-shot segmentation model, trained on COCO.
+Zero-Shot Segmentation model, evaluated on COCO.
 
 **Input** 1024 × 1024 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![FastSAM-s output](../../../../python_example/zero_shot_instance_segmentation/fastsam/fastsam-s_1024x1024/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/zero_shot_instance_segmentation/fastsam/fastsam-s_1024x1024/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/zero_shot_instance_segmentation/fastsam/fastsam-s_1024x1024/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/zero_shot_instance_segmentation/fastsam/fastsam-s_1024
 
 ## Performance
 
-**87 FPS** and **35.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**87 FPS** and **35.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

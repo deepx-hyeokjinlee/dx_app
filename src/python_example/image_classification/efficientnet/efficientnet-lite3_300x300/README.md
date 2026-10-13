@@ -4,13 +4,13 @@
 
 Classification · `efficientnet-lite3_300x300` · DX-APP Python example
 
-EfficientNet-Lite3 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 300 × 300 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![EfficientNet-Lite3 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/efficientnet/efficientnet-lite3_3
 
 ## Performance
 
-**1,031 FPS** and **798.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,031 FPS** and **798.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

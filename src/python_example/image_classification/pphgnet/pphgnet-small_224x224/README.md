@@ -4,13 +4,13 @@
 
 Classification · `pphgnet-small_224x224` · DX-APP Python example
 
-PPHGNet_small — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![PPHGNet_small output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

@@ -4,13 +4,13 @@
 
 Classification · `levit-128s_224x224` · DX-APP C++ example
 
-LeViT-128S — classification model, trained on ImageNet.
+Classification model, evaluated on ImageNet.
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Master
 
 ![LeViT-128S output](../../../../python_example/image_classification/levit/levit-128s_224x224/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/levit/levit-128s_224x224/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/levit/levit-128s_224x224/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/levit/levit-128s_224x224/levit-12
 
 ## Performance
 
-**938 FPS** and **1,949.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**938 FPS** and **1,949.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Face Detection · `scrfd-10g_640x640` · DX-APP Python example
 
-SCRFD-10G — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 640 × 640 × 3 · **Dataset** WiderFace · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![SCRFD-10G output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/scrfd/scrfd-10g_640x640/scrfd-10g_640x6
 
 ## Performance
 
-**341 FPS** and **136.6 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**341 FPS** and **136.6 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

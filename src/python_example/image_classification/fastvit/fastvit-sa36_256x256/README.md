@@ -4,13 +4,13 @@
 
 Classification · `fastvit-sa36_256x256` · DX-APP Python example
 
-FastViT-SA36 — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 256 × 256 × 3 · **Dataset** ILSVRC2012 · **License** Apple Sample Code License · **Quantization** Q-Lite, Q-Pro
 
 ![FastViT-SA36 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/fastvit/fastvit-sa36_256x256/fast
 
 ## Performance
 
-**117 FPS** and **142.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**117 FPS** and **142.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

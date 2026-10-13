@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `stdc1-seg50_512x1024` · DX-APP Python example
 
-STDC1-Seg50 — semantic segmentation model, trained on Cityscapes.
+Semantic Segmentation model, evaluated on Cityscapes.
 
 **Input** 512 × 1024 × 3 · **Dataset** Cityscapes · **License** MIT · **Quantization** Q-Lite
 
 ![STDC1-Seg50 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

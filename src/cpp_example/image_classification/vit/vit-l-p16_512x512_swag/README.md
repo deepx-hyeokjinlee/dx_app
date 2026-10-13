@@ -4,11 +4,11 @@
 
 Classification · `vit-l-p16_512x512_swag` · DX-APP C++ example
 
-vit-l-p16_512x512_swag — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 512 × 512 × 3 · **Dataset** ILSVRC2012 · **License** BSD-3-Clause · **Quantization** Q-Lite
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/vit/vit-l-p16_512x512_swag/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/vit/vit-l-p16_512x512_swag/model.html)
 
 ## Quick start
 

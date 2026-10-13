@@ -4,13 +4,13 @@
 
 Object Detection · `yolov7-e6_1280x1280` · DX-APP C++ example
 
-YOLOv7-e6 — object detection model, trained on COCO 2017.
+Object Detection model, evaluated on COCO 2017.
 
 **Input** 1280 × 1280 × 3 · **Dataset** COCO 2017 · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOv7-e6 output](../../../../python_example/object_detection/yolov7/yolov7-e6_1280x1280/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolov7/yolov7-e6_1280x1280/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolov7/yolov7-e6_1280x1280/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolov7/yolov7-e6_1280x1280/yolov7-e6_
 
 ## Performance
 
-**24 FPS** and **7.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**24 FPS** and **7.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

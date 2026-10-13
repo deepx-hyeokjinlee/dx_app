@@ -4,13 +4,13 @@
 
 Object Detection · `yolox-s_640x640` · DX-APP C++ example
 
-YOLOX-s — object detection model, trained on COCO 2017.
+Object Detection model, evaluated on COCO 2017.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO 2017 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOX-s output](../../../../python_example/object_detection/yolox/yolox-s_640x640/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolox/yolox-s_640x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolox/yolox-s_640x640/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolox/yolox-s_640x640/yolox-s_640x640
 
 ## Performance
 
-**398 FPS** and **140.5 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**398 FPS** and **140.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

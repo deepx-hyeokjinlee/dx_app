@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `stdc2-seg75_768x1536` · DX-APP Python example
 
-STDC2-Seg75 — semantic segmentation model, trained on Cityscapes.
+Semantic Segmentation model, evaluated on Cityscapes.
 
 **Input** 768 × 1536 × 3 · **Dataset** Cityscapes · **License** MIT · **Quantization** Q-Lite
 
 ![STDC2-Seg75 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

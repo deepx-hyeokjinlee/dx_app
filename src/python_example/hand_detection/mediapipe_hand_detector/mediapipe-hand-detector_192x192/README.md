@@ -4,13 +4,13 @@
 
 Hand Detection · `mediapipe-hand-detector_192x192` · DX-APP Python example
 
-MediaPipe Hand (Palm) Detector — hand detection model, trained on HandKeypointsDetection.
+Hand Detection model, evaluated on HandKeypointsDetection.
 
 **Input** 192 × 192 × 3 · **Dataset** HandKeypointsDetection · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![MediaPipe Hand (Palm) Detector output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/hand_detection/mediapipe_hand_detector/mediapipe-hand-
 
 ## Performance
 
-**382 FPS** and **916.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**382 FPS** and **916.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Classification · `resmlp24_224x224` · DX-APP Python example
 
-ResMLP-24 — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![ResMLP-24 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/resmlp/resmlp24_224x224/resmlp24_
 
 ## Performance
 
-**361 FPS** and **283.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**361 FPS** and **283.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

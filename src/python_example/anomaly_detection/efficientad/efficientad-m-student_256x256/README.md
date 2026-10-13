@@ -4,13 +4,13 @@
 
 Anomaly Detection · `efficientad-m-student_256x256` · DX-APP Python example
 
-EfficientAD-M Student — anomaly detection model, trained on MVTecAD.
+Anomaly Detection model, evaluated on MVTecAD.
 
 **Input** 256 × 256 × 3 · **Dataset** MVTecAD · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![EfficientAD-M Student output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

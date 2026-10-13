@@ -4,13 +4,13 @@
 
 Depth Estimation · `scdepthv3_256x320` · DX-APP Python example
 
-SC-DepthV3 — depth estimation model, trained on NYUDepthv2.
+Depth Estimation model, evaluated on NYUDepthv2.
 
 **Input** 320 × 256 × 3 · **Dataset** NYUDepthv2 · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![SC-DepthV3 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/depth_estimation/scdepthv3/scdepthv3_256x320/scdepthv3
 
 ## Performance
 
-**334 FPS** and **300.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**334 FPS** and **300.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

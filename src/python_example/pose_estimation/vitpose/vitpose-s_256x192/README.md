@@ -4,13 +4,13 @@
 
 Pose Estimation · `vitpose-s_256x192` · DX-APP Python example
 
-ViTPose-S — pose estimation model, trained on COCOPoseTopDown.
+Pose Estimation model, evaluated on COCOPoseTopDown.
 
 **Input** 256 × 192 × 3 · **Dataset** COCOPoseTopDown · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![ViTPose-S output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/pose_estimation/vitpose/vitpose-s_256x192/vitpose-s_25
 
 ## Performance
 
-**99 FPS** and **153.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**99 FPS** and **153.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

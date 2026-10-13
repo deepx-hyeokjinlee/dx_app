@@ -4,13 +4,13 @@
 
 Object Detection · `yolov4_512x512_ppu` · DX-APP C++ example
 
-YOLOv4 (PPU) — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 512 × 512 × 3 · **Dataset** COCO · **License** Public Domain · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOv4 (PPU) output](../../../../python_example/object_detection/yolo_ppu/yolov4_512x512_ppu/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolo_ppu/yolov4_512x512_ppu/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolo_ppu/yolov4_512x512_ppu/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolo_ppu/yolov4_512x512_ppu/yolov4_51
 
 ## Performance
 
-**160 FPS** and **43.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**160 FPS** and **43.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

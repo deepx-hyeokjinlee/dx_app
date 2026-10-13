@@ -4,13 +4,13 @@
 
 Classification · `densenet169_224x224` · DX-APP C++ example
 
-DenseNet-169 — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![DenseNet-169 output](../../../../python_example/image_classification/densenet/densenet169_224x224/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/densenet/densenet169_224x224/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/densenet/densenet169_224x224/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/densenet/densenet169_224x224/dens
 
 ## Performance
 
-**69 FPS** and **170.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**69 FPS** and **170.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

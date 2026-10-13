@@ -4,13 +4,13 @@
 
 Classification · `mnasnet-0.5_224x224` · DX-APP Python example
 
-MnasNet-0.5 — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![MnasNet-0.5 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/mnasnet/mnasnet-0.5_224x224/mnasn
 
 ## Performance
 
-**7,307 FPS** and **6,992.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**7,307 FPS** and **6,992.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

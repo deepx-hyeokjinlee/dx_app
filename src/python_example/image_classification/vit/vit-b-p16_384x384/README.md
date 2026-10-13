@@ -4,13 +4,13 @@
 
 Classification · `vit-b-p16_384x384` · DX-APP Python example
 
-ViT-Base/16 (384x384) — classification model, trained on ImageNet.
+Classification model, evaluated on ImageNet.
 
 **Input** 384 × 384 × 3 · **Dataset** ImageNet · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Master
 
 ![ViT-Base/16 (384x384) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/vit/vit-b-p16_384x384/vit-b-p16_3
 
 ## Performance
 
-**21 FPS** and **25.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**21 FPS** and **25.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Face Detection · `yolov7-w6-face_960x960` · DX-APP C++ example
 
-YOLOv7-w6-face — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 960 × 960 × 3 · **Dataset** WiderFace · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOv7-w6-face output](../../../../python_example/face_detection/yolov7_face/yolov7-w6-face_960x960/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/face_detection/yolov7_face/yolov7-w6-face_960x960/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/face_detection/yolov7_face/yolov7-w6-face_960x960/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/yolov7_face/yolov7-w6-face_960x960/yolo
 
 ## Performance
 
-**77 FPS** and **21.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**77 FPS** and **21.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

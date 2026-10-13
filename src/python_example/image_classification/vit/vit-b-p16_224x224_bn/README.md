@@ -4,13 +4,13 @@
 
 Classification · `vit-b-p16_224x224_bn` · DX-APP Python example
 
-ViT-Base/16 (BN) — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![ViT-Base/16 (BN) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/vit/vit-b-p16_224x224_bn/vit-b-p1
 
 ## Performance
 
-**86 FPS** and **89.6 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**86 FPS** and **89.6 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Classification · `resnet34_224x224` · DX-APP Python example
 
-ResNet-34 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![ResNet-34 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/resnet/resnet34_224x224/resnet34_
 
 ## Performance
 
-**1,454 FPS** and **574.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,454 FPS** and **574.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

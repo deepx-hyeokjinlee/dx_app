@@ -4,13 +4,13 @@
 
 Panoptic Driving Perception · `yolopv2_384x640` · DX-APP C++ example
 
-YOLOPv2 — panoptic driving perception model, trained on BDD100K.
+Panoptic Driving Perception model, evaluated on BDD100K.
 
 **Input** 384 × 640 × 3 · **Dataset** BDD100K · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOPv2 output](../../../../python_example/panoptic_driving_perception/yolopv2/yolopv2_384x640/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/panoptic_driving_perception/yolopv2/yolopv2_384x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/panoptic_driving_perception/yolopv2/yolopv2_384x640/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/panoptic_driving_perception/yolopv2/yolopv2_384x640/yo
 
 ## Performance
 
-**36 FPS** and **39.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**36 FPS** and **39.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

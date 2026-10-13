@@ -4,13 +4,13 @@
 
 Visual Place Recognition · `pp-shituv2-feature-extraction_224x224` · DX-APP C++ example
 
-PP-ShiTuV2_feature_extraction — visual place recognition model, trained on HPatches.
+Visual Place Recognition model, evaluated on HPatches.
 
 **Input** 224 × 224 × 3 · **Dataset** HPatches · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![PP-ShiTuV2_feature_extraction output](../../../../python_example/visual_place_recognition/pp_shitu_rec/pp-shituv2-feature-extraction_224x224/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/visual_place_recognition/pp_shitu_rec/pp-shituv2-feature-extraction_224x224/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/visual_place_recognition/pp_shitu_rec/pp-shituv2-feature-extraction_224x224/model.html)
 
 ## Quick start
 

@@ -4,13 +4,13 @@
 
 Instance Segmentation · `mask-rtdetr-hgnetv2-l-6x_640x640` · DX-APP C++ example
 
-mask_rtdetr_hgnetv2_l_6x_coco — instance segmentation model, trained on COCO.
+Instance Segmentation model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![mask_rtdetr_hgnetv2_l_6x_coco output](../../../../python_example/instance_segmentation/mask_rtdetr/mask-rtdetr-hgnetv2-l-6x_640x640/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/instance_segmentation/mask_rtdetr/mask-rtdetr-hgnetv2-l-6x_640x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/instance_segmentation/mask_rtdetr/mask-rtdetr-hgnetv2-l-6x_640x640/model.html)
 
 ## Quick start
 

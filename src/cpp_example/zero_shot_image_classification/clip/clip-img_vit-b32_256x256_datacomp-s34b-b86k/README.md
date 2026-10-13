@@ -4,13 +4,13 @@
 
 Zero-Shot Classification · `clip-img_vit-b32_256x256_datacomp-s34b-b86k` · DX-APP C++ example
 
-CLIP ViT-B/32 (DataComp) — zero-shot classification model, trained on ILSVRC2012.
+Zero-Shot Classification model, evaluated on ILSVRC2012.
 
 **Input** 256 × 256 × 3 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![CLIP ViT-B/32 (DataComp) output](../../../../python_example/zero_shot_image_classification/clip/clip-img_vit-b32_256x256_datacomp-s34b-b86k/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/zero_shot_image_classification/clip/clip-img_vit-b32_256x256_datacomp-s34b-b86k/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/zero_shot_image_classification/clip/clip-img_vit-b32_256x256_datacomp-s34b-b86k/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_vit-b32_2
 
 ## Performance
 
-**195 FPS** and **246.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**195 FPS** and **246.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,7 +4,7 @@
 
 Face Detection · `SCRFD500M_PPU` · DX-APP Python example
 
-SCRFD500M_PPU — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 640 × 640 × 3 · **Dataset** WiderFace · **License** MIT
 
@@ -12,7 +12,7 @@ SCRFD500M_PPU — face detection model, trained on WiderFace.
 
 ![SCRFD500M_PPU output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

@@ -4,13 +4,13 @@
 
 Object Detection · `yolov4-leaky_512x512` · DX-APP C++ example
 
-YOLOv4-leaky — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 512 × 512 × 3 · **Dataset** COCO · **License** Public Domain · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOv4-leaky output](../../../../python_example/object_detection/yolov4/yolov4-leaky_512x512/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolov4/yolov4-leaky_512x512/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolov4/yolov4-leaky_512x512/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolov4/yolov4-leaky_512x512/yolov4-le
 
 ## Performance
 
-**151 FPS** and **41.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**151 FPS** and **41.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Object Detection · `yolov6-m6_1280x1280` · DX-APP C++ example
 
-yolov6-m6_1280x1280 — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 1280 × 1280 × 3 · **Dataset** COCO · **License** GPL-3.0 · **Quantization** Q-Lite
 
 ![yolov6-m6_1280x1280 output](../../../../python_example/object_detection/yolov6/yolov6-m6_1280x1280/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolov6/yolov6-m6_1280x1280/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolov6/yolov6-m6_1280x1280/model.html)
 
 ## Quick start
 

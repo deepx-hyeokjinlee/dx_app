@@ -4,13 +4,13 @@
 
 Classification · `efficientnet-b4_380x380` · DX-APP C++ example
 
-EfficientNet-B4 — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 380 × 380 × 3 · **Dataset** ILSVRC2012 · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![EfficientNet-B4 output](../../../../python_example/image_classification/efficientnet/efficientnet-b4_380x380/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/efficientnet/efficientnet-b4_380x380/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/efficientnet/efficientnet-b4_380x380/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/efficientnet/efficientnet-b4_380x
 
 ## Performance
 
-**274 FPS** and **255.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**274 FPS** and **255.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

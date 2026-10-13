@@ -4,13 +4,13 @@
 
 Re-Identification · `repvgg-a0-reid_256x128` · DX-APP C++ example
 
-RepVGG-A0 Person ReID — re-identification model, trained on Market1501.
+Re-Identification model, evaluated on Market1501.
 
 **Input** 256 × 128 × 3 · **Dataset** Market1501 · **License** MIT · **Quantization** Q-Lite
 
 ![RepVGG-A0 Person ReID output](../../../../python_example/person_reid/repvgg_reid/repvgg-a0-reid_256x128/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/person_reid/repvgg_reid/repvgg-a0-reid_256x128/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/person_reid/repvgg_reid/repvgg-a0-reid_256x128/model.html)
 
 ## Quick start
 

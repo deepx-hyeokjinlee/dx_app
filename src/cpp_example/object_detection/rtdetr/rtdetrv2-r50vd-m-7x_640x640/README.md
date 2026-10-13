@@ -4,13 +4,13 @@
 
 Object Detection · `rtdetrv2-r50vd-m-7x_640x640` · DX-APP C++ example
 
-rtdetrv2_r50vd_m_7x_coco — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![rtdetrv2_r50vd_m_7x_coco output](../../../../python_example/object_detection/rtdetr/rtdetrv2-r50vd-m-7x_640x640/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/rtdetr/rtdetrv2-r50vd-m-7x_640x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/rtdetr/rtdetrv2-r50vd-m-7x_640x640/model.html)
 
 ## Quick start
 

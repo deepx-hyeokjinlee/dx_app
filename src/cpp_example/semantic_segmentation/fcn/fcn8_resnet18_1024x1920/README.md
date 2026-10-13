@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `fcn8_resnet18_1024x1920` · DX-APP C++ example
 
-FCN-8s (ResNet-18) — semantic segmentation model, trained on Cityscapes.
+Semantic Segmentation model, evaluated on Cityscapes.
 
 **Input** 1024 × 1920 × 3 · **Dataset** Cityscapes · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![FCN-8s (ResNet-18) output](../../../../python_example/semantic_segmentation/fcn/fcn8_resnet18_1024x1920/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/fcn/fcn8_resnet18_1024x1920/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/fcn/fcn8_resnet18_1024x1920/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/fcn/fcn8_resnet18_1024x1920/fcn8
 
 ## Performance
 
-**104 FPS** and **38.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**104 FPS** and **38.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

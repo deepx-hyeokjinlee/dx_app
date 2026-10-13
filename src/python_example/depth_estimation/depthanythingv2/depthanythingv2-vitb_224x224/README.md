@@ -4,13 +4,13 @@
 
 Depth Estimation · `depthanythingv2-vitb_224x224` · DX-APP Python example
 
-Depth-Anything-V2-ViT-B — depth estimation model, trained on NYUDepthv2.
+Depth Estimation model, evaluated on NYUDepthv2.
 
 **Input** 224 × 224 × 3 · **Dataset** NYUDepthv2 · **License** CC BY-NC 4.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Depth-Anything-V2-ViT-B output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/depth_estimation/depthanythingv2/depthanythingv2-vitb_
 
 ## Performance
 
-**50 FPS** and **52.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**50 FPS** and **52.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

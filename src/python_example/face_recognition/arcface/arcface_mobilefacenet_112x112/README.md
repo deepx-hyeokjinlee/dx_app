@@ -4,13 +4,13 @@
 
 Embedding · `arcface_mobilefacenet_112x112` · DX-APP Python example
 
-ArcFace MobileFaceNet — embedding model, trained on LFW.
+Embedding model, evaluated on LFW.
 
 **Input** 112 × 112 × 3 · **Dataset** LFW · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![ArcFace MobileFaceNet output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_recognition/arcface/arcface_mobilefacenet_112x112
 
 ## Performance
 
-**2,463 FPS** and **3,240.5 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**2,463 FPS** and **3,240.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

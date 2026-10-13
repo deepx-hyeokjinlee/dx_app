@@ -4,13 +4,13 @@
 
 Object Detection · `efficientdet-d4_1024x1024` · DX-APP Python example
 
-EfficientDet-D4 — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 1024 × 1024 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![EfficientDet-D4 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/efficientdet/efficientdet-d4_1024x102
 
 ## Performance
 
-**12 FPS** and **19.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**12 FPS** and **19.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

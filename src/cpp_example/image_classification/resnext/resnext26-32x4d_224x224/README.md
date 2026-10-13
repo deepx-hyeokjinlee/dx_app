@@ -4,13 +4,13 @@
 
 Classification · `resnext26-32x4d_224x224` · DX-APP C++ example
 
-ResNeXt-26 (32x4d) — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![ResNeXt-26 (32x4d) output](../../../../python_example/image_classification/resnext/resnext26-32x4d_224x224/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/resnext/resnext26-32x4d_224x224/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/resnext/resnext26-32x4d_224x224/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/resnext/resnext26-32x4d_224x224/r
 
 ## Performance
 
-**833 FPS** and **608.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**833 FPS** and **608.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

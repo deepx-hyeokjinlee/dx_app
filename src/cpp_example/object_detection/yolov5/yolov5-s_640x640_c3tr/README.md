@@ -4,13 +4,13 @@
 
 Object Detection · `yolov5-s_640x640_c3tr` · DX-APP C++ example
 
-Ultralytics YOLOv5-s (C3TR) — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Ultralytics YOLOv5-s (C3TR) output](../../../../python_example/object_detection/yolov5/yolov5-s_640x640_c3tr/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolov5/yolov5-s_640x640_c3tr/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolov5/yolov5-s_640x640_c3tr/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolov5/yolov5-s_640x640_c3tr/yolov5-s
 
 ## Performance
 
-**292 FPS** and **208.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**292 FPS** and **208.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

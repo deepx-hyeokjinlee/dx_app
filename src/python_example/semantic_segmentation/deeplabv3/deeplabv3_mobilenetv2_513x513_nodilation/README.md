@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `deeplabv3_mobilenetv2_513x513_nodilation` · DX-APP Python example
 
-DeepLabV3 (MobileNetV2, no-dilation) — semantic segmentation model, trained on PascalVOC2012.
+Semantic Segmentation model, evaluated on PascalVOC2012.
 
 **Input** 513 × 513 × 3 · **Dataset** PascalVOC2012 · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![DeepLabV3 (MobileNetV2, no-dilation) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/deeplabv3/deeplabv3_mobilenetv2_
 
 ## Performance
 
-**501 FPS** and **629.9 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**501 FPS** and **629.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

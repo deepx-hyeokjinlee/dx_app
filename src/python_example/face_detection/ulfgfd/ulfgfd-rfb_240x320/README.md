@@ -4,13 +4,13 @@
 
 Face Detection · `ulfgfd-rfb_240x320` · DX-APP Python example
 
-ULFGFD-RFB (240x320) — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 320 × 240 × 3 · **Dataset** WiderFace · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![ULFGFD-RFB (240x320) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/ulfgfd/ulfgfd-rfb_240x320/ulfgfd-rfb_24
 
 ## Performance
 
-**3,911 FPS** and **7,144.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**3,911 FPS** and **7,144.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

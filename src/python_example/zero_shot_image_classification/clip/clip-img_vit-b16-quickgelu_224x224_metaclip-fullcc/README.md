@@ -4,13 +4,13 @@
 
 Zero-Shot Classification · `clip-img_vit-b16-quickgelu_224x224_metaclip-fullcc` · DX-APP Python example
 
-CLIP ViT-B/16 QuickGELU (MetaCLIP FullCC) — zero-shot classification model, trained on ILSVRC2012.
+Zero-Shot Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite
 
 ![CLIP ViT-B/16 QuickGELU (MetaCLIP FullCC) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

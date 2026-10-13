@@ -4,13 +4,13 @@
 
 Image Enhancement · `zerodce-pp_400x600` · DX-APP C++ example
 
-Zero-DCE++ — image enhancement model, trained on LOL.
+Image Enhancement model, evaluated on LOL.
 
 **Input** 400 × 600 × 3 · **Dataset** LOL · **License** Non-commercial · **Quantization** Q-Lite, Q-Pro
 
 ![Zero-DCE++ output](../../../../python_example/low_light_enhancement/zerodce/zerodce-pp_400x600/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/low_light_enhancement/zerodce/zerodce-pp_400x600/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/low_light_enhancement/zerodce/zerodce-pp_400x600/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/low_light_enhancement/zerodce/zerodce-pp_400x600/zerod
 
 ## Performance
 
-**33 FPS** and **116.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**33 FPS** and **116.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

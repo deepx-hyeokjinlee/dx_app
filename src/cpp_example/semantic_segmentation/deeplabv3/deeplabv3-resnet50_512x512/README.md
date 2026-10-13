@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `deeplabv3-resnet50_512x512` · DX-APP C++ example
 
-DeepLabV3 (ResNet-50) — semantic segmentation model, trained on PascalVOC2012.
+Semantic Segmentation model, evaluated on PascalVOC2012.
 
 **Input** 512 × 512 × 3 · **Dataset** PascalVOC2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![DeepLabV3 (ResNet-50) output](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3-resnet50_512x512/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3-resnet50_512x512/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3-resnet50_512x512/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/deeplabv3/deeplabv3-resnet50_512
 
 ## Performance
 
-**132 FPS** and **43.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**132 FPS** and **43.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

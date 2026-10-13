@@ -4,13 +4,13 @@
 
 Visual Place Recognition · `pp-shituv2-feature-extraction_224x224` · DX-APP Python example
 
-PP-ShiTuV2_feature_extraction — visual place recognition model, trained on HPatches.
+Visual Place Recognition model, evaluated on HPatches.
 
 **Input** 224 × 224 × 3 · **Dataset** HPatches · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![PP-ShiTuV2_feature_extraction output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

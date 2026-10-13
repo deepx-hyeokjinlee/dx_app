@@ -4,13 +4,13 @@
 
 Object Detection · `damoyolo-tinynas-l25s_640x640` · DX-APP Python example
 
-DAMO-YOLO TinyNAS-L25S — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![DAMO-YOLO TinyNAS-L25S output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/damoyolo/damoyolo-tinynas-l25s_640x64
 
 ## Performance
 
-**167 FPS** and **106.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**167 FPS** and **106.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

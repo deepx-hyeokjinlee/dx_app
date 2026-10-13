@@ -4,13 +4,13 @@
 
 Classification · `vgg11_224x224` · DX-APP Python example
 
-VGG-11 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![VGG-11 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/vgg/vgg11_224x224/vgg11_224x224_s
 
 ## Performance
 
-**297 FPS** and **253.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**297 FPS** and **253.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

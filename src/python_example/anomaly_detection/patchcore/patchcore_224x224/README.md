@@ -4,13 +4,13 @@
 
 Anomaly Detection · `patchcore_224x224` · DX-APP Python example
 
-PatchCore 224x224 — anomaly detection model, trained on MVTecAD.
+Anomaly Detection model, evaluated on MVTecAD.
 
 **Input** 224 × 224 × 3 · **Dataset** MVTecAD · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![PatchCore 224x224 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

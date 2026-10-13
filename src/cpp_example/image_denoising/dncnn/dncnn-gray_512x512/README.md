@@ -4,13 +4,13 @@
 
 Image Denoising · `dncnn-gray_512x512` · DX-APP C++ example
 
-DnCNN-gray — image denoising model, trained on BSD68.
+Image Denoising model, evaluated on BSD68.
 
 **Input** 512 × 512 × 1 · **Dataset** BSD68 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![DnCNN-gray output](../../../../python_example/image_denoising/dncnn/dncnn-gray_512x512/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_denoising/dncnn/dncnn-gray_512x512/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_denoising/dncnn/dncnn-gray_512x512/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_denoising/dncnn/dncnn-gray_512x512/dncnn-gray_51
 
 ## Performance
 
-**44 FPS** and **12.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**44 FPS** and **12.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

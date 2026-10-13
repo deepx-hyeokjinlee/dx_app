@@ -4,13 +4,13 @@
 
 Super Resolution · `espcn-x2_17x17` · DX-APP Python example
 
-ESPCN-x2 — super resolution model, trained on BSD100.
+Super Resolution model, evaluated on BSD100.
 
 **Input** 17 × 17 × 1 · **Dataset** BSD100 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![ESPCN-x2 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/super_resolution/espcn/espcn-x2_17x17/espcn-x2_17x17_s
 
 ## Performance
 
-**19,132 FPS** and **91,867.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**19,132 FPS** and **91,867.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

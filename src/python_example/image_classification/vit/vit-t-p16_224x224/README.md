@@ -4,13 +4,13 @@
 
 Classification · `vit-t-p16_224x224` · DX-APP Python example
 
-ViT-Tiny/16 — classification model, trained on ImageNet.
+Classification model, evaluated on ImageNet.
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Master
 
 ![ViT-Tiny/16 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/vit/vit-t-p16_224x224/vit-t-p16_2
 
 ## Performance
 
-**602 FPS** and **818.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**602 FPS** and **818.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

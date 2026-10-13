@@ -4,13 +4,13 @@
 
 Classification · `efficientnet-b2_288x288` · DX-APP C++ example
 
-EfficientNet-B2 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 288 × 288 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![EfficientNet-B2 output](../../../../python_example/image_classification/efficientnet/efficientnet-b2_288x288/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/efficientnet/efficientnet-b2_288x288/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/efficientnet/efficientnet-b2_288x288/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/efficientnet/efficientnet-b2_288x
 
 ## Performance
 
-**743 FPS** and **834.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**743 FPS** and **834.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

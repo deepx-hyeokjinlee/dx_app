@@ -4,13 +4,13 @@
 
 Classification · `resnet18_224x224_brecq` · DX-APP C++ example
 
-ResNet-18 (BRECQ) — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 · **Dataset** ILSVRC2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![ResNet-18 (BRECQ) output](../../../../python_example/image_classification/resnet/resnet18_224x224_brecq/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/resnet/resnet18_224x224_brecq/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/resnet/resnet18_224x224_brecq/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/resnet/resnet18_224x224_brecq/res
 
 ## Performance
 
-**2,580 FPS** and **1,143.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**2,580 FPS** and **1,143.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

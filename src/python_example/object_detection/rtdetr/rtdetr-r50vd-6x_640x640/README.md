@@ -4,13 +4,13 @@
 
 Object Detection · `rtdetr-r50vd-6x_640x640` · DX-APP Python example
 
-rtdetr_r50vd_6x_coco — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![rtdetr_r50vd_6x_coco output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

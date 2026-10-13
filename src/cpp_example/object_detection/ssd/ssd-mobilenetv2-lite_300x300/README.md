@@ -4,13 +4,13 @@
 
 Object Detection · `ssd-mobilenetv2-lite_300x300` · DX-APP C++ example
 
-SSD (MobileNetV2-Lite) — object detection model, trained on Pascal VOC 2007.
+Object Detection model, evaluated on Pascal VOC 2007.
 
 **Input** 300 × 300 × 3 · **Dataset** Pascal VOC 2007 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![SSD (MobileNetV2-Lite) output](../../../../python_example/object_detection/ssd/ssd-mobilenetv2-lite_300x300/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/ssd/ssd-mobilenetv2-lite_300x300/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/ssd/ssd-mobilenetv2-lite_300x300/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/ssd/ssd-mobilenetv2-lite_300x300/ssd-
 
 ## Performance
 
-**1,572 FPS** and **1,678.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,572 FPS** and **1,678.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

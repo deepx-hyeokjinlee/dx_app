@@ -4,13 +4,13 @@
 
 Instance Segmentation · `yolov9-seg-gelan-c_640x640` · DX-APP Python example
 
-YOLOv9-gelan-c-seg — instance segmentation model, trained on COCO.
+Instance Segmentation model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** GPL-3.0 · **Quantization** Q-Lite
 
 ![YOLOv9-gelan-c-seg output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

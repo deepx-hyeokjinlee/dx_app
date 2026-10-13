@@ -4,13 +4,13 @@
 
 Face Detection · `yolov7-s-face_640x640` · DX-APP Python example
 
-YOLOv7-s-face — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 640 × 640 × 3 · **Dataset** WiderFace · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOv7-s-face output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/yolov7_face/yolov7-s-face_640x640/yolov
 
 ## Performance
 
-**336 FPS** and **188.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**336 FPS** and **188.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

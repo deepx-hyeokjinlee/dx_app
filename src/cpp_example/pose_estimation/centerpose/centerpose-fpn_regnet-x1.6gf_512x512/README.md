@@ -4,13 +4,13 @@
 
 Pose Estimation · `centerpose-fpn_regnet-x1.6gf_512x512` · DX-APP C++ example
 
-CenterPose-FPN (RegNetX-1.6GF) — pose estimation model, trained on COCOPose.
+Pose Estimation model, evaluated on COCOPose.
 
 **Input** 512 × 512 × 3 · **Dataset** COCOPose · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![CenterPose-FPN (RegNetX-1.6GF) output](../../../../python_example/pose_estimation/centerpose/centerpose-fpn_regnet-x1.6gf_512x512/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/pose_estimation/centerpose/centerpose-fpn_regnet-x1.6gf_512x512/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/pose_estimation/centerpose/centerpose-fpn_regnet-x1.6gf_512x512/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/pose_estimation/centerpose/centerpose-fpn_regnet-x1.6g
 
 ## Performance
 
-**141 FPS** and **51.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**141 FPS** and **51.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Object Detection · `nanodet-repvgg-a_224x224` · DX-APP Python example
 
-NanoDet-RepVGG-A — object detection model, trained on COCO 2017.
+Object Detection model, evaluated on COCO 2017.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO 2017 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![NanoDet-RepVGG-A output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/nanodet/nanodet-repvgg-a_224x224/nano
 
 ## Performance
 
-**436 FPS** and **111.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**436 FPS** and **111.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

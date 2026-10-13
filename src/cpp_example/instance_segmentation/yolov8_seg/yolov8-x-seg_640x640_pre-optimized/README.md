@@ -4,13 +4,13 @@
 
 Instance Segmentation · `yolov8-x-seg_640x640_pre-optimized` · DX-APP C++ example
 
-Ultralytics YOLOv8-x-seg (Pre-Optimized) — instance segmentation model, trained on COCO.
+Instance Segmentation model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** AGPL-3.0 · **Quantization** Q-Lite
 
 ![Ultralytics YOLOv8-x-seg (Pre-Optimized) output](../../../../python_example/instance_segmentation/yolov8_seg/yolov8-x-seg_640x640_pre-optimized/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/instance_segmentation/yolov8_seg/yolov8-x-seg_640x640_pre-optimized/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/instance_segmentation/yolov8_seg/yolov8-x-seg_640x640_pre-optimized/model.html)
 
 ## Quick start
 

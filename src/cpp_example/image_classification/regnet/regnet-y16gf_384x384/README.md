@@ -4,13 +4,13 @@
 
 Classification · `regnet-y16gf_384x384` · DX-APP C++ example
 
-RegNetY-16GF — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 384 × 384 × 3 · **Dataset** ILSVRC2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![RegNetY-16GF output](../../../../python_example/image_classification/regnet/regnet-y16gf_384x384/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/regnet/regnet-y16gf_384x384/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/regnet/regnet-y16gf_384x384/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/regnet/regnet-y16gf_384x384/regne
 
 ## Performance
 
-**36 FPS** and **34.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**36 FPS** and **34.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

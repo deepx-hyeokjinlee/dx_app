@@ -4,13 +4,13 @@
 
 Instance Segmentation · `yolov8-s-seg_640x640_pre-optimized` · DX-APP Python example
 
-Ultralytics YOLOv8-s-seg (Pre-Optimized) — instance segmentation model, trained on COCO.
+Instance Segmentation model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** AGPL-3.0 · **Quantization** Q-Lite
 
 ![Ultralytics YOLOv8-s-seg (Pre-Optimized) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

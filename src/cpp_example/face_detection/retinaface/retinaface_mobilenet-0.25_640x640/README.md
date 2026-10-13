@@ -4,13 +4,13 @@
 
 Face Detection · `retinaface_mobilenet-0.25_640x640` · DX-APP C++ example
 
-RetinaFace (MobileNet-0.25) — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 640 × 640 × 3 · **Dataset** WiderFace · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![RetinaFace (MobileNet-0.25) output](../../../../python_example/face_detection/retinaface/retinaface_mobilenet-0.25_640x640/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/face_detection/retinaface/retinaface_mobilenet-0.25_640x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/face_detection/retinaface/retinaface_mobilenet-0.25_640x640/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/retinaface/retinaface_mobilenet-0.25_64
 
 ## Performance
 
-**429 FPS** and **791.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**429 FPS** and **791.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

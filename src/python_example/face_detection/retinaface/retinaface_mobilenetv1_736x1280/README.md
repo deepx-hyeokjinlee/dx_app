@@ -4,13 +4,13 @@
 
 Face Detection · `retinaface_mobilenetv1_736x1280` · DX-APP Python example
 
-RetinaFace (MobileNetV1) — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 736 × 1280 × 3 · **Dataset** WiderFace · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![RetinaFace (MobileNetV1) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/retinaface/retinaface_mobilenetv1_736x1
 
 ## Performance
 
-**12 FPS** and **53.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**12 FPS** and **53.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

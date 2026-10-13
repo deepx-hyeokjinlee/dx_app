@@ -4,13 +4,13 @@
 
 Face Detection · `yolov7-w6-face_1280x1280_tta` · DX-APP Python example
 
-YOLOv7-w6-face (TTA) — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 1280 × 1280 × 3 · **Dataset** WiderFace · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOv7-w6-face (TTA) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/yolov7_face/yolov7-w6-face_1280x1280_tt
 
 ## Performance
 
-**44 FPS** and **11.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**44 FPS** and **11.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

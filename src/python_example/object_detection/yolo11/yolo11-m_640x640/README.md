@@ -4,13 +4,13 @@
 
 Object Detection · `yolo11-m_640x640` · DX-APP Python example
 
-Ultralytics YOLO11-m — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** AGPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Ultralytics YOLO11-m output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolo11/yolo11-m_640x640/yolo11-m_640x
 
 ## Performance
 
-**140 FPS** and **54.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**140 FPS** and **54.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

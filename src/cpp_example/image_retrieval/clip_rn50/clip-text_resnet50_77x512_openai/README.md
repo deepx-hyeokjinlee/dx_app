@@ -4,11 +4,11 @@
 
 Image Retrieval · `clip-text_resnet50_77x512_openai` · DX-APP C++ example
 
-CLIP ResNet-50 Text Encoder (OpenAI) — image retrieval model, trained on ImageNetText.
+Image Retrieval model, evaluated on ImageNetText.
 
 **Input** 77 × 512 · **Dataset** ImageNetText · **License** MIT · **Quantization** Q-Lite
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_retrieval/clip_rn50/clip-text_resnet50_77x512_openai/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_retrieval/clip_rn50/clip-text_resnet50_77x512_openai/model.html)
 
 ## Quick start
 

@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `deeplabv3plus_mobilenetv1_512x512` · DX-APP C++ example
 
-DeepLabV3+ (MobileNetV1) — semantic segmentation model, trained on Pascal VOC 2012.
+Semantic Segmentation model, evaluated on Pascal VOC 2012.
 
 **Input** 512 × 512 × 3 · **Dataset** Pascal VOC 2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![DeepLabV3+ (MobileNetV1) output](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3plus_mobilenetv1_512x512/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3plus_mobilenetv1_512x512/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/deeplabv3/deeplabv3plus_mobilenetv1_512x512/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/deeplabv3/deeplabv3plus_mobilene
 
 ## Performance
 
-**231 FPS** and **74.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**231 FPS** and **74.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

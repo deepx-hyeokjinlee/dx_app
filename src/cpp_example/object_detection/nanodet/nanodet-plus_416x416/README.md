@@ -4,13 +4,13 @@
 
 Object Detection · `nanodet-plus_416x416` · DX-APP C++ example
 
-NanoDet-Plus — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 416 × 416 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![NanoDet-Plus output](../../../../python_example/object_detection/nanodet/nanodet-plus_416x416/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/nanodet/nanodet-plus_416x416/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/nanodet/nanodet-plus_416x416/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/nanodet/nanodet-plus_416x416/nanodet-
 
 ## Performance
 
-**1,322 FPS** and **1,205.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,322 FPS** and **1,205.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

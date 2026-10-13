@@ -4,13 +4,13 @@
 
 Classification · `shufflenetv2-x0.5_224x224` · DX-APP Python example
 
-ShuffleNetV2-x0.5 — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![ShuffleNetV2-x0.5 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/shufflenetv2/shufflenetv2-x0.5_22
 
 ## Performance
 
-**7,449 FPS** and **13,951.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**7,449 FPS** and **13,951.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

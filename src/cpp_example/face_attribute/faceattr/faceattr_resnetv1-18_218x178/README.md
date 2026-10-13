@@ -4,13 +4,13 @@
 
 Face Attribute · `faceattr_resnetv1-18_218x178` · DX-APP C++ example
 
-FaceAttr ResNet-18 — face attribute model, trained on CelebA.
+Face Attribute model, evaluated on CelebA.
 
 **Input** 178 × 218 × 3 · **Dataset** CelebA · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![FaceAttr ResNet-18 output](../../../../python_example/face_attribute/faceattr/faceattr_resnetv1-18_218x178/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/face_attribute/faceattr/faceattr_resnetv1-18_218x178/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/face_attribute/faceattr/faceattr_resnetv1-18_218x178/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_attribute/faceattr/faceattr_resnetv1-18_218x178/f
 
 ## Performance
 
-**2,188 FPS** and **1,358.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**2,188 FPS** and **1,358.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

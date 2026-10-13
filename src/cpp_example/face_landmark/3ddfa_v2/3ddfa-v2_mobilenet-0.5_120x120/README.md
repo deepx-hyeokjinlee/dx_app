@@ -4,13 +4,13 @@
 
 Face Alignment · `3ddfa-v2_mobilenet-0.5_120x120` · DX-APP C++ example
 
-3DDFA-V2 (MobileNet-0.5) — face alignment model, trained on AFLW20003D.
+Face Alignment model, evaluated on AFLW20003D.
 
 **Input** 120 × 120 × 3 · **Dataset** AFLW20003D · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![3DDFA-V2 (MobileNet-0.5) output](../../../../python_example/face_landmark/3ddfa_v2/3ddfa-v2_mobilenet-0.5_120x120/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/face_landmark/3ddfa_v2/3ddfa-v2_mobilenet-0.5_120x120/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/face_landmark/3ddfa_v2/3ddfa-v2_mobilenet-0.5_120x120/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_landmark/3ddfa_v2/3ddfa-v2_mobilenet-0.5_120x120/
 
 ## Performance
 
-**14,336 FPS** and **23,095.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**14,336 FPS** and **23,095.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

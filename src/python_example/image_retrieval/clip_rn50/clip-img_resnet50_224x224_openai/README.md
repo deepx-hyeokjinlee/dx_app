@@ -4,13 +4,13 @@
 
 Image Retrieval · `clip-img_resnet50_224x224_openai` · DX-APP Python example
 
-CLIP ResNet-50 (OpenAI) — image retrieval model, trained on ILSVRC2012.
+Image Retrieval model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite
 
 ![CLIP ResNet-50 (OpenAI) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

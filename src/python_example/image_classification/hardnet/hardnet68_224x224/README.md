@@ -4,13 +4,13 @@
 
 Classification · `hardnet68_224x224` · DX-APP Python example
 
-HarDNet-68 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![HarDNet-68 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/hardnet/hardnet68_224x224/hardnet
 
 ## Performance
 
-**641 FPS** and **425.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**641 FPS** and **425.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

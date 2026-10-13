@@ -4,13 +4,13 @@
 
 Classification · `resnet152_224x224` · DX-APP Python example
 
-ResNet-152 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![ResNet-152 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/resnet/resnet152_224x224/resnet15
 
 ## Performance
 
-**488 FPS** and **191.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**488 FPS** and **191.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Classification · `yolov12-cls-x_224x224` · DX-APP Python example
 
-YOLOv12-x-cls — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** AGPL-3.0 · **Quantization** Q-Lite
 
 ![YOLOv12-x-cls output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

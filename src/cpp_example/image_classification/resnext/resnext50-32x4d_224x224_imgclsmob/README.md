@@ -4,13 +4,13 @@
 
 Classification · `resnext50-32x4d_224x224_imgclsmob` · DX-APP C++ example
 
-ResNeXt-50 (32x4d, imgclsmob) — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![ResNeXt-50 (32x4d, imgclsmob) output](../../../../python_example/image_classification/resnext/resnext50-32x4d_224x224_imgclsmob/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/resnext/resnext50-32x4d_224x224_imgclsmob/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/resnext/resnext50-32x4d_224x224_imgclsmob/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/resnext/resnext50-32x4d_224x224_i
 
 ## Performance
 
-**487 FPS** and **355.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**487 FPS** and **355.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

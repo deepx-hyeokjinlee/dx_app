@@ -4,13 +4,13 @@
 
 Classification · `regnet-y200mf_224x224` · DX-APP Python example
 
-RegNetY-200MF — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![RegNetY-200MF output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/regnet/regnet-y200mf_224x224/regn
 
 ## Performance
 
-**2,517 FPS** and **4,286.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**2,517 FPS** and **4,286.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

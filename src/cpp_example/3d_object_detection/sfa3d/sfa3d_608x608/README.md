@@ -4,13 +4,13 @@
 
 3D Object Detection · `sfa3d_608x608` · DX-APP C++ example
 
-SFA3D — 3d object detection model, trained on KITTI.
+3D Object Detection model, evaluated on KITTI.
 
 **Input** 608 × 608 × 3 · **Dataset** KITTI · **License** MIT · **Quantization** Q-Lite
 
 ![SFA3D output](../../../../python_example/3d_object_detection/sfa3d/sfa3d_608x608/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/3d_object_detection/sfa3d/sfa3d_608x608/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/3d_object_detection/sfa3d/sfa3d_608x608/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/3d_object_detection/sfa3d/sfa3d_608x608/sfa3d_608x608_
 
 ## Performance
 
-**117 FPS** and **58.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**117 FPS** and **58.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

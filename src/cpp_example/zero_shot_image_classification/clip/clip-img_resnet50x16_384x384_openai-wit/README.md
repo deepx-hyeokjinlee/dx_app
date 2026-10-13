@@ -4,13 +4,13 @@
 
 Zero-Shot Classification · `clip-img_resnet50x16_384x384_openai-wit` · DX-APP C++ example
 
-CLIP ResNet-50x16 (OpenAI WIT) — zero-shot classification model, trained on ILSVRC2012.
+Zero-Shot Classification model, evaluated on ILSVRC2012.
 
 **Input** 384 × 384 × 3 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![CLIP ResNet-50x16 (OpenAI WIT) output](../../../../python_example/zero_shot_image_classification/clip/clip-img_resnet50x16_384x384_openai-wit/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/zero_shot_image_classification/clip/clip-img_resnet50x16_384x384_openai-wit/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/zero_shot_image_classification/clip/clip-img_resnet50x16_384x384_openai-wit/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_resnet50x
 
 ## Performance
 
-**100 FPS** and **30.7 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**100 FPS** and **30.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

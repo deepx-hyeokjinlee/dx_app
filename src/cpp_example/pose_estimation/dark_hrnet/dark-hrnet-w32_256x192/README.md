@@ -4,13 +4,13 @@
 
 Pose Estimation · `dark-hrnet-w32_256x192` · DX-APP C++ example
 
-dark_hrnet_w32_256x192 — pose estimation model, trained on COCOPoseTopDown.
+Pose Estimation model, evaluated on COCOPoseTopDown.
 
 **Input** 192 × 256 × 3 · **Dataset** COCOPoseTopDown · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![dark_hrnet_w32_256x192 output](../../../../python_example/pose_estimation/dark_hrnet/dark-hrnet-w32_256x192/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/pose_estimation/dark_hrnet/dark-hrnet-w32_256x192/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/pose_estimation/dark_hrnet/dark-hrnet-w32_256x192/model.html)
 
 ## Quick start
 

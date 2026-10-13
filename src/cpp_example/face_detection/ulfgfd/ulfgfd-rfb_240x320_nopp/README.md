@@ -4,13 +4,13 @@
 
 Face Detection · `ulfgfd-rfb_240x320_nopp` · DX-APP C++ example
 
-ULFGFD-RFB (no-PP) — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 320 × 240 × 3 · **Dataset** WiderFace · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![ULFGFD-RFB (no-PP) output](../../../../python_example/face_detection/ulfgfd/ulfgfd-rfb_240x320_nopp/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/face_detection/ulfgfd/ulfgfd-rfb_240x320_nopp/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/face_detection/ulfgfd/ulfgfd-rfb_240x320_nopp/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/ulfgfd/ulfgfd-rfb_240x320_nopp/ulfgfd-r
 
 ## Performance
 
-**3,900 FPS** and **7,273.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**3,900 FPS** and **7,273.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

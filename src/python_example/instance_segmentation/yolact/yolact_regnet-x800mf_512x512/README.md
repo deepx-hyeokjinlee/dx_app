@@ -4,13 +4,13 @@
 
 Instance Segmentation · `yolact_regnet-x800mf_512x512` · DX-APP Python example
 
-YOLACT (RegNetX-800MF) — instance segmentation model, trained on COCO.
+Instance Segmentation model, evaluated on COCO.
 
 **Input** 512 × 512 × 3 · **Dataset** COCO · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![YOLACT (RegNetX-800MF) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/instance_segmentation/yolact/yolact_regnet-x800mf_512x
 
 ## Performance
 
-**112 FPS** and **34.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**112 FPS** and **34.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

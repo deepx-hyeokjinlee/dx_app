@@ -4,13 +4,13 @@
 
 Object Detection · `yolov5-s_320x320` · DX-APP C++ example
 
-Ultralytics YOLOv5-s (320x320) — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 320 × 320 × 3 · **Dataset** COCO · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Ultralytics YOLOv5-s (320x320) output](../../../../python_example/object_detection/yolov5/yolov5-s_320x320/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolov5/yolov5-s_320x320/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolov5/yolov5-s_320x320/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolov5/yolov5-s_320x320/yolov5-s_320x
 
 ## Performance
 
-**1,507 FPS** and **862.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,507 FPS** and **862.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

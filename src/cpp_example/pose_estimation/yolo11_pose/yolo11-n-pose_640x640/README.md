@@ -4,13 +4,13 @@
 
 Pose Estimation · `yolo11-n-pose_640x640` · DX-APP C++ example
 
-Ultralytics YOLO11-n-pose — pose estimation model, trained on COCOPose.
+Pose Estimation model, evaluated on COCOPose.
 
 **Input** 640 × 640 × 3 · **Dataset** COCOPose · **License** AGPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Ultralytics YOLO11-n-pose output](../../../../python_example/pose_estimation/yolo11_pose/yolo11-n-pose_640x640/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/pose_estimation/yolo11_pose/yolo11-n-pose_640x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/pose_estimation/yolo11_pose/yolo11-n-pose_640x640/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/pose_estimation/yolo11_pose/yolo11-n-pose_640x640/yolo
 
 ## Performance
 
-**278 FPS** and **351.9 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**278 FPS** and **351.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Object Detection · `yolov7_640x640` · DX-APP Python example
 
-YOLOv7 — object detection model, trained on COCO 2017.
+Object Detection model, evaluated on COCO 2017.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO 2017 · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![YOLOv7 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolov7/yolov7_640x640/yolov7_640x640_
 
 ## Performance
 
-**121 FPS** and **39.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**121 FPS** and **39.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

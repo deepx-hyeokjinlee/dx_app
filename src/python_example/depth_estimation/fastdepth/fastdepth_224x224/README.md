@@ -4,13 +4,13 @@
 
 Depth Estimation · `fastdepth_224x224` · DX-APP Python example
 
-FastDepth — depth estimation model, trained on NYU Depth V2.
+Depth Estimation model, evaluated on NYU Depth V2.
 
 **Input** 224 × 224 × 3 · **Dataset** NYU Depth V2 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![FastDepth output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/depth_estimation/fastdepth/fastdepth_224x224/fastdepth
 
 ## Performance
 
-**839 FPS** and **1,975.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**839 FPS** and **1,975.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

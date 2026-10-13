@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `pidnet-s_1024x2048` · DX-APP C++ example
 
-PIDNet-S — semantic segmentation model, trained on Cityscapes.
+Semantic Segmentation model, evaluated on Cityscapes.
 
 **Input** 1024 × 2048 × 3 · **Dataset** Cityscapes · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![PIDNet-S output](../../../../python_example/semantic_segmentation/pidnet/pidnet-s_1024x2048/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/pidnet/pidnet-s_1024x2048/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/pidnet/pidnet-s_1024x2048/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/pidnet/pidnet-s_1024x2048/pidnet
 
 ## Performance
 
-**31 FPS** and **33.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**31 FPS** and **33.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Instance Segmentation · `yolov9-seg-e_640x640` · DX-APP C++ example
 
-YOLOv9-e-seg — instance segmentation model, trained on COCO.
+Instance Segmentation model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** GPL-3.0 · **Quantization** Q-Lite
 
 ![YOLOv9-e-seg output](../../../../python_example/instance_segmentation/yolov9_seg/yolov9-seg-e_640x640/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/instance_segmentation/yolov9_seg/yolov9-seg-e_640x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/instance_segmentation/yolov9_seg/yolov9-seg-e_640x640/model.html)
 
 ## Quick start
 

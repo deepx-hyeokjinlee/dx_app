@@ -4,13 +4,13 @@
 
 Zero-Shot Classification · `clip-img_vit-l14_224x224_datacomp-xl-s13b-b90k` · DX-APP Python example
 
-CLIP ViT-L/14 (DataComp-XL) — zero-shot classification model, trained on ILSVRC2012.
+Zero-Shot Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![CLIP ViT-L/14 (DataComp-XL) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_vit-l14_2
 
 ## Performance
 
-**22 FPS** and **20.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**22 FPS** and **20.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

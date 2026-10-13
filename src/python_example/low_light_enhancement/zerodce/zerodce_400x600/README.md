@@ -4,13 +4,13 @@
 
 Image Enhancement · `zerodce_400x600` · DX-APP Python example
 
-Zero-DCE — image enhancement model, trained on LOL.
+Image Enhancement model, evaluated on LOL.
 
 **Input** 400 × 600 × 3 · **Dataset** LOL · **License** CC BY-NC 4.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Zero-DCE output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/low_light_enhancement/zerodce/zerodce_400x600/zerodce_
 
 ## Performance
 
-**25 FPS** and **55.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**25 FPS** and **55.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

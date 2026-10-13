@@ -4,13 +4,13 @@
 
 Face Detection · `ulfgfd-slim_240x320_nopp` · DX-APP Python example
 
-ULFGFD-Slim (no-PP) — face detection model, trained on WiderFace.
+Face Detection model, evaluated on WiderFace.
 
 **Input** 320 × 240 × 3 · **Dataset** WiderFace · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![ULFGFD-Slim (no-PP) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_detection/ulfgfd/ulfgfd-slim_240x320_nopp/ulfgfd-
 
 ## Performance
 
-**4,127 FPS** and **8,511.1 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**4,127 FPS** and **8,511.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

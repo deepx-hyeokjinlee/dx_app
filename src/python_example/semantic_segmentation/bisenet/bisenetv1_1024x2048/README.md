@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `bisenetv1_1024x2048` · DX-APP Python example
 
-BiSeNetV1 — semantic segmentation model, trained on Cityscapes.
+Semantic Segmentation model, evaluated on Cityscapes.
 
 **Input** 1024 × 2048 × 3 · **Dataset** Cityscapes · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![BiSeNetV1 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/semantic_segmentation/bisenet/bisenetv1_1024x2048/bise
 
 ## Performance
 
-**18 FPS** and **14.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**18 FPS** and **14.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

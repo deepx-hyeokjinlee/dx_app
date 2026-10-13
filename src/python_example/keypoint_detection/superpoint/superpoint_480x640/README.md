@@ -4,13 +4,13 @@
 
 Keypoint Detection · `superpoint_480x640` · DX-APP Python example
 
-SuperPoint — keypoint detection model, trained on HPatches.
+Keypoint Detection model, evaluated on HPatches.
 
 **Input** 480 × 640 × 3 · **Dataset** HPatches · **License** Non-commercial · **Quantization** Q-Lite, Q-Pro
 
 ![SuperPoint output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/keypoint_detection/superpoint/superpoint_480x640/super
 
 ## Performance
 
-**266 FPS** and **86.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**266 FPS** and **86.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Embedding · `arcface_resnet50_112x112` · DX-APP C++ example
 
-ArcFace ResNet-50 — embedding model, trained on LFW.
+Embedding model, evaluated on LFW.
 
 **Input** 112 × 112 × 3 · **Dataset** LFW · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![ArcFace ResNet-50 output](../../../../python_example/face_recognition/arcface/arcface_resnet50_112x112/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/face_recognition/arcface/arcface_resnet50_112x112/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/face_recognition/arcface/arcface_resnet50_112x112/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_recognition/arcface/arcface_resnet50_112x112/arcf
 
 ## Performance
 
-**588 FPS** and **337.3 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**588 FPS** and **337.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

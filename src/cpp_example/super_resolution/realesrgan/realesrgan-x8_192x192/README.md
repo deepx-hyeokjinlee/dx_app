@@ -4,13 +4,13 @@
 
 Super Resolution · `realesrgan-x8_192x192` · DX-APP C++ example
 
-Real-ESRGAN-x8 — super resolution model, trained on BSD100.
+Super Resolution model, evaluated on BSD100.
 
 **Input** 192 × 192 × 3 · **Dataset** BSD100 · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![Real-ESRGAN-x8 output](../../../../python_example/super_resolution/realesrgan/realesrgan-x8_192x192/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/super_resolution/realesrgan/realesrgan-x8_192x192/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/super_resolution/realesrgan/realesrgan-x8_192x192/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/super_resolution/realesrgan/realesrgan-x8_192x192/real
 
 ## Performance
 
-**1 FPS** and **1.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1 FPS** and **1.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

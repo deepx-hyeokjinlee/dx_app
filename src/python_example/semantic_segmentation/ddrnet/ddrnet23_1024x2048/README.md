@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `ddrnet23_1024x2048` · DX-APP Python example
 
-DDRNet23 — semantic segmentation model, trained on Cityscapes.
+Semantic Segmentation model, evaluated on Cityscapes.
 
 **Input** 1024 × 2048 × 3 · **Dataset** Cityscapes · **License** MIT · **Quantization** Q-Lite
 
 ![DDRNet23 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 

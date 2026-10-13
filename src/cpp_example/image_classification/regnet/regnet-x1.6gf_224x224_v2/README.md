@@ -4,13 +4,13 @@
 
 Classification · `regnet-x1.6gf_224x224_v2` · DX-APP C++ example
 
-RegNetX-1.6GF (v2) — classification model, trained on ImageNet.
+Classification model, evaluated on ImageNet.
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![RegNetX-1.6GF (v2) output](../../../../python_example/image_classification/regnet/regnet-x1.6gf_224x224_v2/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/regnet/regnet-x1.6gf_224x224_v2/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/regnet/regnet-x1.6gf_224x224_v2/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/regnet/regnet-x1.6gf_224x224_v2/r
 
 ## Performance
 
-**747 FPS** and **719.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**747 FPS** and **719.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

@@ -4,13 +4,13 @@
 
 Semantic Segmentation · `pp-liteseg-stdc1-camvid-10k_960x720` · DX-APP C++ example
 
-pp_liteseg_stdc1_camvid_960x720_10k — semantic segmentation model, trained on CamVid.
+Semantic Segmentation model, evaluated on CamVid.
 
 **Input** 720 × 960 × 3 · **Dataset** CamVid · **License** Apache-2.0 · **Quantization** Q-Lite
 
 ![pp_liteseg_stdc1_camvid_960x720_10k output](../../../../python_example/semantic_segmentation/pp_liteseg/pp-liteseg-stdc1-camvid-10k_960x720/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/semantic_segmentation/pp_liteseg/pp-liteseg-stdc1-camvid-10k_960x720/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/semantic_segmentation/pp_liteseg/pp-liteseg-stdc1-camvid-10k_960x720/model.html)
 
 ## Quick start
 

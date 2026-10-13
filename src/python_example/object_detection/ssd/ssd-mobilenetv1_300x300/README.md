@@ -4,13 +4,13 @@
 
 Object Detection · `ssd-mobilenetv1_300x300` · DX-APP Python example
 
-SSD (MobileNetV1) — object detection model, trained on Pascal VOC 2007.
+Object Detection model, evaluated on Pascal VOC 2007.
 
 **Input** 300 × 300 × 3 · **Dataset** Pascal VOC 2007 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![SSD (MobileNetV1) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/ssd/ssd-mobilenetv1_300x300/ssd-mobil
 
 ## Performance
 
-**1,847 FPS** and **1,328.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**1,847 FPS** and **1,328.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

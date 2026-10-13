@@ -4,13 +4,13 @@
 
 Classification · `yolo26-cls-n_224x224` · DX-APP Python example
 
-Ultralytics YOLO26-n-cls — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** AGPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Ultralytics YOLO26-n-cls output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/yolo26_cls/yolo26-cls-n_224x224/y
 
 ## Performance
 
-**3,695 FPS** and **5,845.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**3,695 FPS** and **5,845.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

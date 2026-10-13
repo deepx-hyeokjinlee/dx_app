@@ -4,13 +4,13 @@
 
 Image Denoising · `dncnn-25_512x512` · DX-APP Python example
 
-DnCNN-25 — image denoising model, trained on BSD68.
+Image Denoising model, evaluated on BSD68.
 
 **Input** 512 × 512 × 1 · **Dataset** BSD68 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro
 
 ![DnCNN-25 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_denoising/dncnn/dncnn-25_512x512/dncnn-25_512x51
 
 ## Performance
 
-**50 FPS** and **13.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**50 FPS** and **13.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

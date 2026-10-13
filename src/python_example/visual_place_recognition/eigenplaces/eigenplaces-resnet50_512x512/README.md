@@ -4,13 +4,13 @@
 
 Visual Place Recognition · `eigenplaces-resnet50_512x512` · DX-APP Python example
 
-EigenPlaces ResNet-50 — visual place recognition model, trained on HPatches.
+Visual Place Recognition model, evaluated on HPatches.
 
 **Input** 512 × 512 × 3 · **Dataset** HPatches · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![EigenPlaces ResNet-50 output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/visual_place_recognition/eigenplaces/eigenplaces-resne
 
 ## Performance
 
-**270 FPS** and **98.0 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**270 FPS** and **98.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

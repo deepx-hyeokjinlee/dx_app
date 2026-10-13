@@ -4,13 +4,13 @@
 
 Classification · `squeezenet-1.0_224x224` · DX-APP C++ example
 
-SqueezeNet-1.0 — classification model, trained on ImageNet (ILSVRC2012).
+Classification model, evaluated on ImageNet (ILSVRC2012).
 
 **Input** 224 × 224 × 3 · **Dataset** ImageNet (ILSVRC2012) · **License** BSD-3-Clause · **Quantization** Q-Lite, Q-Pro
 
 ![SqueezeNet-1.0 output](../../../../python_example/image_classification/squeezenet/squeezenet-1.0_224x224/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/image_classification/squeezenet/squeezenet-1.0_224x224/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/image_classification/squeezenet/squeezenet-1.0_224x224/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/squeezenet/squeezenet-1.0_224x224
 
 ## Performance
 
-**2,145 FPS** and **1,760.4 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**2,145 FPS** and **1,760.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

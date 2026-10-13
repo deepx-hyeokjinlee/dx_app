@@ -4,13 +4,13 @@
 
 Object Detection · `yolov5-xs_512x512_nospp` · DX-APP C++ example
 
-Ultralytics YOLOv5-xs (no-SPP) — object detection model, trained on COCO.
+Object Detection model, evaluated on COCO.
 
 **Input** 512 × 512 × 3 · **Dataset** COCO · **License** GPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Ultralytics YOLOv5-xs (no-SPP) output](../../../../python_example/object_detection/yolov5/yolov5-xs_512x512_nospp/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/object_detection/yolov5/yolov5-xs_512x512_nospp/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/yolov5/yolov5-xs_512x512_nospp/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/yolov5/yolov5-xs_512x512_nospp/yolov5
 
 ## Performance
 
-**237 FPS** and **248.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**237 FPS** and **248.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

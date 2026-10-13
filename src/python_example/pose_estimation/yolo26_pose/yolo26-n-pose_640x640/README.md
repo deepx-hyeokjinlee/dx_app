@@ -4,13 +4,13 @@
 
 Pose Estimation · `yolo26-n-pose_640x640` · DX-APP Python example
 
-Ultralytics YOLO26-n-pose — pose estimation model, trained on COCOPose.
+Pose Estimation model, evaluated on COCOPose.
 
 **Input** 640 × 640 × 3 · **Dataset** COCOPose · **License** AGPL-3.0 · **Quantization** Q-Lite, Q-Pro
 
 ![Ultralytics YOLO26-n-pose output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/pose_estimation/yolo26_pose/yolo26-n-pose_640x640/yolo
 
 ## Performance
 
-**310 FPS** and **331.2 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**310 FPS** and **331.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

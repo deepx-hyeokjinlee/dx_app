@@ -4,13 +4,13 @@
 
 Embedding · `arcface_iresnet50_112x112_ms1m` · DX-APP C++ example
 
-ArcFace IResNet-50 (MS1M) — embedding model, trained on LFW.
+Embedding model, evaluated on LFW.
 
 **Input** 112 × 112 × 3 · **Dataset** LFW · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![ArcFace IResNet-50 (MS1M) output](../../../../python_example/face_recognition/arcface/arcface_iresnet50_112x112_ms1m/result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](../../../../python_example/face_recognition/arcface/arcface_iresnet50_112x112_ms1m/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/face_recognition/arcface/arcface_iresnet50_112x112_ms1m/model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/face_recognition/arcface/arcface_iresnet50_112x112_ms1
 
 ## Performance
 
-**275 FPS** and **261.8 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**275 FPS** and **261.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

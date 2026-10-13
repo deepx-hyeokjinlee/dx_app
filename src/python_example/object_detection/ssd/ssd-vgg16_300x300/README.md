@@ -4,13 +4,13 @@
 
 Object Detection · `ssd-vgg16_300x300` · DX-APP Python example
 
-SSD (VGG-16) — object detection model, trained on PascalVOC2007.
+Object Detection model, evaluated on PascalVOC2007.
 
 **Input** 300 × 300 × 3 · **Dataset** PascalVOC2007 · **License** MIT · **Quantization** Q-Lite, Q-Pro
 
 ![SSD (VGG-16) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/object_detection/ssd/ssd-vgg16_300x300/ssd-vgg16_300x3
 
 ## Performance
 
-**307 FPS** and **72.9 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**307 FPS** and **72.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 

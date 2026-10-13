@@ -4,13 +4,13 @@
 
 Classification · `deit-b_224x224_distilled` · DX-APP Python example
 
-DeiT-Base (distilled, 224x224) — classification model, trained on ILSVRC2012.
+Classification model, evaluated on ILSVRC2012.
 
 **Input** 224 × 224 × 3 · **Dataset** ILSVRC2012 · **License** Apache-2.0 · **Quantization** Q-Lite, Q-Pro, Q-Master
 
 ![DeiT-Base (distilled, 224x224) output](result.webp)
 
-Full card with copy buttons and dark/light theme: [model.html](model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](model.html)
 
 ## Quick start
 
@@ -40,7 +40,7 @@ python src/python_example/image_classification/deit/deit-b_224x224_distilled/dei
 
 ## Performance
 
-**124 FPS** and **92.9 FPS/W** on DX-M1, DX Model Zoo reference measurement.
+**124 FPS** and **92.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
 
 ### Accuracy
 
