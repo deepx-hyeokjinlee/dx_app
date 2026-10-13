@@ -7,7 +7,7 @@
  * image. This stage cuts the frame into halo-overlapped tiles instead and
  * returns the frame at input x scale (275x150 -> 1100x600 at x4). Every step is
  * one of the runner's own functions in common/utility/sr_tiling.hpp -
- * planTiles, prepareLowRes, runTilesPipelined, assembleTiles, mergeSrLuma -
+ * planTiles, prepareLowRes, runAndAssembleTiles, mergeSrLuma -
  * so the graph's image equals the runner's _output_only image by
  * construction, not by a second implementation kept in step.
  *
@@ -28,7 +28,7 @@
  * -----------------------------------------------------------
  *  - One worker thread owns the engine and runs jobs in submission order. The
  *    engine has NO callback registered, ever, so RunAsync + Wait inside
- *    runTilesPipelined returns real outputs (hardware fact 2).
+ *    runAndAssembleTiles gets real outputs (hardware fact 2).
  *  - (1) run(), submit() and flush() are serialized by the caller; the queue
  *    they share with the worker is under mutex_.
  *  - (2)/(3) submit()'s callback runs on the worker, with no lock held, so a
@@ -253,12 +253,10 @@ class TiledSrStage : public IStage {
         cv::Mat lr_bgr, lr_gray;
         srtiling::prepareLowRes(image, padded_h, padded_w, lr_bgr, lr_gray);
 
-        std::vector<dxrt::TensorPtrs> outputs;
-        srtiling::runTilesPipelined(*engine_, lr_gray, plans, tile_h_, tile_w_, outputs);
         cv::Mat sr_y_padded;
-        const int tiles_done = srtiling::assembleTiles(
-            plans, outputs, padded_h * scale_y_, padded_w * scale_x_, scale_y_, scale_x_,
-            tile_w_ * scale_x_, sr_y_padded);
+        const int tiles_done = srtiling::runAndAssembleTiles(
+            *engine_, lr_gray, plans, tile_h_, tile_w_, padded_h * scale_y_,
+            padded_w * scale_x_, scale_y_, scale_x_, tile_w_ * scale_x_, sr_y_padded);
         // The graph reports errors, so a missing tile fails the job instead
         // of leaving a black patch.
         if (tiles_done < static_cast<int>(plans.size())) {

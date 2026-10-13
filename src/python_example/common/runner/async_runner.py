@@ -51,7 +51,7 @@ from ..utility.colorspace import bgr_to_y_limited, bgr_to_ycrcb_limited, ycrcb_l
 from .interrupts import interrupt_scope
 from .run_dir import create_run_dir, write_run_info, dump_tensors, dump_tensors_on_exception
 from .sr_tiling import (
-    assemble_tiles, plan_tiles, resolve_runner_halo, run_tiles_pipelined,
+    plan_tiles, resolve_runner_halo, run_and_assemble_tiles,
 )
 from .verify_serialize import is_verify_enabled, dump_verify_json
 
@@ -966,12 +966,11 @@ class AsyncRunner:
 
         # Only each tile's valid centre is stitched, so with halo >= the
         # receptive-field radius (4 px for ESPCN) no tile seams remain. Tiles go
-        # through run_async so the per-call overhead is pipelined away.
-        outputs = run_tiles_pipelined(
-            self.ie, self._prep_input, lr_gray, plans, tile_h, tile_w)
-        sr_y, tiles_done = assemble_tiles(
-            plans, outputs, padded_h * scale_y, padded_w * scale_x,
-            scale_y, scale_x)
+        # through run_async so the per-call overhead is pipelined away, and each
+        # is stitched as it arrives instead of holding every output of the frame.
+        sr_y, tiles_done = run_and_assemble_tiles(
+            self.ie, self._prep_input, lr_gray, plans, tile_h, tile_w,
+            padded_h * scale_y, padded_w * scale_x, scale_y, scale_x)
         t2 = time.perf_counter()
         sr_y = sr_y[:out_h, :out_w]
 

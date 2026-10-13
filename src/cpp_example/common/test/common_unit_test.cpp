@@ -1973,6 +1973,115 @@ void TestSrPipelinedTilesWaitForSubmittedJobsWhenRunAsyncThrows() {
     }
 }
 
+/// A nearest-neighbour x2 "model" for 17x17 uint8 tiles: each output is 34x34
+/// floats in [0, 1]. At every Wait() it records how many outputs it handed out
+/// earlier are still referenced by the caller.
+class UpscalingTileEngine {
+public:
+    static const int kTile = 17;
+    static const int kScale = 2;
+    static const int kOutTile = kTile * kScale;
+
+    int RunAsync(void* input) {
+        const unsigned char* bytes = static_cast<const unsigned char*>(input);
+        jobs_.push_back(std::vector<unsigned char>(bytes, bytes + kTile * kTile));
+        return static_cast<int>(jobs_.size()) - 1;
+    }
+
+    dxrt::TensorPtrs Wait(int job) {
+        int alive = 0;
+        for (const auto& ref : handed_out_) alive += ref.expired() ? 0 : 1;
+        max_alive_ = std::max(max_alive_, alive);
+
+        auto storage = std::make_shared<std::vector<float>>(kOutTile * kOutTile);
+        for (int y = 0; y < kOutTile; ++y) {
+            for (int x = 0; x < kOutTile; ++x) {
+                (*storage)[y * kOutTile + x] =
+                    jobs_[job][(y / kScale) * kTile + x / kScale] / 255.0f;
+            }
+        }
+        std::vector<int64_t> shape;
+        shape.push_back(1);
+        shape.push_back(1);
+        shape.push_back(kOutTile);
+        shape.push_back(kOutTile);
+        // The tensor does not own its data; the deleter keeps the buffer alive with it.
+        std::shared_ptr<dxrt::Tensor> tensor(
+            new dxrt::Tensor("sr", shape, dxrt::DataType::FLOAT, storage->data()),
+            [storage](dxrt::Tensor* t) { delete t; });
+        handed_out_.push_back(tensor);
+        return dxrt::TensorPtrs(1, tensor);
+    }
+
+    int max_alive_ = 0;
+
+private:
+    std::vector<std::vector<unsigned char>> jobs_;
+    std::vector<std::weak_ptr<dxrt::Tensor>> handed_out_;
+};
+
+/// A 40x61 random plane cut into 17x17 tiles with a halo of 4.
+void MakeSrTilingCase(int& padded_h, int& padded_w,
+                      std::vector<dxapp::srtiling::TilePlan>& plans, cv::Mat& plane) {
+    const int tile = UpscalingTileEngine::kTile;
+    dxapp::srtiling::planTiles(40, 61, tile, tile, 4, padded_h, padded_w, plans);
+    plane.create(padded_h, padded_w, CV_8UC1);
+    cv::randu(plane, 0, 256);
+}
+
+// Streaming assembly (each tile stitched as its output arrives) gives the same
+// image as collect-then-assemble, pixel for pixel.
+void TestSrStreamingAssemblyMatchesCollectThenAssemble() {
+    const int tile = UpscalingTileEngine::kTile;
+    const int scale = UpscalingTileEngine::kScale;
+    const int out_tile = UpscalingTileEngine::kOutTile;
+    int padded_h = 0, padded_w = 0;
+    std::vector<dxapp::srtiling::TilePlan> plans;
+    cv::Mat plane;
+    MakeSrTilingCase(padded_h, padded_w, plans, plane);
+
+    UpscalingTileEngine collecting;
+    std::vector<dxrt::TensorPtrs> outputs;
+    dxapp::srtiling::runTilesPipelined(collecting, plane, plans, tile, tile, outputs, 16);
+    cv::Mat expected;
+    const int expected_done = dxapp::srtiling::assembleTiles(
+        plans, outputs, padded_h * scale, padded_w * scale, scale, scale, out_tile, expected);
+
+    UpscalingTileEngine streaming;
+    cv::Mat streamed;
+    const int streamed_done = dxapp::srtiling::runAndAssembleTiles(
+        streaming, plane, plans, tile, tile, padded_h * scale, padded_w * scale,
+        scale, scale, out_tile, streamed, 16);
+
+    COMMON_CHECK(expected_done == static_cast<int>(plans.size()));
+    COMMON_CHECK(streamed_done == expected_done);
+    COMMON_CHECK(streamed.size() == expected.size() && streamed.type() == expected.type());
+    COMMON_CHECK(cv::norm(streamed, expected, cv::NORM_INF) == 0);
+}
+
+// Streaming keeps no finished tile output alive; collect-then-assemble holds
+// every one (25,560 at 1080p for ESPCN x4, ~0.5 GB).
+void TestSrStreamingAssemblyKeepsNoFinishedOutputAlive() {
+    const int tile = UpscalingTileEngine::kTile;
+    const int scale = UpscalingTileEngine::kScale;
+    int padded_h = 0, padded_w = 0;
+    std::vector<dxapp::srtiling::TilePlan> plans;
+    cv::Mat plane;
+    MakeSrTilingCase(padded_h, padded_w, plans, plane);
+
+    UpscalingTileEngine streaming;
+    cv::Mat sr_y;
+    dxapp::srtiling::runAndAssembleTiles(streaming, plane, plans, tile, tile,
+                                         padded_h * scale, padded_w * scale, scale, scale,
+                                         UpscalingTileEngine::kOutTile, sr_y, 4);
+    COMMON_CHECK(streaming.max_alive_ == 0);
+
+    UpscalingTileEngine collecting;
+    std::vector<dxrt::TensorPtrs> outputs;
+    dxapp::srtiling::runTilesPipelined(collecting, plane, plans, tile, tile, outputs, 4);
+    COMMON_CHECK(collecting.max_alive_ == static_cast<int>(plans.size()) - 1);
+}
+
 // =====================================================================
 // I17: one ROI crop rule (common/utility/roi_crop.hpp) for the graph engine.
 // =====================================================================
@@ -2383,6 +2492,8 @@ int main() {
     TestSrMergeLumaIsTheRunnersMerge();
     TestSrPrepareLowResPadsAndConvertsLikeTheRunner();
     TestSrPipelinedTilesWaitForSubmittedJobsWhenRunAsyncThrows();
+    TestSrStreamingAssemblyMatchesCollectThenAssemble();
+    TestSrStreamingAssemblyKeepsNoFinishedOutputAlive();
 
     TestPaddedCropRectMatchesTheGraphRule();
     TestPaddedCropRectEdgeCases();

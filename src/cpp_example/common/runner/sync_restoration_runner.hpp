@@ -409,13 +409,11 @@ private:
         // Tiles are cut with a halo and only their valid centres are stitched, so
         // with halo >= the receptive-field radius (4 px for ESPCN) no tile seams
         // remain. Tiles go through RunAsync so the per-call overhead — which
-        // dominates a 17x17 forward pass — is pipelined away.
+        // dominates a 17x17 forward pass — is pipelined away, and each is
+        // stitched as it arrives instead of holding every output of the frame.
         auto ti0 = std::chrono::high_resolution_clock::now();
-        std::vector<dxrt::TensorPtrs> tile_outputs;
-        dxapp::srtiling::runTilesPipelined(
-            ie, lr_gray, tile_plans_, tile_h, tile_w, tile_outputs);
-        tiles_done = dxapp::srtiling::assembleTiles(
-            tile_plans_, tile_outputs, padded_out_h, padded_out_w,
+        tiles_done = dxapp::srtiling::runAndAssembleTiles(
+            ie, lr_gray, tile_plans_, tile_h, tile_w, padded_out_h, padded_out_w,
             scale_y, scale_x, out_tile_w, sr_y_padded);
         t_inference_total = std::chrono::duration<double, std::milli>(
             std::chrono::high_resolution_clock::now() - ti0).count();

@@ -215,8 +215,7 @@ public:
         });
 
         int buffer_index = 0;
-        ie.RegisterCallback([this, postprocessor](dxrt::TensorPtrs& outputs, void* user_data) -> int {  // NOSONAR(cpp:S5008)
-            // user_data is null for tiled SR path (ie.Run called without user_data)
+        auto on_complete = [this, postprocessor](dxrt::TensorPtrs& outputs, void* user_data) -> int {  // NOSONAR(cpp:S5008)
             if (!user_data) return 0;
             auto* ud = static_cast<AsyncUserData*>(user_data);
             auto t_post_start = std::chrono::high_resolution_clock::now();
@@ -256,7 +255,11 @@ public:
             display_queue_.push(std::move(display_args));
             delete ud;
             return 0;
-        });
+        };
+        // Tiled SR submits its tiles with RunAsync + Wait (sr_tiling.hpp), which
+        // returns the outputs only while no callback is registered. SR frames
+        // never take the callback path, so only the other models register it.
+        if (!is_sr_) ie.RegisterCallback(on_complete);
 
         auto s_time = std::chrono::high_resolution_clock::now();
         int last_job_id = -1;
@@ -561,17 +564,12 @@ private:
         int out_h = orig_h * scale_y_;
         cv::Mat sr_y_padded;
 
-        // Blocking Run per tile — NOT the pipelined variant. This runner has a
-        // callback registered on `ie` (see RegisterCallback in run()), which
-        // consumes async outputs, so RunAsync + Wait() would return empty tensors
-        // for every tile. The sync restoration runner has no callback and does use
-        // runTilesPipelined().
+        // Tiles go through RunAsync over a bounded in-flight window (no callback is
+        // registered for SR models, see run()), and each is stitched as it
+        // arrives instead of holding every output of the frame.
         auto ti0 = std::chrono::high_resolution_clock::now();
-        std::vector<dxrt::TensorPtrs> tile_outputs;
-        dxapp::srtiling::runTilesBlocking(
-            ie, lr_gray, plans, tile_w_, tile_h_, tile_outputs);
-        int tiles_done = dxapp::srtiling::assembleTiles(
-            plans, tile_outputs, padded_out_h, padded_out_w,
+        int tiles_done = dxapp::srtiling::runAndAssembleTiles(
+            ie, lr_gray, plans, tile_h_, tile_w_, padded_out_h, padded_out_w,
             scale_y_, scale_x_, out_tile_w_, sr_y_padded);
         auto ti1 = std::chrono::high_resolution_clock::now();
 
