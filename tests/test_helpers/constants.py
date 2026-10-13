@@ -102,20 +102,22 @@ TASK_IMAGE_MAP: dict[str, str] = {
 EXCLUDED_EXAMPLE_VARIANTS = frozenset({"SCRFD500M_PPU", "YOLOV5Pose_PPU"})
 
 MODEL_IMAGE_OVERRIDE: dict[str, str] = {
-    "yolov5pose":                 _SAMPLE_PEOPLE,
-    "yolov8m_pose":               _SAMPLE_PEOPLE,
-    "yolov8s_pose":               _SAMPLE_PEOPLE,
-    "centerpose_regnetx_800mf":   _SAMPLE_PEOPLE,
-    "unet_mobilenet_v2":          _SAMPLE_DOG,
-    "mediapipe_hand_detector":    _SAMPLE_PERSON_A2,
+    # Keyed by variant name (the binary / script stem), which is what
+    # resolve_image_for_model() is called with.
+    "yolov5-s6-pose_640x640":           _SAMPLE_PEOPLE,
+    "yolov8-m-pose_640x640":            _SAMPLE_PEOPLE,
+    "yolov8-s-pose_640x640":            _SAMPLE_PEOPLE,
+    "centerpose_regnet-x800mf_640x640": _SAMPLE_PEOPLE,
+    "unet_mobilenetv2_256x256":         _SAMPLE_DOG,
+    "mediapipe-hand-detector_192x192":  _SAMPLE_PERSON_A2,
     # Super-resolution: ESPCN upscales a 275x150 crop; Real-ESRGAN takes a
     # smaller 165x90 one so the x8 output stays a sane size.
-    "espcn_x2":                   _SAMPLE_LOWRES_275x150,
-    "espcn_x3":                   _SAMPLE_LOWRES_275x150,
-    "espcn_x4":                   _SAMPLE_LOWRES_275x150,
-    "realesrgan_x2":              _SAMPLE_LOWRES_165x90,
-    "realesrgan_x4":              _SAMPLE_LOWRES_165x90,
-    "realesrgan_x8":              _SAMPLE_LOWRES_165x90,
+    "espcn-x2_17x17":                   _SAMPLE_LOWRES_275x150,
+    "espcn-x3_17x17":                   _SAMPLE_LOWRES_275x150,
+    "espcn-x4_17x17":                   _SAMPLE_LOWRES_275x150,
+    "realesrgan-x2_192x192":            _SAMPLE_LOWRES_165x90,
+    "realesrgan-x4_192x192":            _SAMPLE_LOWRES_165x90,
+    "realesrgan-x8_192x192":            _SAMPLE_LOWRES_165x90,
 }
 
 
