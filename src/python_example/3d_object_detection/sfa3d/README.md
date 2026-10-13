@@ -179,7 +179,7 @@ Same behavior as the other dx_app examples.
 | Model loaded / input size | yes | yes |
 | Starting inference | yes | yes |
 | PERFORMANCE SUMMARY | yes | yes |
-| Config loaded | no | yes |
+| Config loaded (with `--config`) | no | yes |
 | Input path / resolution | no | yes |
 | `[Result] Detected N...` / detection coordinates | no | yes |
 | Per-frame Read / Pre / Infer milliseconds | no | yes |

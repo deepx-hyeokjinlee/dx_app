@@ -257,7 +257,7 @@ All C++ and Python examples share a consistent set of command-line arguments.
 | `-s` / `--save` | `--save` | `--save` | Save rendered output to run directory |
 | `--save-dir` | `--save-dir` | `--save-dir` | Base output directory (default: `artifacts/`) |
 | `--dump-tensors` | `--dump-tensors` | `--dump-tensors` | Dump raw input/output tensors to files |
-| `--config` | `--config` | `--config` | Model config JSON path (auto-detected if omitted) |
+| `--config` | `--config` | `--config` | Model config JSON path; its settings override the built-in defaults (read only when given) |
 | `-h` / `--help` | `-h` | `-h` | Show usage |
 
 > **Input Source Rule:** `--image`, `--video`, `--camera`, and `--rtsp` form a mutually exclusive group. If none is specified, a **default sample image** is automatically selected based on the task type (e.g., `sample/img/sample_street.jpg` for object detection).

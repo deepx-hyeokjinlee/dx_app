@@ -27,7 +27,7 @@ import numpy as np
 import cv2
 
 from ..base.i_processor import SuperResolutionResult
-from ..config import load_config
+from ..config import load_config, overlay_nested_config
 from ..utility import print_image_processing_summary, print_sync_performance_summary
 from ..utility.camera import open_camera_capture
 from ..utility.common_util import window_exists
@@ -185,18 +185,24 @@ _DEFAULT_DISPLAY_SIZE = (960, 640)
 # ======================================================================
 
 def _resolve_config_path(args) -> Optional[str]:
-    """Locate config.json next to model or next to the main script."""
-    config_path = getattr(args, "config", None)
-    if config_path is not None:
-        return config_path
-    candidate = os.path.join(os.path.dirname(args.model), "config.json")
-    if os.path.isfile(candidate):
-        return candidate
-    import __main__
-    pkg_dir = os.path.dirname(os.path.abspath(
-        getattr(__main__, '__file__', '')))
-    candidate = os.path.join(pkg_dir, "config.json")
-    return candidate if os.path.isfile(candidate) else None
+    """The ``--config`` file, or None.
+
+    No config.json is searched for: without ``--config`` the run uses the
+    defaults the factory was built with, as the C++ runners do.
+    """
+    return getattr(args, "config", None)
+
+
+def _load_run_config(config_path: Optional[str], verbose: bool = False) -> dict:
+    """The ``--config`` file as a dict ({} without one).
+
+    Read the way the C++ runners read it: the members of the per-variant
+    layout's nested ``"config"`` object overlay the top level, so its thresholds
+    and ``sr_tile_halo`` apply.
+    """
+    if not config_path:
+        return {}
+    return overlay_nested_config(load_config(config_path, verbose=verbose))
 
 
 def _parse_loop_value(args) -> int:
@@ -820,11 +826,10 @@ class SyncRunner:
         if len(shape) < 3:
             logger.warning(f"Non-image model detected (shape={shape}).")
 
-        if config_path:
-            config = load_config(config_path, verbose=self._verbose)
-            if config:
-                self._config = config
-                self.factory.load_config(config)
+        config = _load_run_config(config_path, verbose=self._verbose)
+        if config:
+            self._config = config
+            self.factory.load_config(config)
 
         self.preprocessor = self.factory.create_preprocessor(self.input_width, self.input_height)
         self.postprocessor = self.factory.create_postprocessor(self.input_width, self.input_height)

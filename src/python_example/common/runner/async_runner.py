@@ -58,7 +58,7 @@ from .verify_serialize import is_verify_enabled, dump_verify_json
 # Import shared validation / version check / helpers from sync_runner
 from .sync_runner import (
     _check_dxrt_version, _validate_inputs, _apply_default_input, _has_display,
-    _resolve_config_path, _parse_loop_value, _window_should_close,
+    _resolve_config_path, _load_run_config, _parse_loop_value, _window_should_close,
     _create_sync_metrics, _add_sync_metrics,
     _DEFAULT_SAMPLE_IMAGE, _IMG_STREET, _IMAGE_ONLY_TASKS,
     _show_image_only_no_input_hint, _reject_image_only_stream_input,
@@ -339,12 +339,10 @@ class AsyncRunner:
         logger.info(f"\nModel loaded: {model_path}")
         logger.info(f"Model input size (WxH): {input_w}x{input_h}")
 
-        if config_path:
-            from ..config import load_config
-            config = load_config(config_path, verbose=self._verbose)
-            if config:
-                self._config = config
-                self.factory.load_config(config)
+        config = _load_run_config(config_path, verbose=self._verbose)
+        if config:
+            self._config = config
+            self.factory.load_config(config)
 
         self.preprocessor = self.factory.create_preprocessor(input_w, input_h)
         self.postprocessor = self.factory.create_postprocessor(input_w, input_h)

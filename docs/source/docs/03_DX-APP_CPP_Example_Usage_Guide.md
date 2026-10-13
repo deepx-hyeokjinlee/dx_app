@@ -133,7 +133,7 @@ All C++ examples use `cxxopts` for argument parsing and share a consistent inter
 | `--no-display` | — | bool | Disable visualization window, output FPS only |
 | `--drop-frames` | — | bool | Preview drops stale frames instead of pacing the pipeline (default: off, every frame is shown) |
 | `--show-log` | — | bool | Enable verbose log output (default: quiet) |
-| `--config` | — | string | Model config JSON path (auto-detected if omitted) |
+| `--config` | — | string | Model config JSON path; its settings override the built-in defaults (read only when given) |
 | `--help` | `-h` | — | Show usage |
 
 - **Input source:** `--image_path`, `--video_path`, `--camera_index`, and `--rtsp_url` form a mutually exclusive group. If none is specified, a **default sample image** is automatically selected based on the task type.

@@ -135,7 +135,7 @@ All Python examples use `argparse` via `common/runner/args.py` and share a consi
 | `--loop` | `-l` | int | Inference repeat count (default: 1; bare `--loop` = 2) |
 | `--no-display` | — | flag | Disable visualization window |
 | `--show-log` | — | flag | Enable verbose log output (default: quiet) |
-| `--config` | — | string | Model config JSON path (auto-detected if omitted) |
+| `--config` | — | string | Model config JSON path; its settings override the built-in defaults (read only when given) |
 | `--fast-postprocess` | — | flag | Opt-in faster postprocessing variant where available (standard path is the default) |
 | `--output` | `-o` | string | Output file path (restoration/depth/SR only) |
 | `--help` | `-h` | — | Show usage |

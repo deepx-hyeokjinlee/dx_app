@@ -173,7 +173,7 @@ def parse_common_args(
     # ---- Config ----
     parser.add_argument(
         "--config", type=str, default=None,
-        help="Path to config.json (auto-detected if omitted)",
+        help="config.json whose settings override the built-in defaults (read only when given)",
     )
 
     # ---- Verbosity ----
