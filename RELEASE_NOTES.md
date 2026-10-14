@@ -27,7 +27,6 @@
 
 ### 4. Removed
 - Ubuntu 18.04 support (Makefile, CI matrix, installation guide, `install_python_and_venv.sh`)
-- The `--internal` local-copy mode of `setup.sh`; models and sample videos always come from S3. `--internal`, `--internal-path` and `--internal-video-path` are still accepted and ignored with a warning
 
 ## DX-APP v3.2.2 / 2026-08-14
 
