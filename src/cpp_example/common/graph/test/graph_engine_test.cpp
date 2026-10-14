@@ -14292,6 +14292,163 @@ void TestSecondsAreWrittenRoundedLikeTime() {
     GRAPH_CHECK(later.events.size() == 1 && NumberOf(later.events[0].data, "seconds") == 1.1);
 }
 
+namespace {
+
+/// A per-crop ReID result as gallery_known_person.json's "reid" reports
+/// it: a vector, and its model's own top matches as a scores port.
+StageResult ReidCrop(const cv::Rect2f& crop) {
+    StageResult result;
+    std::shared_ptr<VectorData> vector(new VectorData());
+    vector->values.assign(512, 0.1f);
+    result.data = vector;
+    std::shared_ptr<ScoresData> matches(new ScoresData());
+    for (int i = 0; i < 5; ++i) {
+        ClassificationResult match;
+        match.class_name = "sample/reid/gallery/p" + std::to_string(i) + ".jpg";
+        match.confidence = 0.9f - 0.1f * static_cast<float>(i);
+        matches->items.push_back(match);
+    }
+    result.ports["matches"] = matches;
+    result.origin.from_roi = true;
+    result.origin.src_box = crop;
+    return result;
+}
+
+/// cam -> od -> {reid, attr}, and a gallery node "known" reading `gallery_reads`.
+GraphSpec KnownPersonSpec(const std::string& gallery_reads) {
+    GraphSpec spec;
+    const char* ids[] = {"cam", "od", "reid", "attr", "known"};
+    for (std::size_t i = 0; i < 5; ++i) {
+        NodeSpec node;
+        node.id = ids[i];
+        spec.nodes.push_back(node);
+    }
+    spec.nodes[0].is_source = true;
+    spec.nodes[4].is_logic = true;
+    spec.nodes[4].op = "gallery";
+    const char* edges[][2] = {{"cam", "od"}, {"od", "reid"}, {"od", "attr"}};
+    for (std::size_t i = 0; i < 3; ++i) {
+        EdgeSpec edge;
+        edge.from = edges[i][0];
+        edge.to = edges[i][1];
+        spec.edges.push_back(edge);
+    }
+    EdgeSpec carried;
+    carried.from = gallery_reads;
+    carried.to = "known";
+    carried.carry_result = true;
+    spec.edges.push_back(carried);
+    return spec;
+}
+
+}  // namespace
+
+// gallery_known_person: the gallery node names each person under its box,
+// so the ReID node it reads draws no "vec[512]" and no top-5 list over the
+// person; a node no gallery reads keeps its text.
+void TestAGalleryNodeQuietsTheTextOfTheNodeItReads() {
+    const RenderOptions quiet = RenderOptionsFor(KnownPersonSpec("reid"));
+    GRAPH_CHECK(quiet.quiet_text == std::set<std::string>{"reid"});
+    GRAPH_CHECK(RenderOptionsFor(KnownPersonSpec("attr")).quiet_text ==
+                std::set<std::string>{"attr"});
+    GraphSpec no_gallery = KnownPersonSpec("reid");
+    no_gallery.nodes[4].op = "user";
+    GRAPH_CHECK(RenderOptionsFor(no_gallery).quiet_text.empty());
+
+    const cv::Mat black = cv::Mat::zeros(400, 400, CV_8UC3);
+    FrameReport report;
+    report.roi_results["reid"].push_back(ReidCrop(cv::Rect2f(40.f, 60.f, 120.f, 300.f)));
+    std::shared_ptr<ScoresData> hat(new ScoresData());
+    ClassificationResult row;
+    row.class_name = "Hat";
+    row.confidence = 0.9f;
+    hat->items.push_back(row);
+    StageResult attr;
+    attr.data = hat;
+    attr.origin.from_roi = true;
+    attr.origin.src_box = cv::Rect2f(240.f, 60.f, 120.f, 300.f);
+    report.roi_results["attr"].push_back(attr);
+    LogicOverlay named;
+    OverlayText name;
+    name.at = cv::Point2f(40.f, 360.f);
+    name.text = "sample_people_p0 0.98";
+    named.texts.push_back(name);
+    report.overlays["known"] = named;
+    report.logic_nodes.insert("known");
+    report.node_results["known"].data.reset(new RecordsData());
+
+    const cv::Rect reid_text(40, 60, 200, 16 * 6 + 8);  // the vector line and 5 matches
+    const cv::Rect attr_text(240, 60, 160, 24);
+    const cv::Rect name_text(40, 330, 200, 40);
+    const cv::Mat loud = RenderReport(black, report);
+    GRAPH_CHECK(cv::countNonZero(loud(reid_text).reshape(1)) > 0);
+    const cv::Mat drawn = RenderReport(black, report, quiet);
+    GRAPH_CHECK(cv::countNonZero(drawn(reid_text).reshape(1)) == 0);
+    GRAPH_CHECK(cv::countNonZero(drawn(attr_text).reshape(1)) > 0);  // read by no gallery
+    GRAPH_CHECK(cv::countNonZero(drawn(name_text).reshape(1)) > 0);  // the gallery's name
+    // The label areas a caller gets back leave the quiet lines out too.
+    std::vector<cv::Rect> labels;
+    RenderReport(black, report, quiet, &labels);
+    bool reid_listed = false;
+    bool name_listed = false;
+    for (std::size_t i = 0; i < labels.size(); ++i) {
+        reid_listed = reid_listed || (labels[i] & reid_text).area() > 0;
+        name_listed = name_listed || (labels[i] & name_text).area() > 0;
+    }
+    GRAPH_CHECK(!reid_listed);
+    GRAPH_CHECK(name_listed);
+}
+
+// v_loitering_dwell: a dwell timer under a box at the bottom edge is not
+// covered by the recent-events panel, which moves to a free corner.
+void TestEventLogKeepsOffTheLabelsRenderReportDrew() {
+    const cv::Mat black = cv::Mat::zeros(360, 640, CV_8UC3);
+    const std::vector<std::string> lines = {"0.5s zone enter #0", "5.5s dwell dwell #0"};
+    FrameReport report;
+    LogicOverlay dwell;
+    OverlayText timer;
+    timer.at = cv::Point2f(60.f, 358.f);  // the box's bottom left, on the frame's edge
+    timer.text = "#0 5.8s";
+    timer.alert = true;
+    dwell.texts.push_back(timer);
+    report.overlays["dwell"] = dwell;
+    std::vector<cv::Rect> labels;
+    const cv::Mat rendered = RenderReport(black, report, RenderOptions(), &labels);
+    GRAPH_CHECK(labels.size() == 1);
+    if (labels.size() != 1) return;
+    const cv::Rect timer_box = labels[0];
+    GRAPH_CHECK(cv::countNonZero(rendered(timer_box).reshape(1)) > 0);
+    GRAPH_CHECK(timer_box.x < 200 && timer_box.y + timer_box.height > 330);
+
+    // Without labels to avoid: bottom left, as before.
+    cv::Mat plain = rendered.clone();
+    DrawEventLog(&plain, lines);
+    const cv::Rect bottom_left = cv::boundingRect(LabelDiffMask(rendered, plain));
+    GRAPH_CHECK(bottom_left.x < 20 && bottom_left.y > 300);
+    GRAPH_CHECK((bottom_left & timer_box).area() > 0);  // the defect: over the timer
+
+    // Told where the labels are: off the timer, to the bottom right.
+    cv::Mat moved = rendered.clone();
+    DrawEventLog(&moved, lines, labels);
+    const cv::Mat changed = LabelDiffMask(rendered, moved);
+    GRAPH_CHECK(cv::countNonZero(changed) > 0);
+    GRAPH_CHECK(cv::countNonZero(changed(timer_box)) == 0);
+    const cv::Rect panel = cv::boundingRect(changed);
+    GRAPH_CHECK(panel.x > 320 && panel.y > 300 && panel.x + panel.width > 600);
+
+    // Bottom right taken too: the top right.
+    std::vector<cv::Rect> both = labels;
+    both.push_back(cv::Rect(560, 330, 80, 30));
+    cv::Mat top = rendered.clone();
+    DrawEventLog(&top, lines, both);
+    const cv::Mat top_changed = LabelDiffMask(rendered, top);
+    const cv::Rect top_panel = cv::boundingRect(top_changed);
+    GRAPH_CHECK(top_panel.x > 320 && top_panel.y + top_panel.height < 60);
+    for (std::size_t i = 0; i < both.size(); ++i) {
+        GRAPH_CHECK(cv::countNonZero(top_changed(both[i] & cv::Rect(0, 0, 640, 360))) == 0);
+    }
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -14694,6 +14851,8 @@ int main() {
     TestConditionComparesRecordValuesWithSlack();
     TestARestartedStreamStartsItsTracksAndLogicAgain();
     TestSecondsAreWrittenRoundedLikeTime();
+    TestAGalleryNodeQuietsTheTextOfTheNodeItReads();
+    TestEventLogKeepsOffTheLabelsRenderReportDrew();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

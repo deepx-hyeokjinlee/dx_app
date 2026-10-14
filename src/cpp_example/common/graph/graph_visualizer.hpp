@@ -38,6 +38,7 @@
 #ifndef DXAPP_GRAPH_GRAPH_VISUALIZER_HPP
 #define DXAPP_GRAPH_GRAPH_VISUALIZER_HPP
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -63,6 +64,21 @@ namespace graph {
  * `FrameView`).
  */
 cv::Point2f RestorePointWarped(const cv::Point2f& roi_local, const RoiRef& ref);
+
+/// What RenderReport takes from the graph rather than from a report.
+/// Built once per graph (RenderOptionsFor); the same for every executor,
+/// so sync and async reports still render to the same pixels.
+struct RenderOptions {
+    /// Nodes whose scores and vector text pass 4 leaves out (and whose
+    /// lines are not label areas): each one feeds a gallery logic node,
+    /// which writes the name it found under each crop itself, so the
+    /// node's own "vec[N]" and top matches would only cover the person.
+    std::set<std::string> quiet_text;
+};
+
+/// The options `spec`'s edges call for: every node an edge carries into a
+/// node of op "gallery" is quiet.
+RenderOptions RenderOptionsFor(const GraphSpec& spec);
 
 /**
  * @brief Composite every stage's result in `report` onto `source`.
@@ -100,14 +116,26 @@ cv::Point2f RestorePointWarped(const cv::Point2f& roi_local, const RoiRef& ref);
  * is not drawn by the shape passes: a zone's boxes are its detector's
  * boxes, already drawn.
  *
+ * A node in `options.quiet_text` draws no scores or vector text.
+ *
+ * `labels`, when given, receives every text area drawn: box label rows,
+ * scores and vector lines, logic labels and the top-left panel - what a
+ * later overlay (DrawEventLog) should keep off.
+ *
  * An empty `source` returns it unchanged; a default (empty) `report`
  * draws nothing and returns a clone of `source`.
  */
-cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report);
+cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report,
+                     const RenderOptions& options = RenderOptions(),
+                     std::vector<cv::Rect>* labels = NULL);
 
-/// The CLI's recent-events panel: `lines` bottom-left, oldest first, the
-/// newest at the bottom. Kept out of RenderReport, which draws one report.
-void DrawEventLog(cv::Mat* canvas, const std::vector<std::string>& lines);
+/// The CLI's recent-events panel: `lines` oldest first, the newest at the
+/// bottom, in the first corner of bottom-left, bottom-right, top-right and
+/// top-left where it covers none of `avoid` (RenderReport's `labels`);
+/// when every corner covers some, the one covering the least. Kept out of
+/// RenderReport, which draws one report.
+void DrawEventLog(cv::Mat* canvas, const std::vector<std::string>& lines,
+                  const std::vector<cv::Rect>& avoid = std::vector<cv::Rect>());
 
 }  // namespace graph
 }  // namespace dxapp

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <opencv2/imgproc.hpp>
@@ -815,7 +817,9 @@ void DrawResultAndPorts(const StageResult& result, cv::Mat* canvas, Shape shape,
     }
 }
 
-void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, DrawFn fn) {
+/// `skip`: nodes left out of this pass (RenderOptions::quiet_text in pass 4).
+void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, DrawFn fn,
+                   const std::set<std::string>& skip = std::set<std::string>()) {
     for (std::map<std::string, StageResult>::const_iterator it =
              report.node_results.begin();
          it != report.node_results.end(); ++it) {
@@ -823,11 +827,13 @@ void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, Draw
         if (report.logic_nodes.count(it->first) != 0 || report.overlays.count(it->first) != 0) {
             continue;
         }
+        if (skip.count(it->first) != 0) continue;
         DrawResultAndPorts(it->second, canvas, shape, fn);
     }
     for (std::map<std::string, std::vector<StageResult> >::const_iterator it =
              report.roi_results.begin();
          it != report.roi_results.end(); ++it) {
+        if (skip.count(it->first) != 0) continue;
         const std::vector<StageResult>& results = it->second;
         for (std::size_t i = 0; i < results.size(); ++i) {
             DrawResultAndPorts(results[i], canvas, shape, fn);
@@ -835,37 +841,83 @@ void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, Draw
     }
 }
 
-/// Every result ForEachResult draws, ports as results of their own, in its order.
+/// Every result ForEachResult draws, ports as results of their own, in its
+/// order, each with the id of the node that produced it.
 template <typename Visit>
 void VisitResults(const FrameReport& report, Visit visit) {
-    std::vector<const StageResult*> results;
+    std::vector<std::pair<const std::string*, const StageResult*> > results;
     for (std::map<std::string, StageResult>::const_iterator it = report.node_results.begin();
          it != report.node_results.end(); ++it) {
         if (report.logic_nodes.count(it->first) != 0 || report.overlays.count(it->first) != 0) {
             continue;
         }
-        results.push_back(&it->second);
+        results.push_back(std::make_pair(&it->first, &it->second));
     }
     for (std::map<std::string, std::vector<StageResult> >::const_iterator it =
              report.roi_results.begin();
          it != report.roi_results.end(); ++it) {
-        for (std::size_t i = 0; i < it->second.size(); ++i) results.push_back(&it->second[i]);
+        for (std::size_t i = 0; i < it->second.size(); ++i) {
+            results.push_back(std::make_pair(&it->first, &it->second[i]));
+        }
     }
     for (std::size_t i = 0; i < results.size(); ++i) {
-        visit(*results[i]);
-        for (StagePorts::const_iterator port = results[i]->ports.begin();
-             port != results[i]->ports.end(); ++port) {
+        const StageResult& result = *results[i].second;
+        visit(*results[i].first, result);
+        for (StagePorts::const_iterator port = result.ports.begin(); port != result.ports.end();
+             ++port) {
             StageResult as_result;
             as_result.data = port->second;
-            as_result.origin = results[i]->origin;
-            visit(as_result);
+            as_result.origin = result.origin;
+            visit(*results[i].first, as_result);
         }
     }
 }
 
+/// The boxes DrawEventLog's `lines` fill with the panel in `corner`
+/// (0 bottom-left, 1 bottom-right, 2 top-right, 3 top-left), and the
+/// baseline each line is drawn at.
+std::vector<cv::Rect> EventLogBoxes(const cv::Size& canvas, const std::vector<std::string>& lines,
+                                    int corner, std::vector<cv::Point>* baselines) {
+    const int kMargin = 10;
+    const int kLineHeight = 22;
+    const int kTopBaseline = 24;
+    int widest = 0;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        widest = std::max(widest, LabelBox(lines[i], cv::Point(0, 0)).width);
+    }
+    const bool right = corner == 1 || corner == 2;
+    const bool bottom = corner == 0 || corner == 1;
+    std::vector<cv::Rect> boxes;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        const int from_bottom = static_cast<int>(lines.size() - 1 - i);
+        cv::Point at(right ? canvas.width - kMargin - widest : kMargin,
+                     bottom ? canvas.height - kMargin - kLineHeight * from_bottom
+                            : kTopBaseline + kLineHeight * static_cast<int>(i));
+        // Where DrawLabel puts it: inside the canvas.
+        const cv::Rect origin = LabelBox(lines[i], cv::Point(0, 0));
+        const cv::Rect box = InsideCanvas(LabelBox(lines[i], at), canvas);
+        boxes.push_back(box);
+        if (baselines != NULL) baselines->push_back(cv::Point(box.x, box.y - origin.y));
+    }
+    return boxes;
+}
+
 }  // namespace
 
-cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report) {
+RenderOptions RenderOptionsFor(const GraphSpec& spec) {
+    RenderOptions options;
+    for (std::size_t i = 0; i < spec.edges.size(); ++i) {
+        const NodeSpec* to = spec.FindNode(spec.edges[i].to);
+        if (to != NULL && to->is_logic && to->op == "gallery") {
+            options.quiet_text.insert(spec.edges[i].from);
+        }
+    }
+    return options;
+}
+
+cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report,
+                     const RenderOptions& options, std::vector<cv::Rect>* labels) {
+    if (labels != NULL) labels->clear();
     cv::Mat canvas = source.clone();
     if (canvas.empty()) return canvas;
 
@@ -888,21 +940,23 @@ cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report) {
     ForEachResult(report, &canvas, Shape::kObBoxes, &DrawObBoxes);
     ForEachResult(report, &canvas, Shape::kKeypoints, &DrawKeypoints);
 
-    // Pass 4: scores and vectors as text anchored to their parent box.
-    ForEachResult(report, &canvas, Shape::kScores, &DrawScores);
-    ForEachResult(report, &canvas, Shape::kVector, &DrawVector);
+    // Pass 4: scores and vectors as text anchored to their parent box,
+    // except a quiet node's (a gallery node names its crops instead).
+    ForEachResult(report, &canvas, Shape::kScores, &DrawScores, options.quiet_text);
+    ForEachResult(report, &canvas, Shape::kVector, &DrawVector, options.quiet_text);
 
     // Pass 5: logic nodes, over everything else, in node-id order. A label
     // laid beside its anchor keeps off the box labels of pass 3 and off
     // the labels drawn before it.
     std::vector<cv::Rect> taken;
-    VisitResults(report, [&canvas, &taken](const StageResult& result) {
+    VisitResults(report, [&canvas, &taken, &options](const std::string& node,
+                                                     const StageResult& result) {
         if (!result.data) return;
         const Shape shape = result.data->shape();
         if (shape == Shape::kBoxes || shape == Shape::kInstances) {
             AddBoxLabelRows(result, canvas.size(), &taken);
         }
-        AddScoreLines(result, canvas, &taken);
+        if (options.quiet_text.count(node) == 0) AddScoreLines(result, canvas, &taken);
     });
     cv::Mat tint;
     for (std::map<std::string, LogicOverlay>::const_iterator it = report.overlays.begin();
@@ -910,17 +964,31 @@ cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report) {
         DrawLogicShapes(&canvas, it->second, &tint);
     }
     DrawLogicLabels(&canvas, report.overlays, &taken);
+    if (labels != NULL) labels->swap(taken);
     return canvas;
 }
 
-void DrawEventLog(cv::Mat* canvas, const std::vector<std::string>& lines) {
-    if (canvas == NULL || canvas->empty()) return;
-    const int kLineHeight = 22;
-    for (std::size_t i = 0; i < lines.size(); ++i) {
-        const int from_bottom = static_cast<int>(lines.size() - 1 - i);
-        DrawLabel(canvas, lines[i], cv::Point(10, canvas->rows - 10 - kLineHeight * from_bottom),
-                  false);
+void DrawEventLog(cv::Mat* canvas, const std::vector<std::string>& lines,
+                  const std::vector<cv::Rect>& avoid) {
+    if (canvas == NULL || canvas->empty() || lines.empty()) return;
+    // The first corner that covers no label; failing that, the one that
+    // covers the least of them (bottom-left first on a tie).
+    int best_corner = 0;
+    long long best_cover = -1;
+    for (int corner = 0; corner < 4 && best_cover != 0; ++corner) {
+        const std::vector<cv::Rect> boxes = EventLogBoxes(canvas->size(), lines, corner, NULL);
+        long long cover = 0;
+        for (std::size_t b = 0; b < boxes.size(); ++b) {
+            for (std::size_t a = 0; a < avoid.size(); ++a) cover += (boxes[b] & avoid[a]).area();
+        }
+        if (best_cover < 0 || cover < best_cover) {
+            best_cover = cover;
+            best_corner = corner;
+        }
     }
+    std::vector<cv::Point> baselines;
+    EventLogBoxes(canvas->size(), lines, best_corner, &baselines);
+    for (std::size_t i = 0; i < lines.size(); ++i) DrawLabel(canvas, lines[i], baselines[i], false);
 }
 
 }  // namespace graph

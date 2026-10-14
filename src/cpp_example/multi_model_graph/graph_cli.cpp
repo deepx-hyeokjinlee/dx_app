@@ -1469,6 +1469,7 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
     }
     int failed_frames = 0;
     std::set<std::size_t> warned_edges;
+    const RenderOptions render_options = RenderOptionsFor(spec);
 
     // Under pipelining the report that comes out is not necessarily for the
     // frame just read, so every report is rendered onto ITS OWN frame, which
@@ -1510,9 +1511,12 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
             return false;
         }
         if (output_kind != OutputKind::kNone || sink.window) {
-            cv::Mat rendered = RenderReport(shown, report);
-            DrawEventLog(&rendered, std::vector<std::string>(recent.at(stream_index).begin(),
-                                                             recent.at(stream_index).end()));
+            std::vector<cv::Rect> labels;
+            cv::Mat rendered = RenderReport(shown, report, render_options, &labels);
+            DrawEventLog(&rendered,
+                         std::vector<std::string>(recent.at(stream_index).begin(),
+                                                  recent.at(stream_index).end()),
+                         labels);
             if (sink.video) {
                 if (!sink.video->Write(rendered, &problem)) {
                     std::fprintf(stderr, "%s\n", problem.c_str());

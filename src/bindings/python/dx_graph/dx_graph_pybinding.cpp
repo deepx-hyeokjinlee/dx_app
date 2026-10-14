@@ -809,7 +809,8 @@ class PyGraph {
         cv::Mat rendered;
         {
             py::gil_scoped_release release;
-            rendered = dxapp::graph::RenderReport(report.shown(), report.report());
+            rendered = dxapp::graph::RenderReport(report.shown(), report.report(),
+                                                  dxapp::graph::RenderOptionsFor(spec_));
         }
         if (rendered.empty()) return py::none();
         return NumpyFromMat(rendered);
