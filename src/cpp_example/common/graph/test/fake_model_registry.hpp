@@ -109,6 +109,7 @@ class FakeStage : public IStage {
     }
 
     StageResult run(const StageInput& input) {
+        if (latency_ms_ > 0) std::this_thread::sleep_for(std::chrono::milliseconds(latency_ms_));
         seen_.push_back(input);
         if (!failure_.empty()) throw std::runtime_error(FailureFor(input));
         StageResult result;
@@ -155,6 +156,7 @@ class FakeStage : public IStage {
         StageCallback callback = pending_[index].second;
         pending_.erase(pending_.begin() + index);
         if (meter_) meter_->Leave();
+        if (latency_ms_ > 0) std::this_thread::sleep_for(std::chrono::milliseconds(latency_ms_));
         if (!failure_.empty()) {
             const std::string message = FailureFor(input);
             callback(StageResult(), message);
@@ -253,6 +255,7 @@ class FakeModelRegistry : public IModelRegistry {
         order_.push_back(info.model_name);
     }
 
+    /// run() and every delivery of stages created for this model sleep this long first. Must be set before StageGraph::Build.
     void SetLatency(const std::string& model_name, int latency_ms) {
         latency_[model_name] = latency_ms;
     }

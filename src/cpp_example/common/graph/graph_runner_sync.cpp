@@ -1,6 +1,7 @@
 #include "common/graph/graph_runner_sync.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <stdexcept>
 #include <string>
 
@@ -70,7 +71,9 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
                 result_inbox.find(index);
             const std::vector<StageDataPtr>& inputs =
                 found == result_inbox.end() ? empty_inputs : found->second;
+            const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
             const CpuReduction reduced = ReduceCpu(node.op, node.params, inputs, frame.size());
+            report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
             report.node_results[node.id] = reduced.result;
             if (!reduced.error.empty() && report.error.empty()) {
                 report.error = std::string("node \"") + node.id + "\": " + reduced.error;
@@ -83,12 +86,15 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             StageInput input;
             input.image = in.image;
             input.origin.inv_align = in.to_source;
+            const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
             try {
                 StageResult result = node.stage->run(input);
+                report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
                 report.node_results[node.id] = result;
                 produced = result.data;
                 ports = result.ports;
             } catch (const std::exception& error) {
+                report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
                 report.error = std::string("node \"") + node.id + "\": " +
                                error.what();
                 continue;
@@ -99,6 +105,7 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             }
             std::vector<RoiCrop>& crops = roi_inbox[index];
             std::vector<StageResult> results;
+            const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
             for (std::size_t c = 0; c < crops.size(); ++c) {
                 StageInput input;
                 input.image = crops[c].image;
@@ -110,6 +117,7 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
                                    error.what();
                 }
             }
+            report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
             // Canonical order: both executors sort a node's ROI results
             // into ByOrigin order before storing them, so Task 10's parity
             // test compares like-ordered vectors regardless of either

@@ -548,6 +548,8 @@ std::vector<std::size_t> StageGraph::OutgoingEdges(std::size_t node) const {
  * branch for no discriminating power. It is not the same claim as "false
  * for everything is safe" — a null StageDataPtr is a distinct, meaningful
  * state (absence), not a placeholder for content that might differ.
+ *
+ * node_ms is measured, not produced, and is deliberately not compared.
  */
 bool operator==(const FrameReport& a, const FrameReport& b) {
     if (a.frame_index != b.frame_index) return false;

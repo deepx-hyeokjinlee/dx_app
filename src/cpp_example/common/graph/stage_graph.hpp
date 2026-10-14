@@ -9,6 +9,7 @@
 #define DXAPP_GRAPH_STAGE_GRAPH_HPP
 
 #include <cstddef>
+#include <chrono>
 #include <map>
 #include <memory>
 #include <string>
@@ -72,9 +73,23 @@ struct FrameReport {
     std::map<std::string, std::vector<StageResult> > roi_results; ///< ROI stages
     int skipped_out_of_bounds;
     std::string error;
+    /// Milliseconds each non-source node took in this frame. Sync: inside the
+    /// node's stage calls (every crop of a ROI node, summed) or its cpu
+    /// reduction. Async: from the node's dispatch to its last job's recorded
+    /// completion, waiting behind other frames included; 0 for a ROI node
+    /// with no crops. Measured, so NOT compared by operator== and written to
+    /// --report only with --report-timing.
+    std::map<std::string, double> node_ms;
 
     FrameReport() : frame_index(0), skipped_out_of_bounds(0) {}
 };
+
+/// Milliseconds from `since` to `until`, for FrameReport::node_ms; never negative.
+inline double ElapsedMs(std::chrono::steady_clock::time_point since,
+                        std::chrono::steady_clock::time_point until) {
+    const double ms = std::chrono::duration<double, std::milli>(until - since).count();
+    return ms > 0.0 ? ms : 0.0;
+}
 
 /// Structural equality, used by the sync/async parity test.
 bool operator==(const FrameReport& a, const FrameReport& b);

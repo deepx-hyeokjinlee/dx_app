@@ -11870,6 +11870,52 @@ void TestVolumeProxyMatchesSyncAndAsync() {
                 records->items[0].text[0].second == "backpack");
 }
 
+// Graph Composer P1: every non-source node's time in this frame, sync.
+void TestSyncExecutorTimesEveryNode() {
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    registry.SetLatency("yolov8n", 30);
+    registry.SetLatency("casvit_t", 10);
+    const GraphSpec spec = ParseGraphText(CascadeJson(), "t.json");
+    ValidateGraph(spec, registry);
+    StageGraph graph;
+    graph.Build(spec, registry, "/models", false);
+    const FrameReport report =
+        SyncExecutor().RunFrame(graph, cv::Mat::zeros(480, 640, CV_8UC3), 0);
+    GRAPH_CHECK(report.error.empty());
+    GRAPH_CHECK(report.node_ms.count("cam") == 0);
+    GRAPH_CHECK(report.node_ms.count("od") == 1 && report.node_ms.at("od") >= 29.0);
+    // Two person crops run one after the other: both run() calls count.
+    GRAPH_CHECK(report.node_ms.count("reid") == 1 && report.node_ms.at("reid") >= 19.0);
+    GRAPH_CHECK(report.node_ms.at("od") < 5000.0);
+    // Timing is not part of a report's identity: parity compares results.
+    FrameReport other = report;
+    other.node_ms["od"] += 100.0;
+    GRAPH_CHECK(other == report);
+
+    // A cpu node is timed too.
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    BoxItem face;
+    face.box = cv::Rect2f(200.f, 120.f, 80.f, 100.f);
+    face.class_name = "face";
+    face.landmarks.push_back(Keypoint(220.f, 150.f, 1.f));
+    face.landmarks.push_back(Keypoint(260.f, 150.f, 1.f));
+    face.landmarks.push_back(Keypoint(240.f, 180.f, 1.f));
+    face.landmarks.push_back(Keypoint(225.f, 200.f, 1.f));
+    face.landmarks.push_back(Keypoint(255.f, 200.f, 1.f));
+    boxes->items.push_back(face);
+    FakeModelRegistry cpu_registry;
+    cpu_registry.AddModel(CpuFixtureModel("face", Shape::kBoxes), boxes);
+    const FrameReport cpu = RunSync(
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"face\",\"model\":\"face\"},{\"id\":\"pose\",\"type\":\"cpu\",\"op\":\"headpose\"}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"face\"},"
+        "{\"from\":\"face\",\"to\":\"pose\",\"carry\":\"result\"}]}",
+        &cpu_registry, cv::Mat::zeros(480, 640, CV_8UC3));
+    GRAPH_CHECK(cpu.error.empty());
+    GRAPH_CHECK(cpu.node_ms.count("pose") == 1 && cpu.node_ms.at("pose") >= 0.0);
+    GRAPH_CHECK(cpu.node_ms.count("face") == 1);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12216,6 +12262,7 @@ int main() {
     TestCpuNodeRejectsAGenericFuseAndABadResultEdge();
     TestHeadPoseMatchesSyncAndAsync();
     TestVolumeProxyMatchesSyncAndAsync();
+    TestSyncExecutorTimesEveryNode();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
