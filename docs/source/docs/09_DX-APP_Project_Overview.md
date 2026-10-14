@@ -331,7 +331,7 @@ All C++ and Python examples share a consistent set of command-line arguments.
 | `DXAPP_SAVE_IMAGE` | When set to a file path, saves the visualization output to that path (no `--save` required) |
 | `DXAPP_VERIFY` | When set to `1`, dumps post-processing results to `logs/verify/{model}.json` (last frame) and `{model}.frames.jsonl` (every frame, in input order) for numerical verification |
 | `DXAPP_VERIFY_DIR` | Directory for `DXAPP_VERIFY` output (default `logs/verify`) |
-| `DXAPP_PROGRESS` | When set to `1`, prints `[PROGRESS] frames=N fps=F avg_fps=A read_ms=R pre_ms=P infer_ms=I post_ms=Q` at most once a second and once at exit, for front ends such as DX AI Studio: `fps` is the last second's rate, `avg_fps` counts from the first frame (start-up and model load excluded), `*_ms` are the stage averages over the same second (the final line: run averages) |
+| `DXAPP_PROGRESS` | When set to `1`, prints `[PROGRESS] frames=N fps=F avg_fps=A read_ms=R pre_ms=P infer_ms=I post_ms=Q` at most once a second and once at exit, for front ends such as DX AI Studio: `fps` is the last second's rate, `avg_fps` counts from the first frame (start-up and model load excluded), `*_ms` are the stage averages over the same second (the final line: run averages). The multi_model_graph binaries print `node_ms=<id>:<ms>,...` (time per graph node) instead of the `*_ms` stage fields |
 
 ### C++ Templates 
 

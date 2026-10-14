@@ -117,7 +117,7 @@ the corner and the size once.
 | Kind | Written as | Meaning |
 |---|---|---|
 | source | `{ "id": "cam", "type": "source", "uri": "..." }` | where frames come from: an image, a video file, `camera:0`, or an `rtsp://` URL. A relative `uri` is resolved against the repository root, so the samples run from any directory. A graph may have several source nodes; each one is its own stream (see *Several sources: one stream each*) |
-| model | `{ "id": "od", "model": "yolov8-n_640x640" }` | one model from the registry — note there is **no `"type"`** on a model node. `--list-models` and [`docs/graph_models.md`](../../../docs/graph_models.md) say which names exist |
+| model | `{ "id": "od", "model": "yolov8-n_640x640" }` | one model from the registry — note there is **no `"type"`** on a model node. `--list-models` and [`docs/graph_models.md`](../../../docs/graph_models.md) say which names exist. Optional `"engine": {"buffers": N, "share": true}`: NPU memory (see *Device memory*) |
 | cpu | `{ "id": "headpose", "type": "cpu", "op": "headpose" }` | one named reduction, run once per frame after its parents finish. `"op"` is `headpose` or `volume`. No `"model"`, no `"track"`. `headpose` takes no params. `volume` accepts `scale_factor` (number, default 1), `classes` and `class_ids` (string arrays; omit them for the defaults, pass `[]` to disable that match) |
 
 **Edges**
@@ -514,7 +514,7 @@ each, for edge ports and node params. Each example below is real output from
 | `MODEL_NO_TASK` | registered without a task *(no model this build ships is in this state; not real output)* | `ERROR [MODEL_NO_TASK] node "od": model "X" has no task registered`<br>`  -> ./scripts/add_model.sh --model X --task <task>` |
 | `MODEL_NOT_READY` | registered, but the graph engine cannot run it: no factory, no postprocessor, or an interface with no graph stage (the four anomaly models in this release) | `ERROR [MODEL_NOT_READY] node "ad": model "patchcore_224x224" is registered but cannot run: anomaly detection is not graph-ready in this release`<br>`  -> see docs/graph_models.md for models usable in graphs` |
 | `MODEL_MISSING` | the `.dxnn` is not in `--model-dir` | *(from a run: `--check` lists the same files and the same command without failing)*<br>`ERROR [MODEL_MISSING] graph "person-reid": 2 model files are not in ./no_models`<br>`  node "od"  model yolov8-n_640x640  ->  ./no_models/yolov8-n_640x640.dxnn`<br>`  node "reid"  model casvit-t_224x224  ->  ./no_models/casvit-t_224x224.dxnn`<br>`  -> ./setup.sh --models YoloV8N casvit_t` |
-| `MODEL_LOAD` | the `.dxnn` is present but the runtime cannot load it (device memory, device state, an incompatible file). `--check` reports the one case it can see without the NPU, a v9 file on DX-RT older than 3.5.0 (see *Model files*), and exits 1 | *(real output on DX-M1, from a run, not from `--check`, of a graph that names its models by their old names; the runtime's source path is shortened to `...`)*<br>`ERROR [MODEL_LOAD] node "sr2": model "realesrgan_x2" (realesrgan-x2_192x192.dxnn) could not be loaded: [dxrt-exception] Invalid model exception {"failed to register task":.../task.cpp:115:Task}`<br>`  -> the NPU's device memory may be full: this graph loaded 3 model(s) before this one, and every node loads its own copy, even of the same model (another process on the NPU uses memory too); remove a node or use a smaller model - DX-M1 cannot hold a second realesrgan-x2_192x192 next to yolov8-n_640x640 and resnet50_224x224` |
+| `MODEL_LOAD` | the `.dxnn` is present but the runtime cannot load it (device memory, device state, an incompatible file). `--check` reports the cases it can see without the NPU, a file that is not a `.dxnn` and a v9 file on DX-RT older than 3.5.0 (see *Model files*), and exits 1; whether the models fit in device memory shows only when they load | *(real output on DX-M1, from a run, not from `--check`, of a graph that names its models by their old names)*<br>`ERROR [MODEL_LOAD] node "sr2": model "realesrgan_x2" (realesrgan-x2_192x192.dxnn) could not be loaded: [dxrt-exception] Invalid model exception {"failed to register task":lib/task.cpp:145:Task}`<br>`  -> the NPU's device memory may be full: this graph loaded 3 model(s) before this one, and every node loads its own copy, even of the same model, unless the nodes set "engine": {"share": true} (another process on the NPU uses memory too); share an engine, lower a node's "engine": {"buffers": N} (DX-RT's default is 6), remove a node or use a smaller model - DX-M1 cannot hold a second realesrgan-x2_192x192 next to yolov8-n_640x640 and resnet50_224x224` |
 
 `MODEL_LOAD` names the node and keeps the runtime's own reason whole. Its
 hint depends on how far loading got: after other models loaded, it is the
@@ -641,6 +641,40 @@ Because it never opens the NPU, `--check` cannot tell whether the device
 can hold every model of the graph at once: that is found out when the
 models load (`MODEL_LOAD`, see *Device memory*).
 
+### `--check --json`
+
+One JSON object on stdout, nothing on stderr; exit 0 when `errors` is
+empty, else 1:
+
+```json
+{
+  "ok": false,
+  "graph": "person-reid",
+  "errors": [
+    {"code": "GRAPH_EDGE", "where": "edge \"seg\"->\"reid\"", "what": "...", "how": "...",
+     "node": null, "edge": {"from": "seg", "to": "reid"}},
+    {"code": "MODEL_LOAD", "where": "node \"od\"", "what": "...", "how": "download it again: ./setup.sh --models YoloV8N",
+     "node": "od", "edge": null}
+  ],
+  "models": [
+    {"node": "od", "model": "yolov8-n_640x640", "file": "yolov8-n_640x640.dxnn",
+     "state": "present", "container": "v9",
+     "engine": {"buffers": 2, "share": true, "shared_with": null}},
+    {"node": "od2", "model": "yolov8-n_640x640", "file": "yolov8-n_640x640.dxnn",
+     "state": "present", "container": "v9",
+     "engine": {"buffers": 2, "share": true, "shared_with": "od"}}
+  ],
+  "notes": ["note: node \"od\": \"yolov8n\" is the old name of \"yolov8-n_640x640\""]
+}
+```
+
+- `graph`: the graph's `"name"`, else the path given.
+- `errors`: at most one parse/validation error (`ValidateGraph` stops at the first), then one `MODEL_LOAD` per model node whose present file cannot load. `node`/`edge`: validation errors are matched against the parsed graph (`node "<id>"`, `edge "<from>"->"<to>"` in `where`); parse errors by the index in `where` (`node[i]`, `edge[i]`) looked up in the raw JSON file (`from`/`to` are `null` when that key is missing). Both `null` when the error is about the whole graph (`GRAPH_CYCLE`, `GRAPH_VERSION`, no source, unreadable file).
+- `models`: one entry per model node, in declaration order, when the file parsed (also when validation failed): `state` is `present`, `missing`, `invalid` (not a `.dxnn`), `unloadable` (container this DX-RT cannot load) or `unknown` (model not registered; then `file` and `container` are `null`); `container` is `"v8"`/`"v9"` or `null`; `engine.buffers` 0 means DX-RT's default; `engine.shared_with` is the owner's id for a sharing node that is not the owner, else `null`. No device-memory figure (see *Device memory*).
+- `notes`: the `note:` lines `--check` prints for old names, one string each.
+
+Object keys come out in alphabetical order; the order above is for reading.
+
 ## Finding a model: `--list-models`
 
 ```console
@@ -670,6 +704,25 @@ says why, as in `v9 (needs DX-RT >= 3.5.0)`. `ready` is `no`, with the
 reason, for a model the graph engine cannot run (the anomaly models in this
 release). A model with extra outputs ends its row with
 `  ports: <name>=<shape> ...`.
+
+### `--list-models --json`
+
+One JSON array on stdout and nothing else on stdout or stderr; exit 0. A bad
+filter is exit 2 with the text error on stderr and nothing on stdout:
+
+```json
+[
+  {"model": "yolov8-n_640x640", "task": "object_detection", "produces": "boxes",
+   "consumes": "full_frame", "input": {"width": 640, "height": 640}, "published": true,
+   "file": "yolov8-n_640x640.dxnn", "container": "v9", "ready": true, "reason": "",
+   "ports": [], "alias_of": null},
+  {"model": "yolopv2_384x640", "...": "...",
+   "ports": [{"name": "drivable", "shape": "labelmap"}, {"name": "lane", "shape": "labelmap"}]},
+  {"model": "deit_base384_distilled", "alias_of": "deit-b_384x384_distilled", "...": "every other field copied from the variant"}
+]
+```
+
+`container` is exactly the table's `file` column (`v8`, `v9`, `v9 (needs DX-RT >= 3.5.0)`, `missing`, `invalid`). Rows come in table order: models, then `alias_of` rows. `--consumes`/`--produces`/`--model-dir` apply as in the table.
 
 Three sources, in order of authority:
 
@@ -714,7 +767,7 @@ ERROR [GRAPH_SCHEMA] typo.json edge[1] "od"->"reid" "roi": 2 unknown keys: "clas
   -> did you mean "classes" for "classez", "pad" for "paddng"? accepted keys: classes, min_score, min_area, pad, max, align
 ```
 
-This holds at every level — top level, node, `track`, edge and `roi` — and
+This holds at every level — top level, node, `track`, `engine`, edge and `roi` — and
 it matters more here than in most configuration formats: a dropped key does
 not stop the graph, it runs it with the option missing, and nothing prompts
 you to look. Three details worth knowing:
@@ -975,13 +1028,40 @@ Every model node opens its own engine on the NPU, even two nodes that name
 the same model, and each engine holds its own device memory; other
 processes using the NPU draw on the same memory. A graph whose engines do
 not fit fails while it loads, with `MODEL_LOAD` on the first node that does
-not fit. On DX-M1, a second `realesrgan-x2_192x192` next to `yolov8-n_640x640`, `resnet50_224x224`
-and a first `realesrgan-x2_192x192` cannot load (the example under *Error
-messages*).
+not fit, and every engine opened before it is closed again before the error
+is reported. On DX-M1, a second `realesrgan-x2_192x192` next to
+`yolov8-n_640x640`, `resnet50_224x224` and a first `realesrgan-x2_192x192`
+cannot load (the example under *Error messages*).
 
-`--check` cannot predict this: it never opens the NPU, and the runtime
-exposes no reliable per-model device-memory figure to add up. When it
-happens, remove a node or use a smaller model.
+Two node settings lower what a graph needs, both under `"engine"`:
+
+```json
+{ "id": "od",  "model": "yolov8-n_640x640", "engine": { "share": true, "buffers": 2 } },
+{ "id": "od2", "model": "yolov8-n_640x640", "engine": { "share": true, "buffers": 2 } }
+```
+
+* `"buffers": N` (1 to 100) is how many inputs DX-RT keeps in flight for
+  the model (`InferenceOption::bufferCount`; DX-RT's default is 6). Most of
+  a model's device memory is that buffer pool: `parse_model -m <file>`
+  prints it under *Model Memory Usage* (`yolov8-n_640x640`: 73.87 MB in
+  total, 70.31 MB of it six buffers), so 2 buffers need about a third. Fewer
+  buffers can lower async throughput; results do not change.
+* `"share": true` lets every node with it and the same model variant use ONE
+  engine. They must have the same `params` and the same `buffers`
+  (`GRAPH_SCHEMA` on `node "<id>" "engine"` otherwise). Results are the same
+  as with an engine each. The executors call each stage from one thread and
+  route every result by the job that asked for it, so sharing is safe in
+  both binaries; `--max-jobs-per-stage` counts per node, so a shared engine
+  may hold that many jobs per sharing node.
+
+Either setting on the two `realesrgan-x2_192x192` nodes of the example
+above (`"share": true` on both, or `"buffers": 2` on each) lets that graph
+load on DX-M1.
+
+`--check` cannot measure device memory: it never opens the NPU, and DX-RT
+has no API for a model's memory before it loads. `--check --json` lists
+each model node's `engine` settings and which node's engine it shares, so a
+front end can add up `parse_model` figures itself.
 
 ---
 
@@ -1064,6 +1144,14 @@ request, let the run finish; if you may have to kill it, write `.mkv` or
 - **The bytes are those of a whole-file dump**: `{"frames": [...],
   "graph": "<name>"}`, indented by two spaces, with a trailing newline. The
   sync and async binaries write byte-identical files.
+- **`--report-timing`** adds `"node_ms": {"<node>": ms}` to every frame:
+  milliseconds per non-source node, rounded to 0.001. In
+  `multi_model_graph_sync` it is the time inside the node's stage (all
+  crops of a ROI node, summed) or its cpu reduction; in
+  `multi_model_graph_async` it runs from the node's dispatch to its last
+  job's completion, so it includes waiting behind other frames' jobs. A ROI
+  node with no crops is `0`. Timings differ from run to run, so without the
+  flag a report holds none and the two binaries' files stay byte-identical.
 - **Every exit short of a kill finalizes it**: the normal end; Ctrl-C,
   SIGTERM, `q`/ESC; a frame whose `--output` cannot be written; an error that
   stops the run, such as `--stall-timeout-ms`; a source that produced no
@@ -1092,6 +1180,22 @@ request, let the run finish; if you may have to kill it, write `.mkv` or
   NaN in the same place compare equal as text, while the C++
   `FrameReport::operator==` treats NaN as never equal, so an in-memory
   comparison of a NaN-bearing report fails by design.
+
+### Progress lines (`DXAPP_PROGRESS=1`)
+
+With `DXAPP_PROGRESS=1` both binaries print, at most once a second and once
+at the end, after the per-frame lines:
+
+```text
+[PROGRESS] frames=24 fps=31.8 avg_fps=30.9 node_ms=od:12.41,reid:6.02
+```
+
+`frames` counts finished frames of every stream; `fps` is the rate since
+the previous line and `avg_fps` since the first frame. `node_ms` is the
+per-node time (as in `--report-timing`) averaged over the frames since the
+previous line that ran the node; the final line carries run averages. Node
+ids are percent-encoded outside `[A-Za-z0-9_.-]` (`cam 1` is `cam%201`).
+The first line, before any rate can be measured, carries only `frames=`.
 
 ---
 

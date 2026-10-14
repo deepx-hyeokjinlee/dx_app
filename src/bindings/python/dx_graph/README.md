@@ -390,9 +390,12 @@ memory. A graph whose engines do not fit raises `GraphError` with `.code ==
 "MODEL_LOAD"` from the constructor, naming the first node that did not fit:
 on DX-M1, a second `realesrgan-x2_192x192` next to `yolov8-n_640x640`, `resnet50_224x224` and a first
 `realesrgan-x2_192x192` cannot load. Nothing checks this in advance (the CLI's
-`--check` cannot either: the runtime exposes no reliable per-model
-device-memory figure); remove a node or use a smaller model. See the
-multi_model_graph README's *Device memory*.
+`--check` cannot either: DX-RT has no API for a model's memory before it
+loads). A node's `"engine"` key lowers what a graph needs: `"share": true`
+on nodes with the same model gives them one engine, and `"buffers": N`
+shrinks a model's buffer pool (DX-RT's default is 6); otherwise remove a
+node or use a smaller model. See the multi_model_graph README's *Device
+memory*.
 
 ---
 
