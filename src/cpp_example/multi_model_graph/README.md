@@ -123,7 +123,7 @@ the corner and the size once.
 
 ---
 
-## The whole vocabulary: three node kinds, three edge kinds
+## The whole vocabulary: four node kinds, three edge kinds
 
 **Nodes**
 
@@ -132,6 +132,7 @@ the corner and the size once.
 | source | `{ "id": "cam", "type": "source", "uri": "..." }` | where frames come from: an image, a video file, `camera:0`, or an `rtsp://` URL. A relative `uri` is resolved against the repository root, so the samples run from any directory. A graph may have several source nodes; each one is its own stream (see *Several sources: one stream each*) |
 | model | `{ "id": "od", "model": "yolov8-n_640x640" }` | one model from the registry — note there is **no `"type"`** on a model node. `--list-models` and [`docs/graph_models.md`](../../../docs/graph_models.md) say which names exist. Optional `"engine": {"buffers": N, "share": true}`: NPU memory (see *Device memory*) |
 | cpu | `{ "id": "headpose", "type": "cpu", "op": "headpose" }` | one named reduction, run once per frame after its parents finish. `"op"` is `headpose` or `volume`. No `"model"`, no `"track"`. `headpose` takes no params. `volume` accepts `scale_factor` (number, default 1), `classes` and `class_ids` (string arrays; omit them for the defaults, pass `[]` to disable that match) |
+| logic | `{ "id": "zone", "type": "logic", "op": "zone", "params": { "polygon": [0.5, 0, 1, 0, 1, 1, 0.5, 1] } }` | a decision around the models, run once per frame on the CPU after its inputs: `filter`, `zone`, `line`, `count`, `dwell`, `condition`, `gallery` or `user` (see *Logic nodes*). No `"model"`, no `"track"`, no `"engine"` |
 
 **Edges**
 
@@ -139,7 +140,7 @@ the corner and the size once.
 |---|---|---|
 | frame | `{ "from": "cam", "to": "od" }` | the consumer gets the whole frame: the source frame, or the image the producer made (see below) |
 | ROI | `{ "from": "od", "to": "reid", "roi": { ... } }` | the consumer gets one cropped region per box the producer found, and runs once per crop |
-| result | `{ "from": "face", "to": "headpose", "carry": "result" }` | the consumer, which must be a cpu node, receives the producer payload. Not a crop and not a frame. `headpose` needs one `boxes` result. `volume` needs one `boxes`, one `instances` and one `densemap` |
+| result | `{ "from": "face", "to": "headpose", "carry": "result" }` | the consumer, which must be a cpu or a logic node, receives the producer payload. Not a crop and not a frame. `headpose` needs one `boxes` result. `volume` needs one `boxes`, one `instances` and one `densemap`. A node fed by an ROI edge hands a logic node every crop's result (see *Logic nodes*) |
 | `port` | `{ "from": "drive", "to": "x", "port": "lane" }` | reads one named output of the producer; without it, the primary output (this example is refused today: no shipped port has an edge-carryable shape; see *Output ports*). A result edge cannot also name a port |
 
 A model node accepts a frame edge only if it `consumes` `frame` or `either`,
@@ -498,6 +499,156 @@ that it does not name itself: overriding `score_threshold` does not wipe a
 
 ---
 
+## Logic nodes: zones, lines, counts, conditions, events
+
+A logic node is the decision around the models: which boxes matter, where
+they are, how many, for how long, and when to say so. It runs once per
+frame on the CPU after the nodes it reads, and reads them only on
+`"carry": "result"` edges.
+
+| Op | Reads | Params | Hands on | Events |
+|---|---|---|---|---|
+| `filter` | boxes, obboxes or instances | `classes` (strings), `min_score` (0 to 1), `min_area` (pixels) | the boxes it keeps | - |
+| `zone` | boxes, obboxes or instances | `polygon` (required), `mode` `inside`/`outside`, `anchor` `bottom`/`center` | the boxes whose anchor is in the selected region | `enter`, `exit` (boxes with a `track_id`) |
+| `line` | tracked boxes | `line` (required), `anchor`, `direction` `both`/`in`/`out` | records: `in`, `out`, `total` | `cross` (`direction`, `in`, `out`) |
+| `count` | 1 to 8 box inputs | `classes` | records, one per input: `total` and one number per class, text `node` | - |
+| `dwell` | tracked boxes (usually a zone's) | `threshold_s` (> 0, default 10), `grace_s` (default 1) | records per track: `track_id`, `seconds` | `dwell` (`seconds`), once per stay |
+| `condition` | boxes, records, or a per-crop node's scores or vectors | `value`, `comparator`, `threshold`, `reduce` `max`/`min`/`sum`, `cooldown_s`, `event` | records: `value`, `active` | its `event` (default: the node id), with `value`, `threshold`, `track_ids` |
+| `gallery` | vectors, per crop or full frame | `gallery` (required), `threshold` (0 to 1, default 0.5), `events` `known`/`all`/`none` | records per crop: `track_id`, `score`, `parent_index`, text `name` | `match` (`name`, `score`), `unknown` |
+| `user` | any one full-frame input | `name` (a C identifier), `input`, `output` (shape names, equal) | its input, unchanged | - |
+
+* **Coordinates are fractions 0 to 1 of the source frame**, flat arrays:
+  `"polygon": [x0, y0, x1, y1, ...]` (at least 3 points), `"line": [x0, y0,
+  x1, y1]` from A to B. One graph fits any resolution; pixels are refused.
+  A line's `in` is a crossing from the left of A->B to its right as seen on
+  the image (y down): with A at the bottom and B at the top, walking right
+  is `in`. A box is placed by its `anchor`: its bottom centre (where a
+  person stands) or its centre.
+* **Track ids** come from a detector's `"track"`; `filter`, `zone` and
+  `user` keep them. `line` and `dwell` need them, and `--check` names the
+  detector to add `"track"` to. A track not seen for 5 seconds is forgotten
+  (a zone then raises `exit` for it).
+* **Boxes in, boxes out**: `filter`, `zone` and `user` hand on boxes, so a
+  logic node can feed another one, or an ROI edge to a model: `zone -> roi ->
+  classifier` crops only the people in the zone (`ppe_zone_check.json`).
+  Logic nodes read and write source-frame pixels (a detector run on a
+  handed-off image is mapped back first).
+* **Per crop**: a node fed by an ROI edge hands a logic node every crop's
+  result, with the crop's `track_id`. `condition` reads them as `"count"`,
+  `"with:<label>"` or `"without:<label>"` (the crops whose scores do or do
+  not name the label); `gallery` names each crop's vector.
+* **`condition`** compares one value: `"count"` for boxes or crops, a
+  number its records input writes (`--check` lists them), reduced over
+  several records with `reduce`. With `cooldown_s` 0 it raises its event
+  once, when the condition becomes true; with more, at most every
+  `cooldown_s` seconds while it holds. Names: letters, digits, `_ . : -`.
+* **`gallery`** is a DXGAL1 `.bin`, built once from an image folder by
+  `python3 scripts/build_gallery_database.py --variant <model> --images
+  <folder> --out <file>.bin` (`--labels folder` names entries by
+  sub-folder). `--check` refuses a gallery built by another model than the
+  one feeding the node. A crop is named after its nearest entry (label,
+  else image file stem) at or above `threshold`, else `unknown`; a track
+  announces its name once, and again when it changes.
+* **`user`** passes its input through in a run; an exported project
+  (Studio, Phase 3) turns it into a function stub named `name`.
+* **Time and state**: logic nodes count seconds per stream: a file's frame
+  index over its frame rate, a camera's or RTSP stream's seconds since its
+  first frame (`FrameReport::time_s`). Each logic node keeps its state
+  (tracks, counts, cooldowns) per stream, and both binaries run a stream's
+  frames through it in order, so their reports are byte-identical.
+* **`--loop`**: when a video starts again, its stream's trackers and logic
+  nodes start afresh too (new track ids from 0; no zone members, line
+  crossings or counts, dwell stays, condition edge or cooldown), so every
+  pass raises the events the first one did. Frame indices and stream time
+  keep counting.
+* **On the picture** (`--output`, `--display`): zones tinted and outlined,
+  lines with an arrow to their `in` side, the boxes a zone keeps outlined,
+  counts and conditions in a panel at the top left, dwell timers under each
+  box, gallery names under each crop; red when a zone holds someone, a line
+  was just crossed, a stay passed its threshold or a condition is true. The
+  last five events of the stream are listed at the bottom left. A zone's
+  label sits inside it at its top-left corner and a line's beside its
+  middle, on the side away from the arrow; both, and the panel, move off
+  the detector's box labels.
+
+Behaviour worth knowing before a graph goes live:
+
+* **A line has no hysteresis.** Each change of side across the segment is a
+  crossing, so a box whose anchor jitters on the line counts an `in` and an
+  `out` for every back-and-forth. Place a line where people walk through,
+  not where they stand.
+* **A zone in `"mode": "outside"`** selects the boxes outside the polygon,
+  so a new track first seen outside raises `enter` on that first frame, and
+  `exit` when it steps into the polygon.
+* **An untracked `gallery` input** (no `"track"` on the detector) has no
+  track to remember a name by: every crop announces its name (`match`, or
+  `unknown` with `"events": "all"`) on every frame.
+* **`condition` compares with a slack of 1e-6**, as stream times are: a
+  value within 1e-6 of `threshold` counts as equal to it (a dwell of
+  0.15 s that is 0.15 minus a rounding error is `>= 0.15`). Seconds in
+  `data` and records (`seconds`, names ending in `_s`) are written to
+  0.001 s, like `time`.
+
+### Events
+
+Every event goes, as its frame finishes:
+
+* to **stdout**, always, right after the frame's `frame N:` line:
+
+  ```text
+  frame 0: od boxes=3 person boxes=2 zone boxes=1 alarm records=1 value=1 active=1
+  [EVENT] {"frame":0,"time":0,"stream":"cam","node":"zone","event":"enter","track_id":1,"data":{"count":1}}
+  [EVENT] {"frame":0,"time":0,"stream":"cam","node":"alarm","event":"intrusion","track_id":1,"data":{"value":1,"threshold":0,"track_ids":"1"}}
+  ```
+
+* to **`--events <file>`**, the same objects one per line (JSONL), each
+  line one write, so a reader tailing the file never sees half a line;
+* to **`--report`**, as `"events"` on the frame (a frame without events has
+  no such key).
+
+`time` is the stream time in seconds (0.001 s), `track_id` is `-1` when an
+event is about no one track, `data` holds the event's numbers and text.
+Events come in frame order (with several sources, in the order frames were
+read) and, within a frame, in the graph's topological node order.
+
+### `--list-ops --json`
+
+The catalog of every op a graph can use, for a front end's palette and
+inspector:
+
+```json
+[
+  {"op": "zone", "type": "logic", "summary": "...",
+   "inputs": {"min": 1, "max": 1, "accepts": [{"shape": "boxes", "per_crop": false}, "..."]},
+   "output": "same", "tracking": false, "events": ["enter", "exit"], "numbers": [],
+   "params": [{"name": "polygon", "type": "polygon", "required": true, "min_points": 3, "help": "..."},
+              {"name": "mode", "type": "choice", "required": false, "default": "inside",
+               "choices": ["inside", "outside"], "help": "..."}]}
+]
+```
+
+The eight logic ops come first, then `headpose` and `volume` (`"type":
+"cpu"`). `output` is `"same"` (the input's shape) or `"records"`. Number
+params give `default`, `min` and `max` when bounded, `min_exclusive` when
+the minimum itself is refused; choices give `choices`; polygons
+`min_points`, lines `points`. `"<event>"` in `events` means the `event`
+param names it.
+
+Hints for an inspector, each only on the params it applies to: `step` (a
+sensible increment for a number); for lists, `items` (`"string"`, or
+`"integer"` for ids written as strings, `"24"`) and no `default`, because
+leaving a list out is not `[]` (`when_omitted` lists what it means, for
+`volume` the built-in package classes; for `filter` and `count` it means
+every class); `format: "file"` with `extensions` for a path (`gallery`);
+`equals` names the param a value must repeat (`user`'s `output` equals its
+`input`); and `values_by_input` (condition's `value`) lists, per accepted
+input, the values allowed: `["count"]` for boxes,
+`["count", "with:<label>", "without:<label>"]` for per-crop scores, or
+`"values_from": "numbers"` for records (a number the input op lists in its
+`numbers`).
+
+---
+
 ## Error messages
 
 Every failure names **where** (the node or edge), **what** (the fact) and
@@ -508,9 +659,9 @@ ERROR [CODE] <where>: <what>
   -> <how>
 ```
 
-There are twelve codes. `GRAPH_EDGE` and `GRAPH_SCHEMA` have a second row
-each, for edge ports and node params. Each example below is real output from
-`--check`, except the three marked otherwise.
+There are twelve codes. `GRAPH_EDGE` has two more rows, for edge ports and
+logic inputs, and `GRAPH_SCHEMA` a second row, for node params. Each example
+below is real output from `--check`, except the three marked otherwise.
 
 | Code | When | Example |
 |---|---|---|
@@ -518,6 +669,7 @@ each, for edge ports and node params. Each example below is real output from
 | `GRAPH_SCHEMA` | malformed JSON, a wrong type, a missing or duplicate key, an unreadable file, a value out of range or not a whole number | `ERROR [GRAPH_SCHEMA] edge "od"->"cls": duplicate edge "od" -> "cls"`<br>`  -> declare the connection once; add a second consumer node instead of a second edge`<br>`ERROR [GRAPH_SCHEMA] g.json: "version" must be a whole number, got 1.5`<br>`  -> add "version": 1` |
 | `GRAPH_EDGE` | shapes or input contracts do not meet across an edge | `ERROR [GRAPH_EDGE] edge "seg"->"cls": "seg" produces labelmap, not boxes`<br>`  -> remove "roi" from this edge, or use a detector as the source` |
 | `GRAPH_EDGE` | an edge's `"port"` names no output of the producer, or is on an edge from a source (see *Output ports*) | `ERROR [GRAPH_EDGE] edge "drive"->"x": "drive" has no output port "wings"`<br>`  -> its outputs: boxes, drivable, lane`<br>`ERROR [GRAPH_EDGE] edge "cam"->"drive": "cam" is a source; "port" selects one of a model's outputs`<br>`  -> remove "port" from this edge` |
+| `GRAPH_EDGE` | a logic node's inputs: too few or too many, a kind its op does not read, or boxes without track ids for `line` or `dwell` (see *Logic nodes*) | `ERROR [GRAPH_EDGE] node "crossing": line needs track ids, and the boxes from "od" have none`<br>`  -> add "track": {"algo": "iou"} to node "od"` |
 | `GRAPH_SCHEMA` | a `params` value the model cannot read: text for a numeric key, or the wrong kind for a text key (see *Parameter precedence*) | `ERROR [GRAPH_SCHEMA] node "od" "params": "score_threshold" must be a number, got "0.5"`<br>`  -> model "yolov8-n_640x640" reads text only for: class_names`<br>`ERROR [GRAPH_SCHEMA] node "od" "params": "class_names" must be an array of strings for model "yolov8-n_640x640", got "person"`<br>`ERROR [GRAPH_SCHEMA] node "c" "params": "label" must be a number, got "x"`<br>`  -> model "resnet50_224x224" reads only numbers` |
 | `GRAPH_ALIGN` | `align: "face5"` from a producer without landmarks | `ERROR [GRAPH_ALIGN] edge "od"->"emb": "align": "face5" needs five facial landmarks, and model "yolov8-n_640x640" produces no landmarks`<br>`  -> remove "align", or use a face detector as the source` |
 | `GRAPH_CYCLE` | the nodes do not form a DAG | `ERROR [GRAPH_CYCLE] graph: cycle detected among: a, b`<br>`  -> a graph must be acyclic` |
@@ -895,7 +1047,7 @@ of them.
 |---|---|
 | **Multi-model fusion** (`"type": "fuse"`) | Grammar reserved, rejected with `GRAPH_RESERVED` |
 | **Text-conditioned models** (`"prompt"`) | Grammar reserved, rejected with `GRAPH_RESERVED` |
-| **Condition / rule expressions on edges** | No key in v1; an expression language is a small language and permanently binding once shipped |
+| **Condition / rule expressions on edges** | Rules are logic nodes with a fixed form (*Logic nodes*), not an expression language, which would be permanently binding once shipped |
 | **3D / LiDAR models** (`boxes3d`) | Rejected in every graph (`GRAPH_EDGE`: `consumes LiDAR point clouds, not camera frames`): every source is a camera frame |
 | **Anomaly detection** | The four anomaly models are registered but not graph-ready (`MODEL_NOT_READY`); EfficientAD's companion engines have no graph stage |
 | **CPU nodes besides `headpose` and `volume`** (CLIP prompt scores) | Not graph nodes |
@@ -1194,6 +1346,9 @@ request, let the run finish; if you may have to kill it, write `.mkv` or
   job's completion, so it includes waiting behind other frames' jobs. A ROI
   node with no crops is `0`. Timings differ from run to run, so without the
   flag a report holds none and the two binaries' files stay byte-identical.
+- **Events**: a frame whose logic nodes raised events has `"events": [{"node",
+  "event", "track_id", "time", "data"}]` (see *Events*); other frames, and
+  every graph without logic nodes, have no such key.
 - **Every exit short of a kill finalizes it**: the normal end; Ctrl-C,
   SIGTERM, `q`/ESC; a frame whose `--output` cannot be written; an error that
   stops the run, such as `--stall-timeout-ms`; a source that produced no

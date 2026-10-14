@@ -286,6 +286,12 @@ report, and each dense port payload gets its `<key>_array` too:
 
 A result without ports has no `"ports"` key.
 
+A graph with logic nodes (see *Logic nodes* in the multi_model_graph README)
+gives a frame whose nodes raised events an `"events"` list in `to_dict()`,
+exactly as in the CLI's report. `dx_graph` counts their time at 30 frames
+per second of each stream (it does not know the source's rate). Printing
+`[EVENT]` lines, `--events`, `--loop` and the event panel are CLI options.
+
 A report you keep after its stream has moved on (`reports =
 list(g.stream(...))`) keeps its own frame: its `frame`, `to_dict()` and
 `render()` give what they gave inside the loop, under both executors.

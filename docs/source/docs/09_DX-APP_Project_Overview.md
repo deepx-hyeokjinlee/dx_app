@@ -406,7 +406,7 @@ If no input source (`--image`, `--video`, `--camera`, `--rtsp`) is provided, the
 
 **Signal Handling**  
 
-C++ runners and the `multi_model_graph_*` CLI register SIGINT/SIGTERM handlers for graceful shutdown. Pressing Ctrl+C during inference cleanly exits, releasing all resources: a runner prints `"Interrupted by user"`, and the graph CLI finishes the frames in flight in every stream and finalizes `--report`/`--output`. A later Ctrl+C, more than 200 ms after the first, terminates the process at once (for a shutdown that is itself stuck); repeats within 200 ms count as the same request. SIGTERM is always graceful, however often it arrives. Python runners behave the same way (`common/runner/interrupts.py`); see the [Python usage guide](05_DX-APP_Python_Example_Usage_Guide.md).  
+C++ runners and the `multi_model_graph_*` CLI register SIGINT/SIGTERM handlers for graceful shutdown. Pressing Ctrl+C during inference cleanly exits, releasing all resources: a runner prints `"Interrupted by user"`, and the graph CLI finishes the frames in flight in every stream and finalizes `--report`/`--output`/`--events`. A later Ctrl+C, more than 200 ms after the first, terminates the process at once (for a shutdown that is itself stuck); repeats within 200 ms count as the same request. SIGTERM is always graceful, however often it arrives. Python runners behave the same way (`common/runner/interrupts.py`); see the [Python usage guide](05_DX-APP_Python_Example_Usage_Guide.md).  
 
 **Run Directory** (`--save` / `--save-dir`)  
 

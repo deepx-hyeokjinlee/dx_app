@@ -3600,3 +3600,21 @@ def test_logic_samples_decide_on_their_sample_image(tmp_path, graph):
     if graph == "gallery_known_person.json":
         assert sorted(e["data"]["name"] for e in events) == ["sample_people_p0", "sample_people_p1"]
         assert all(e["data"]["score"] > 0.9 for e in events), events
+
+
+@pytest.mark.graph
+def test_readme_documents_logic_nodes_and_events():
+    text = README.read_text(encoding="utf-8")
+    section = text.split("## Logic nodes", 1)[1].split("\n---", 1)[0]
+    ops = json.loads(run(BINARIES[0], "--list-ops", "--json").stdout)
+    for op in ops:
+        if op["type"] == "logic":
+            assert "| `{}` |".format(op["op"]) in section, op["op"]
+    for needle in ("[EVENT] ", "--events", "--list-ops --json", "cooldown_s", "0 to 1",
+                   "per crop", "with:<label>", "build_gallery_database.py", "track_id",
+                   "seconds since"):
+        assert needle in section, needle
+    assert "## The whole vocabulary: four node kinds, three edge kinds" in text
+    assert '| logic | `{ "id": "zone", "type": "logic"' in text
+    py = DX_GRAPH_README.read_text(encoding="utf-8")
+    assert '"events"' in py and "--loop" in py
