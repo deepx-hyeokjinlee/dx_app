@@ -46,6 +46,7 @@ from ..inputs import InputFactory
 from ..utility import print_async_performance_summary_legacy, SafeQueue
 from ..utility import print_image_processing_summary, print_sync_performance_summary
 from ..utility.camera import open_camera_capture
+from ..utility.progress import progress_tick
 from ..utility.video_io import write_video_frame
 from ..utility.colorspace import bgr_to_y_limited, bgr_to_ycrcb_limited, ycrcb_limited_to_bgr
 from .interrupts import interrupt_scope
@@ -592,6 +593,7 @@ class AsyncRunner:
                 with self._metrics_lock:
                     self._metrics["sum_postprocess"] += t1 - t0
                     self.frame_count += 1
+                    progress_tick(self._metrics)   # [PROGRESS] for front ends (DXAPP_PROGRESS=1)
 
                 if not self._enqueue(render_q, (frame, results)):
                     break
@@ -1098,6 +1100,7 @@ class AsyncRunner:
                 metrics["sum_inference"] += result["t_infer"]
                 metrics["sum_postprocess"] += result["t_post"]
                 metrics["sum_render"] += result["t_render"]
+                progress_tick(metrics)   # [PROGRESS] for front ends (DXAPP_PROGRESS=1)
 
                 if writer is not None:
                     t_s0 = time.perf_counter()
