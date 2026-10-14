@@ -41,6 +41,8 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
     std::map<std::size_t, FrameView> frame_inbox;
     // node index -> parent payloads on carry-result edges
     std::map<std::size_t, std::vector<StageDataPtr> > result_inbox;
+    // node index -> what its "carry": "result" edges bring a logic node
+    std::map<std::size_t, std::vector<LogicInput> > logic_inbox;
     // node index -> the view it actually ran on (full-frame nodes only)
     std::map<std::size_t, FrameView> view;
     // node index -> why its hand-off input was unusable
@@ -81,6 +83,26 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             }
             produced = reduced.result.data;
             view[index] = source_view;
+        } else if (node.is_logic) {
+            const std::vector<LogicInput> no_inputs;
+            std::map<std::size_t, std::vector<LogicInput> >::const_iterator found =
+                logic_inbox.find(index);
+            LogicFrame at;
+            at.frame_size = frame.size();
+            at.time_s = report.time_s;
+            const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+            const LogicOutput out =
+                RunLogic(*node.logic, found == logic_inbox.end() ? no_inputs : found->second, at,
+                         node.logic_states[stream].get());
+            report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
+            report.node_results[node.id] = out.result;
+            report.overlays[node.id] = out.overlay;
+            report.events.insert(report.events.end(), out.events.begin(), out.events.end());
+            if (!out.error.empty() && report.error.empty()) {
+                report.error = std::string("node \"") + node.id + "\": " + out.error;
+            }
+            produced = out.result.data;
+            view[index] = source_view;  // its boxes are in source pixels
         } else if (frame_inbox.count(index) != 0) {
             const FrameView& in = frame_inbox[index];
             view[index] = in;
@@ -159,7 +181,19 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             const EdgeRuntime& edge = graph.edges()[outgoing[e]];
             const EdgeCargo cargo = SelectEdgeCargo(edge, produced, boxes, ports);
             if (edge.carry_result) {
-                if (cargo.payload) result_inbox[edge.to].push_back(cargo.payload);
+                if (!cargo.payload) continue;
+                if (graph.nodes()[edge.to].is_logic) {
+                    LogicInput input;
+                    input.edge = outgoing[e];
+                    input.from = node.id;
+                    input.data = cargo.payload;
+                    std::map<std::string, StageResult>::const_iterator mine =
+                        report.node_results.find(node.id);
+                    if (mine != report.node_results.end()) input.origin = mine->second.origin;
+                    logic_inbox[edge.to].push_back(input);
+                } else {
+                    result_inbox[edge.to].push_back(cargo.payload);
+                }
                 continue;
             }
             if (!edge.roi.present) {

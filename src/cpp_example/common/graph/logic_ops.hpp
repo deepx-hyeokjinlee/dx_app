@@ -21,11 +21,15 @@
 #include <utility>
 #include <vector>
 
+#include <memory>
+
 #include <opencv2/core.hpp>
 
+#include "common/graph/graph_config.hpp"
 #include "common/graph/shape.hpp"
 
 namespace dxapp {
+struct RetrievalGallery;  // common/processors/gallery_retrieval_postprocessor.hpp
 namespace graph {
 
 /// A number param with no bound on that side (--list-ops leaves the bound out).
@@ -120,6 +124,87 @@ const std::vector<LogicOpInfo>& CpuOpInfos();
 const LogicOpInfo* FindCpuOpInfo(const std::string& op);
 /// "number", "text", "choice", "text_list", "polygon", "line".
 const char* ToString(LogicParamInfo::Kind kind);
+
+// ---------------------------------------------------------------------
+// Running a logic node
+// ---------------------------------------------------------------------
+
+/// What one "carry": "result" edge brings a logic node in one frame.
+struct LogicInput {
+    std::size_t edge;      ///< index into the graph's edges: inputs are used in this order
+    std::string from;      ///< the producer's id
+    StageDataPtr data;     ///< a full-frame payload; null for per-crop results
+    RoiRef origin;         ///< the producer's origin: maps its boxes to source pixels
+    bool per_crop;         ///< the producer runs once per crop
+    std::vector<StageResult> crops;  ///< per_crop: every crop's result, ByOrigin order
+    LogicInput() : edge(0), per_crop(false) {}
+};
+
+/// A logic node's params, typed, with the catalog's defaults filled in.
+/// Built once (StageGraph::Build) and shared by every stream.
+struct LogicConfig {
+    std::string id;
+    std::string op;
+    std::map<std::string, double> numbers;
+    std::map<std::string, std::string> text;
+    std::map<std::string, std::vector<std::string> > lists;
+    std::map<std::string, std::vector<double> > arrays;
+    std::shared_ptr<const RetrievalGallery> gallery;  ///< op "gallery"
+};
+
+/// What a logic node remembers about one track id.
+struct TrackMemo {
+    cv::Point2f point;   ///< its last anchor, source pixels
+    int side;            ///< line: -1 left of A->B, +1 right, 0 not known yet
+    bool inside;         ///< zone: in the selected region when last seen
+    double first_s;      ///< dwell: when this stay began
+    double last_s;       ///< when it was last seen
+    bool reported;       ///< dwell: this stay's event has been raised
+    std::string name;    ///< gallery: the name last announced
+    TrackMemo() : side(0), inside(false), first_s(0.0), last_s(0.0), reported(false) {}
+};
+
+/// One logic node's memory in one stream. Each op uses its own fields.
+struct LogicState {
+    std::map<int, TrackMemo> tracks;
+    long long count_in;   ///< line
+    long long count_out;  ///< line
+    bool was_true;        ///< condition: last frame's verdict
+    bool fired;           ///< condition: has raised an event
+    double last_fire_s;   ///< condition: when
+    LogicState()
+        : count_in(0), count_out(0), was_true(false), fired(false), last_fire_s(0.0) {}
+};
+
+/// The frame a logic node runs on.
+struct LogicFrame {
+    cv::Size frame_size;  ///< the stream's source frame
+    double time_s;        ///< FrameReport::time_s
+    LogicFrame() : time_s(0.0) {}
+};
+
+struct LogicOutput {
+    StageResult result;              ///< boxes (filter, zone, user) or records
+    std::vector<GraphEvent> events;
+    LogicOverlay overlay;
+    std::string error;               ///< "" when the frame is valid
+};
+
+/// The typed config of a validated logic node. Throws GraphError
+/// (kGraphSchema) when a gallery file cannot be read.
+LogicConfig MakeLogicConfig(const NodeSpec& node);
+
+/**
+ * @brief One frame of one logic node.
+ *
+ * `inputs` are sorted by edge index first, so their arrival order (async)
+ * does not matter. `state` is this node's state in this stream; the caller
+ * runs a stream's frames in order. Boxes are read in source pixels (a
+ * hand-off producer's are mapped back through its origin) and written in
+ * source pixels with the identity origin.
+ */
+LogicOutput RunLogic(const LogicConfig& config, std::vector<LogicInput> inputs,
+                     const LogicFrame& frame, LogicState* state);
 
 }  // namespace graph
 }  // namespace dxapp

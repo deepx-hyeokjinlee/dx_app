@@ -1,5 +1,16 @@
 #include "common/graph/logic_ops.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <set>
+#include <stdexcept>
+
+#include <opencv2/imgproc.hpp>
+
+#include "common/graph/graph_error.hpp"
+#include "common/graph/roi_router.hpp"
+
 namespace dxapp {
 namespace graph {
 namespace {
@@ -298,6 +309,264 @@ const char* ToString(LogicParamInfo::Kind kind) {
         case LogicParamInfo::kLine:     return "line";
     }
     return "unknown";
+}
+
+namespace {
+
+/// A track not seen for this long (stream seconds) is forgotten.
+const double kForgetAfterS = 5.0;
+
+double Number(const LogicConfig& c, const char* key) {
+    std::map<std::string, double>::const_iterator it = c.numbers.find(key);
+    return it == c.numbers.end() ? 0.0 : it->second;
+}
+
+std::string Text(const LogicConfig& c, const char* key) {
+    std::map<std::string, std::string>::const_iterator it = c.text.find(key);
+    return it == c.text.end() ? std::string() : it->second;
+}
+
+const std::vector<std::string>& List(const LogicConfig& c, const char* key) {
+    static const std::vector<std::string> kNone;
+    std::map<std::string, std::vector<std::string> >::const_iterator it = c.lists.find(key);
+    return it == c.lists.end() ? kNone : it->second;
+}
+
+/// A polygon or line param in source pixels.
+std::vector<cv::Point2f> Points(const LogicConfig& c, const char* key, const cv::Size& size) {
+    std::vector<cv::Point2f> points;
+    std::map<std::string, std::vector<double> >::const_iterator it = c.arrays.find(key);
+    if (it == c.arrays.end()) return points;
+    for (std::size_t i = 0; i + 1 < it->second.size(); i += 2) {
+        points.push_back(cv::Point2f(static_cast<float>(it->second[i] * size.width),
+                                     static_cast<float>(it->second[i + 1] * size.height)));
+    }
+    return points;
+}
+
+cv::Point2f Anchor(const cv::Rect2f& box, const std::string& anchor) {
+    if (anchor == "center") {
+        return cv::Point2f(box.x + box.width * 0.5f, box.y + box.height * 0.5f);
+    }
+    return cv::Point2f(box.x + box.width * 0.5f, box.y + box.height);  // "bottom"
+}
+
+bool Listed(const std::vector<std::string>& classes, const BoxItem& item) {
+    return classes.empty() ||
+           std::find(classes.begin(), classes.end(), item.class_name) != classes.end();
+}
+
+void AddNumber(RecordItem* item, const std::string& name, double value) {
+    item->numbers.push_back(std::make_pair(name, value));
+}
+
+void AddText(RecordItem* item, const std::string& name, const std::string& value) {
+    item->text.push_back(std::make_pair(name, value));
+}
+
+GraphEvent MakeEvent(const LogicConfig& c, const std::string& name, int track_id,
+                     const LogicFrame& at) {
+    GraphEvent event;
+    event.node = c.id;
+    event.event = name;
+    event.track_id = track_id;
+    event.time_s = at.time_s;
+    return event;
+}
+
+/// "3" for a whole number, else two decimals.
+std::string Short(double value) {
+    char text[64];
+    if (std::isfinite(value) && std::fabs(value - std::round(value)) < 1e-9) {
+        std::snprintf(text, sizeof(text), "%.0f", value);
+    } else {
+        std::snprintf(text, sizeof(text), "%.2f", value);
+    }
+    return text;
+}
+
+cv::Point2f Apply(const cv::Matx23f& m, const cv::Point2f& p) {
+    return cv::Point2f(m(0, 0) * p.x + m(0, 1) * p.y + m(0, 2),
+                       m(1, 0) * p.x + m(1, 1) * p.y + m(1, 2));
+}
+
+/// The input's boxes in source pixels; null when it carries no boxes.
+std::shared_ptr<BoxesData> SourceBoxes(const LogicInput& input) {
+    const BoxesData* boxes =
+        input.data ? dynamic_cast<const BoxesData*>(input.data.get()) : NULL;
+    if (boxes == NULL) return std::shared_ptr<BoxesData>();
+    std::shared_ptr<BoxesData> out(new BoxesData(*boxes));
+    if (!input.origin.from_roi && IsIdentityAffine(input.origin.inv_align)) return out;
+    for (std::size_t i = 0; i < out->items.size(); ++i) {
+        BoxItem& item = out->items[i];
+        item.box = RestoreBox(item.box, input.origin);
+        for (std::size_t k = 0; k < item.landmarks.size(); ++k) {
+            const cv::Point2f p = Apply(input.origin.inv_align,
+                                        cv::Point2f(item.landmarks[k].x, item.landmarks[k].y));
+            item.landmarks[k].x = p.x;
+            item.landmarks[k].y = p.y;
+        }
+    }
+    return out;
+}
+
+/// The first full-frame input that carries a payload, or NULL.
+const LogicInput* FirstFullFrame(const std::vector<LogicInput>& inputs) {
+    for (std::size_t i = 0; i < inputs.size(); ++i) {
+        if (!inputs[i].per_crop && inputs[i].data) return &inputs[i];
+    }
+    return NULL;
+}
+
+/// Forget every track not in `seen` and not seen for `after` seconds;
+/// `on_forget` hears each one first.
+template <typename OnForget>
+void Forget(LogicState* s, const std::set<int>& seen, double now, double after,
+            OnForget on_forget) {
+    for (std::map<int, TrackMemo>::iterator it = s->tracks.begin(); it != s->tracks.end();) {
+        if (seen.count(it->first) == 0 && now - it->second.last_s > after) {
+            on_forget(it->first, it->second);
+            it = s->tracks.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+LogicOutput RunFilter(const LogicConfig& c, const std::vector<LogicInput>& inputs) {
+    LogicOutput out;
+    const LogicInput* input = FirstFullFrame(inputs);
+    const std::shared_ptr<BoxesData> boxes =
+        input == NULL ? std::shared_ptr<BoxesData>() : SourceBoxes(*input);
+    if (!boxes) {
+        out.result.data.reset(new BoxesData(Shape::kBoxes));
+        out.error = "missing boxes input";
+        return out;
+    }
+    const std::vector<std::string>& classes = List(c, "classes");
+    const float min_score = static_cast<float>(Number(c, "min_score"));
+    const double min_area = Number(c, "min_area");
+    std::shared_ptr<BoxesData> kept(new BoxesData(boxes->box_shape));
+    for (std::size_t i = 0; i < boxes->items.size(); ++i) {
+        const BoxItem& item = boxes->items[i];
+        if (!Listed(classes, item) || item.score < min_score) continue;
+        if (static_cast<double>(item.box.width) * item.box.height < min_area) continue;
+        kept->items.push_back(item);
+    }
+    out.result.data = kept;
+    return out;
+}
+
+LogicOutput RunZone(const LogicConfig& c, const std::vector<LogicInput>& inputs,
+                    const LogicFrame& at, LogicState* s) {
+    LogicOutput out;
+    const std::vector<cv::Point2f> polygon = Points(c, "polygon", at.frame_size);
+    out.overlay.polygons.push_back(polygon);
+    const LogicInput* input = FirstFullFrame(inputs);
+    const std::shared_ptr<BoxesData> boxes =
+        input == NULL ? std::shared_ptr<BoxesData>() : SourceBoxes(*input);
+    if (!boxes) out.error = "missing boxes input";
+    std::shared_ptr<BoxesData> kept(new BoxesData(boxes ? boxes->box_shape : Shape::kBoxes));
+    const bool want_inside = Text(c, "mode") != "outside";
+    const std::string anchor = Text(c, "anchor");
+    std::set<int> seen;
+    std::vector<std::pair<std::string, int> > changes;  // (enter|exit, track), in box order
+    if (boxes && polygon.size() >= 3) {
+        for (std::size_t i = 0; i < boxes->items.size(); ++i) {
+            const BoxItem& item = boxes->items[i];
+            const cv::Point2f p = Anchor(item.box, anchor);
+            const bool inside = cv::pointPolygonTest(polygon, p, false) >= 0.0;
+            const bool selected = inside == want_inside;
+            if (selected) {
+                kept->items.push_back(item);
+                out.overlay.highlights.push_back(item.box);
+            }
+            if (item.track_id < 0) continue;
+            seen.insert(item.track_id);
+            TrackMemo& memo = s->tracks[item.track_id];
+            if (selected && !memo.inside) changes.push_back(std::make_pair("enter", item.track_id));
+            if (!selected && memo.inside) changes.push_back(std::make_pair("exit", item.track_id));
+            memo.inside = selected;
+            memo.point = p;
+            memo.last_s = at.time_s;
+        }
+    }
+    Forget(s, seen, at.time_s, kForgetAfterS, [&changes](int track, const TrackMemo& memo) {
+        if (memo.inside) changes.push_back(std::make_pair("exit", track));
+    });
+    for (std::size_t i = 0; i < changes.size(); ++i) {
+        GraphEvent event = MakeEvent(c, changes[i].first, changes[i].second, at);
+        AddNumber(&event.data, "count", static_cast<double>(kept->items.size()));
+        out.events.push_back(event);
+    }
+    out.overlay.alert = !kept->items.empty();
+    OverlayText label;
+    if (!polygon.empty()) label.at = polygon[0];
+    label.text = c.id + ": " + std::to_string(kept->items.size());
+    label.alert = out.overlay.alert;
+    out.overlay.texts.push_back(label);
+    out.result.data = kept;
+    return out;
+}
+
+}  // namespace
+
+LogicConfig MakeLogicConfig(const NodeSpec& node) {
+    const LogicOpInfo* info = FindLogicOp(node.op);
+    if (info == NULL) {
+        throw std::invalid_argument("MakeLogicConfig: \"" + node.op + "\" is not a logic op");
+    }
+    LogicConfig config;
+    config.id = node.id;
+    config.op = node.op;
+    for (std::size_t p = 0; p < info->params.size(); ++p) {
+        const LogicParamInfo& param = info->params[p];
+        switch (param.kind) {
+            case LogicParamInfo::kNumber: {
+                std::map<std::string, double>::const_iterator it =
+                    node.params.numeric.find(param.name);
+                config.numbers[param.name] =
+                    it != node.params.numeric.end() ? it->second : param.number_default;
+                break;
+            }
+            case LogicParamInfo::kText:
+            case LogicParamInfo::kChoice: {
+                std::map<std::string, std::string>::const_iterator it =
+                    node.params.text.find(param.name);
+                config.text[param.name] =
+                    it != node.params.text.end() ? it->second : param.text_default;
+                break;
+            }
+            case LogicParamInfo::kTextList: {
+                std::map<std::string, std::vector<std::string> >::const_iterator it =
+                    node.params.lists.find(param.name);
+                if (it != node.params.lists.end()) config.lists[param.name] = it->second;
+                break;
+            }
+            case LogicParamInfo::kPolygon:
+            case LogicParamInfo::kLine: {
+                std::map<std::string, std::vector<double> >::const_iterator it =
+                    node.arrays.find(param.name);
+                if (it != node.arrays.end()) config.arrays[param.name] = it->second;
+                break;
+            }
+        }
+    }
+    return config;
+}
+
+LogicOutput RunLogic(const LogicConfig& config, std::vector<LogicInput> inputs,
+                     const LogicFrame& frame, LogicState* state) {
+    std::stable_sort(inputs.begin(), inputs.end(),
+                     [](const LogicInput& a, const LogicInput& b) { return a.edge < b.edge; });
+    LogicState scratch;
+    LogicState* s = state != NULL ? state : &scratch;
+    if (config.op == "filter") return RunFilter(config, inputs);
+    if (config.op == "zone") return RunZone(config, inputs, frame, s);
+    LogicOutput out;
+    out.result.data.reset(new RecordsData());
+    out.error = "logic op \"" + config.op + "\" cannot run";
+    return out;
 }
 
 }  // namespace graph

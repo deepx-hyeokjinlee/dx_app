@@ -422,6 +422,7 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
         runtime.id = node.id;
         runtime.is_source = node.is_source;
         runtime.is_cpu = node.is_cpu;
+        runtime.is_logic = node.is_logic;
         runtime.uri = node.uri;
         runtime.model_name = node.model;
         runtime.op = node.op;
@@ -435,6 +436,11 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
         }
         if (node.is_cpu) {
             runtime.output_shape = Shape::kRecords;
+            continue;
+        }
+        if (node.is_logic) {
+            runtime.output_shape = NodeOutputShape(spec, registry, node.id);
+            runtime.logic.reset(new LogicConfig(MakeLogicConfig(node)));
             continue;
         }
 
@@ -627,6 +633,16 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
             if (streams_[s].member[i]) {
                 nodes_[i].trackers[s].reset(new IouTracker(track.iou, track.max_age));
             }
+        }
+    }
+    // One state per (logic node, stream that runs it), as for trackers: a
+    // zone's tracks, a line's counts, a condition's cooldown never cross
+    // streams.
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        if (!nodes_[i].is_logic) continue;
+        nodes_[i].logic_states.assign(streams_.size(), std::shared_ptr<LogicState>());
+        for (std::size_t s = 0; s < streams_.size(); ++s) {
+            if (streams_[s].member[i]) nodes_[i].logic_states[s].reset(new LogicState());
         }
     }
 }

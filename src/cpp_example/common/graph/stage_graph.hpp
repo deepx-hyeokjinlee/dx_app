@@ -27,6 +27,7 @@ struct NodeRuntime {
     std::string id;
     bool is_source;
     bool is_cpu;
+    bool is_logic;
     std::string uri;
     std::string model_name;
     std::string op;                  ///< cpu only
@@ -38,9 +39,15 @@ struct NodeRuntime {
     /// IouTracker in every stream that runs it, null in the others. Empty for
     /// an untracked node. Track ids never cross streams.
     std::vector<std::shared_ptr<IouTracker> > trackers;
+    /// Logic only: its params, typed (MakeLogicConfig), shared by every stream.
+    std::shared_ptr<const LogicConfig> logic;
+    /// Per stream (streams() order), for a logic node: its own state in every
+    /// stream that runs it, null in the others. Never shared across streams.
+    std::vector<std::shared_ptr<LogicState> > logic_states;
 
     NodeRuntime()
-        : is_source(false), is_cpu(false), output_shape(Shape::kFrame), tracked(false) {}
+        : is_source(false), is_cpu(false), is_logic(false), output_shape(Shape::kFrame),
+          tracked(false) {}
 };
 
 struct EdgeRuntime {

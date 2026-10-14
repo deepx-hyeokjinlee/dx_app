@@ -12821,6 +12821,171 @@ void TestReportToJsonWritesEventsOnlyWhenThereAreSome() {
                     "\"track_id\":-1,\"data\":{\"count\":\"NaN\"") != std::string::npos);
 }
 
+namespace {
+
+const BoxesData* BoxesOf(const FrameReport& report, const std::string& id) {
+    std::map<std::string, StageResult>::const_iterator it = report.node_results.find(id);
+    if (it == report.node_results.end() || !it->second.data) return NULL;
+    return dynamic_cast<const BoxesData*>(it->second.data.get());
+}
+
+/// One 40x60 "person" at (x, 200), or nobody for x < 0. Positions 10 px
+/// apart overlap with IoU 0.6, so the IoU tracker keeps one id.
+std::shared_ptr<BoxesData> LogicPersonAt(float x) {
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    if (x >= 0.f) boxes->items.push_back(MakeItem(x, 200.f, 40.f, 60.f, 0.9f, "person"));
+    return boxes;
+}
+
+/// Six frames (keys 0..5) of a 640x480 scene: one person walks right across
+/// x = 320, the frame's middle, and back. Bottom-centre anchors x: 305,
+/// 315, 325, 335, 325, 315 (y 260).
+const float kWalk[] = {285.f, 295.f, 305.f, 315.f, 305.f, 295.f};
+
+/// LogicCheckRegistry() plus the walk scripted on "det" and a "Jacket" on
+/// every "attr" crop.
+FakeModelRegistry LogicRegistry() {
+    FakeModelRegistry registry = LogicCheckRegistry();
+    for (int k = 0; k < 6; ++k) registry.SetScriptByFirstPixel("det", k, LogicPersonAt(kWalk[k]));
+    std::shared_ptr<ScoresData> jacket(new ScoresData());
+    ClassificationResult item;
+    item.class_id = 7;
+    item.class_name = "Jacket";
+    item.confidence = 0.9f;
+    jacket->items.push_back(item);
+    registry.SetScriptByFirstPixel("attr", 0, jacket);
+    return registry;
+}
+
+std::vector<int> Keys(int count) {
+    std::vector<int> keys;
+    for (int i = 0; i < count; ++i) keys.push_back(i);
+    return keys;
+}
+
+/// `text` over frames FrameWithKey(keys[i]), stream clock 10 fps (frame k
+/// is at k / 10 s), through one executor.
+std::vector<FrameReport> RunLogicFrames(const std::string& text, FakeModelRegistry registry,
+                                        const std::vector<int>& keys, bool async) {
+    const GraphSpec spec = ParseGraphText(text, "logic.json");
+    ValidateGraph(spec, registry);
+    StageGraph graph;
+    graph.Build(spec, registry, "/models", false);
+    graph.SetStreamClock(0, 10.0, false);
+    std::vector<FrameReport> reports;
+    if (!async) {
+        SyncExecutor executor;
+        for (std::size_t i = 0; i < keys.size(); ++i) {
+            reports.push_back(executor.RunFrame(graph, FrameWithKey(keys[i]), i));
+        }
+        return reports;
+    }
+    AsyncExecutor executor(Frames(4));
+    for (std::size_t i = 0; i < keys.size(); ++i) executor.Submit(graph, FrameWithKey(keys[i]), i);
+    executor.Finish(graph);
+    FrameReport report;
+    while (executor.TryNext(&report)) reports.push_back(report);
+    return reports;
+}
+
+}  // namespace
+
+void TestFilterKeepsClassScoreAndArea() {
+    NodeSpec node;
+    node.id = "f";
+    node.is_logic = true;
+    node.op = "filter";
+    node.params.lists["classes"].push_back("person");
+    node.params.numeric["min_score"] = 0.5;
+    node.params.numeric["min_area"] = 1000.0;
+    const LogicConfig config = MakeLogicConfig(node);
+    GRAPH_CHECK(config.op == "filter" && config.numbers.at("min_area") == 1000.0);
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(0, 0, 40, 60, 0.9f, "person"));  // kept
+    boxes->items.push_back(MakeItem(0, 0, 40, 60, 0.9f, "car"));     // class
+    boxes->items.push_back(MakeItem(0, 0, 40, 60, 0.3f, "person"));  // score
+    boxes->items.push_back(MakeItem(0, 0, 10, 10, 0.9f, "person"));  // area 100
+    LogicInput input;
+    input.from = "od";
+    input.data = boxes;
+    LogicFrame at;
+    at.frame_size = cv::Size(640, 480);
+    LogicState state;
+    const LogicOutput out = RunLogic(config, std::vector<LogicInput>(1, input), at, &state);
+    GRAPH_CHECK(out.error.empty());
+    const BoxesData* kept = dynamic_cast<const BoxesData*>(out.result.data.get());
+    GRAPH_CHECK(kept != NULL && kept->items.size() == 1 && kept->box_shape == Shape::kBoxes);
+    GRAPH_CHECK(out.events.empty() && out.overlay.polygons.empty());
+    // Boxes from a handed-off x2 image come back to source pixels first:
+    // 40x60 becomes 20x30, under min_area.
+    LogicInput scaled = input;
+    scaled.origin.inv_align = cv::Matx23f(0.5f, 0.f, 0.f, 0.f, 0.5f, 0.f);
+    const LogicOutput half = RunLogic(config, std::vector<LogicInput>(1, scaled), at, &state);
+    const BoxesData* restored = dynamic_cast<const BoxesData*>(half.result.data.get());
+    GRAPH_CHECK(restored != NULL && restored->items.empty());
+    const LogicOutput none = RunLogic(config, std::vector<LogicInput>(), at, &state);
+    GRAPH_CHECK(none.error == "missing boxes input");
+    GRAPH_CHECK(dynamic_cast<const BoxesData*>(none.result.data.get()) != NULL);
+    // The catalog's defaults fill what the graph leaves out.
+    NodeSpec bare = node;
+    bare.params = StageParams();
+    const LogicConfig defaults = MakeLogicConfig(bare);
+    GRAPH_CHECK(defaults.numbers.at("min_score") == 0.0 && defaults.lists.count("classes") == 0);
+}
+
+void TestZoneKeepsTheBoxesInsideAndRaisesEnterAndExit() {
+    const std::string text = LogicJson(
+        std::string(kZoneNode) + ",{\"id\":\"a\",\"model\":\"attr\"}",
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"a\",\"roi\":{}}");
+    const std::vector<FrameReport> reports = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    const std::size_t inside[] = {0, 0, 1, 1, 1, 0};
+    for (std::size_t i = 0; i < 6; ++i) {
+        GRAPH_CHECK(reports[i].error.empty());
+        const BoxesData* z = BoxesOf(reports[i], "z");
+        GRAPH_CHECK(z != NULL && z->items.size() == inside[i]);
+        GRAPH_CHECK(reports[i].roi_results.count("a") == 1 &&
+                    reports[i].roi_results.at("a").size() == inside[i]);
+        GRAPH_CHECK(reports[i].overlays.count("z") == 1 &&
+                    reports[i].overlays.at("z").polygons.size() == 1);
+        GRAPH_CHECK(reports[i].time_s == static_cast<double>(i) / 10.0);
+        GRAPH_CHECK(reports[i].node_ms.count("z") == 1);
+    }
+    GRAPH_CHECK(reports[2].events.size() == 1);
+    if (reports[2].events.size() == 1) {
+        const GraphEvent& enter = reports[2].events[0];
+        GRAPH_CHECK(enter.node == "z" && enter.event == "enter" && enter.track_id == 0);
+        GRAPH_CHECK(enter.time_s == 2.0 / 10.0);
+    }
+    GRAPH_CHECK(reports[3].events.empty() && reports[4].events.empty());
+    GRAPH_CHECK(reports[5].events.size() == 1 && reports[5].events[0].event == "exit");
+    // The polygon in source pixels; the crop comes from the zone, with its track.
+    GRAPH_CHECK(reports[0].overlays.at("z").polygons[0][0] == cv::Point2f(320.f, 0.f));
+    GRAPH_CHECK(reports[2].roi_results.at("a")[0].origin.parent_node == "z");
+    GRAPH_CHECK(reports[2].roi_results.at("a")[0].origin.track_id == 0);
+    GRAPH_CHECK(reports[2].overlays.at("z").alert && !reports[0].overlays.at("z").alert);
+}
+
+void TestBuildGivesEachLogicNodeAStatePerStream() {
+    const std::string text =
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam1\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"cam2\",\"type\":\"source\",\"uri\":\"b.jpg\"},"
+        "{\"id\":\"od\",\"model\":\"det\",\"track\":{\"algo\":\"iou\"}}" + std::string(kZoneNode) +
+        "],\"edges\":[{\"from\":\"cam1\",\"to\":\"od\"},{\"from\":\"cam2\",\"to\":\"od\"}" +
+        std::string(kOdToZ) + "]}";
+    FakeModelRegistry registry = LogicCheckRegistry();
+    const GraphSpec spec = ParseGraphText(text, "two.json");
+    ValidateGraph(spec, registry);
+    StageGraph graph;
+    graph.Build(spec, registry, "/models", false);
+    const NodeRuntime& z = graph.nodes()[3];
+    GRAPH_CHECK(z.is_logic && z.logic && z.logic->op == "zone" && !z.stage);
+    GRAPH_CHECK(z.logic_states.size() == 2 && z.logic_states[0] && z.logic_states[1]);
+    GRAPH_CHECK(z.logic_states.size() == 2 && z.logic_states[0] != z.logic_states[1]);
+    GRAPH_CHECK(z.output_shape == Shape::kBoxes);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13192,6 +13357,9 @@ int main() {
     TestReportsCarryTheFrameTime();
     TestOperatorEqualityComparesTimeEventsAndOverlays();
     TestReportToJsonWritesEventsOnlyWhenThereAreSome();
+    TestFilterKeepsClassScoreAndArea();
+    TestZoneKeepsTheBoxesInsideAndRaisesEnterAndExit();
+    TestBuildGivesEachLogicNodeAStatePerStream();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
