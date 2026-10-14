@@ -199,7 +199,7 @@ inline bool minversionforRTandCompiler(dxrt::InferenceEngine* ie) {
                          ">= 7, current: "
                       << compiler_version << ")" << std::endl;
             std::cerr << DXAPP_GREEN << "[HINT] Model/compiler version mismatch. "
-                         "Please download updated models: ./setup.sh --models <model_name>"
+                         "Please download updated models: python3 scripts/download_models.py --models <model_name>"
                       << DXAPP_RESET << std::endl;
         }
     } else {
@@ -743,7 +743,7 @@ inline std::string exampleKeyFromArgv0(const std::string& argv0) {
  * canonical row (alias_of null) wins. dxnn_file sits before variant in each
  * object, so the match is bounded to the enclosing object. Returns
  * "assets/models/<dxnn_file>" plus the model_name used by
- * ./setup.sh --models. path is empty when the key is absent.
+ * python3 scripts/download_models.py --models. path is empty when the key is absent.
  */
 struct ExampleModelRef {
     std::string path;
@@ -886,7 +886,7 @@ inline void resolveAndValidateModel(std::string& modelPath, const std::string& a
         if (ref.path.empty()) {
             std::string key = exampleKeyFromArgv0(argv0);
             fatal_error("[DXAPP] [ERROR] Model path is required. Use -m or --model_path option.\n"
-                "        -> Download:  ./setup.sh --models " + key + "\n"
+                "        -> Download:  python3 scripts/download_models.py --models " + key + "\n"
                 "        -> Or use:    ./run_demo.sh  (auto-downloads demo models)\n"
                 "Use -h or --help for usage information.");
         }
@@ -898,7 +898,7 @@ inline void resolveAndValidateModel(std::string& modelPath, const std::string& a
                 ? fs::path(modelPath).stem().string() : ref.modelName;
             if (!autoDownloadModel(modelPath, selector)) {
                 fatal_error("[DXAPP] [ERROR] Model file not found: " + modelPath + "\n"
-                    "        -> Download:  ./setup.sh --models " + selector + "\n"
+                    "        -> Download:  python3 scripts/download_models.py --models " + selector + "\n"
                     "        -> Or use:    ./run_demo.sh  (auto-downloads demo models)");
             }
             std::cout << "[DXAPP] [INFO] Model downloaded successfully: " << modelPath << std::endl;
@@ -909,7 +909,7 @@ inline void resolveAndValidateModel(std::string& modelPath, const std::string& a
     if (!fileExists(modelPath)) {
         fatal_error("[DXAPP] [ERROR] Model file not found: " + modelPath + "\n"
             "        -> Check the path, or omit -m to use this example's default model.\n"
-            "        -> Download:  ./setup.sh --models " + fs::path(modelPath).stem().string());
+            "        -> Download:  python3 scripts/download_models.py --models " + fs::path(modelPath).stem().string());
     }
 }
 
