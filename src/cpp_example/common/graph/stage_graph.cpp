@@ -361,6 +361,7 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
     // variant, params and buffers), and owner id -> the one stage.
     const std::map<std::string, std::string> owners = SharedEngineOwners(spec, registry);
     std::map<std::string, std::shared_ptr<IStage> > shared;
+    try {
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
         NodeRuntime& runtime = nodes_[i];
@@ -461,10 +462,12 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
             } else {
                 how << "the NPU's device memory may be full: this graph loaded "
                     << engines_opened << " model(s) before this one, and every node "
-                    << "loads its own copy, even of the same model (another process "
-                    << "on the NPU uses memory too); remove a node or use a smaller "
-                    << "model - DX-M1 cannot hold a second realesrgan-x2_192x192 next to "
-                    << "yolov8-n_640x640 and resnet50_224x224";
+                    << "loads its own copy, even of the same model, unless the nodes "
+                    << "set \"engine\": {\"share\": true} (another process on the NPU "
+                    << "uses memory too); share an engine, lower a node's \"engine\": "
+                    << "{\"buffers\": N} (DX-RT's default is 6), remove a node or use a "
+                    << "smaller model - DX-M1 cannot hold a second realesrgan-x2_192x192 "
+                    << "next to yolov8-n_640x640 and resnet50_224x224";
             }
             throw GraphError(GraphErrorCode::kModelLoad, "node \"" + node.id + "\"",
                              "model \"" + node.model + "\" (" + info->dxnn_file +
@@ -480,6 +483,16 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
         runtime.output_shape = info->output_shape;
 
         runtime.tracked = node.track.present;
+    }
+    } catch (...) {
+        // Close every engine this Build opened before the error leaves it,
+        // so the device memory is free at once - for a caller that keeps
+        // this StageGraph (dx_graph) or retries with a smaller graph - and
+        // the graph is left empty rather than half built.
+        shared.clear();
+        nodes_.clear();
+        sources_.clear();
+        throw;
     }
 
     for (std::size_t i = 0; i < spec.edges.size(); ++i) {

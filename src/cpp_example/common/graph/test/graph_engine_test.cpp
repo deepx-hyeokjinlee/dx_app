@@ -12241,6 +12241,30 @@ void TestSharedEngineRestrictions() {
     GRAPH_CHECK(jobs.last_stage("yolov8n")->max_pending() == 2);  // od's 1 + od2's 1
 }
 
+// Graph Composer P1: MODEL_LOAD leaves no engine open, even while the
+// StageGraph that failed is still alive (dx_graph keeps it; Studio retries).
+void TestAFailedLoadClosesEveryEngineItOpened() {
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    registry.SetCreateFailure("yolov8n", "Failed to register memory cache", 1);
+    const GraphSpec spec = ParseGraphText(TwoDetectorsJson(), "two.json");
+    ValidateGraph(spec, registry);
+    StageGraph graph;
+    std::string message;
+    bool model_load = false;
+    try {
+        graph.Build(spec, registry, "/models", false);
+    } catch (const GraphError& error) {
+        model_load = error.code() == GraphErrorCode::kModelLoad;
+        message = error.what();
+    }
+    GRAPH_CHECK(model_load);
+    GRAPH_CHECK(registry.stages_made("yolov8n") == 1);  // od opened, od2 failed
+    GRAPH_CHECK(registry.live_stages() == 0);           // and od is closed again
+    GRAPH_CHECK(graph.nodes().empty());
+    GRAPH_CHECK(message.find("\"engine\": {\"share\": true}") != std::string::npos);
+    GRAPH_CHECK(message.find("\"buffers\"") != std::string::npos);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12597,6 +12621,7 @@ int main() {
     TestASharedStageKeepsEachNodesJobsApartUnderPipelining();
     TestRealSharedEngineWithBuffers();
     TestSharedEngineRestrictions();
+    TestAFailedLoadClosesEveryEngineItOpened();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
