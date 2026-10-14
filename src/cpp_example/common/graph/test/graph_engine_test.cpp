@@ -14049,6 +14049,23 @@ void TestLogicLabelsCoverNeitherBoxLabelsNorTheInArrow() {
     const cv::Rect label = cv::boundingRect(changed);
     GRAPH_CHECK(label.x >= 288 && label.y >= 224);           // inside the zone, at its corner
     GRAPH_CHECK(label.x < 320 && label.y < 280);
+    // A crop's scores listed at the zone's corner (pass 4) stay readable too.
+    std::shared_ptr<ScoresData> scores(new ScoresData());
+    ClassificationResult hat;
+    hat.class_name = "Hat";
+    hat.confidence = 0.9f;
+    scores->items.push_back(hat);
+    StageResult crop;
+    crop.data = scores;
+    crop.origin.from_roi = true;
+    crop.origin.src_box = cv::Rect2f(290.f, 226.f, 130.f, 195.f);
+    report.roi_results["attr"].push_back(crop);
+    report.overlays["zone"] = WithoutTexts(out.overlay);
+    const cv::Mat scored = RenderReport(grey, report);
+    report.overlays["zone"] = out.overlay;
+    const cv::Mat score_changed = LabelDiffMask(scored, RenderReport(grey, report));
+    GRAPH_CHECK(cv::countNonZero(score_changed(cv::Rect(290, 226, 60, 22))) == 0);
+    GRAPH_CHECK(cv::countNonZero(score_changed) > 0);
 
     // A line from A (bottom) to B (top): the arrow points right, the label
     // is left of the line, beside its midpoint.

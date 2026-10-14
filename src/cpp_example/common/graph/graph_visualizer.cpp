@@ -214,19 +214,27 @@ cv::Point TextAnchor(const cv::Mat& canvas, const RoiRef& origin) {
     return cv::Point(x, y);
 }
 
-void DrawTextLine(cv::Mat* canvas, const std::string& text, const cv::Point& anchor,
-                  int line_index) {
+/// The box DrawTextLine fills for line `line_index` of `text` under `anchor`.
+cv::Rect TextLineBox(const cv::Size& canvas, const std::string& text, const cv::Point& anchor,
+                     int line_index, cv::Point* baseline_at) {
     const int kLineHeight = 16;
     cv::Point pos(anchor.x, anchor.y + kLineHeight * (line_index + 1));
-    pos.x = std::max(0, std::min(pos.x, canvas->cols - 1));
-    pos.y = std::max(kLineHeight, std::min(pos.y, canvas->rows - 1));
-
+    pos.x = std::max(0, std::min(pos.x, canvas.width - 1));
+    pos.y = std::max(kLineHeight, std::min(pos.y, canvas.height - 1));
     int baseline = 0;
     const cv::Size text_size =
         cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 0.4, 1, &baseline);
-    cv::rectangle(*canvas, cv::Point(pos.x, pos.y - text_size.height - 2),
-                  cv::Point(pos.x + text_size.width, pos.y + baseline),
-                  cv::Scalar(0, 0, 0), cv::FILLED);
+    if (baseline_at != NULL) *baseline_at = pos;
+    return cv::Rect(cv::Point(pos.x, pos.y - text_size.height - 2),
+                    cv::Point(pos.x + text_size.width + 1, pos.y + baseline + 1));
+}
+
+void DrawTextLine(cv::Mat* canvas, const std::string& text, const cv::Point& anchor,
+                  int line_index) {
+    cv::Point pos;
+    const cv::Rect box = TextLineBox(canvas->size(), text, anchor, line_index, &pos);
+    cv::rectangle(*canvas, box.tl(), box.br() - cv::Point(1, 1), cv::Scalar(0, 0, 0),
+                  cv::FILLED);
     cv::putText(*canvas, text, pos, cv::FONT_HERSHEY_SIMPLEX, 0.4,
                 cv::Scalar(255, 255, 255), 1);
 }
@@ -680,6 +688,25 @@ void AddBoxLabelRows(const StageResult& result, const cv::Size& canvas,
     }
 }
 
+/// The text lines pass 4 draws for scores and vectors (DrawScores, DrawVector).
+void AddScoreLines(const StageResult& result, const cv::Mat& canvas,
+                   std::vector<cv::Rect>* taken) {
+    const cv::Point anchor = TextAnchor(canvas, result.origin);
+    const ScoresData* scores = dynamic_cast<const ScoresData*>(result.data.get());
+    for (std::size_t i = 0; scores != NULL && i < scores->items.size(); ++i) {
+        const ClassificationResult& item = scores->items[i];
+        const std::string label = item.class_name + ": " +
+            std::to_string(static_cast<int>(item.confidence * 100)) + "%";
+        taken->push_back(
+            TextLineBox(canvas.size(), label, anchor, static_cast<int>(i), NULL));
+    }
+    const VectorData* vec = dynamic_cast<const VectorData*>(result.data.get());
+    if (vec != NULL) {
+        const std::string label = "vec[" + std::to_string(vec->values.size()) + "]";
+        taken->push_back(TextLineBox(canvas.size(), label, anchor, 0, NULL));
+    }
+}
+
 /// Zones, lines with their "in" arrow and highlighted boxes; labels are
 /// drawn after every overlay's shapes (DrawLogicLabels).
 void DrawLogicShapes(cv::Mat* canvas, const LogicOverlay& overlay, cv::Mat* tint) {
@@ -875,6 +902,7 @@ cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report) {
         if (shape == Shape::kBoxes || shape == Shape::kInstances) {
             AddBoxLabelRows(result, canvas.size(), &taken);
         }
+        AddScoreLines(result, canvas, &taken);
     });
     cv::Mat tint;
     for (std::map<std::string, LogicOverlay>::const_iterator it = report.overlays.begin();
