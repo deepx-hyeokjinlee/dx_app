@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -94,9 +95,13 @@ struct FrameReport {
     /// Every event the logic nodes raised in this frame, in the stream's
     /// topological node order (each node's events in the order it raised them).
     std::vector<GraphEvent> events;
-    /// What each logic node asks the visualizer to draw, by node id. A node
-    /// with an entry here is drawn by pass 5 only, never by the shape passes.
+    /// What a logic node asks the visualizer to draw (pass 5), by node id;
+    /// only a node with something to draw this frame has an entry.
     std::map<std::string, LogicOverlay> overlays;
+    /// Every logic node that ran in this frame. The visualizer's shape
+    /// passes skip their payloads: a filter's or a zone's boxes are its
+    /// detector's boxes, already drawn.
+    std::set<std::string> logic_nodes;
 
     FrameReport() : frame_index(0), skipped_out_of_bounds(0), time_s(0.0) {}
 };

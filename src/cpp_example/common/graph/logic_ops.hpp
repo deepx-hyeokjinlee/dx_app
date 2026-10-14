@@ -104,6 +104,12 @@ struct LogicOverlay {
     LogicOverlay() : alert(false) {}
 };
 
+/// Nothing to draw: no polygon, line, highlight or label.
+inline bool IsEmpty(const LogicOverlay& overlay) {
+    return overlay.polygons.empty() && overlay.lines.empty() && overlay.highlights.empty() &&
+           overlay.texts.empty();
+}
+
 /// One event a logic node raised in one frame.
 struct GraphEvent {
     std::string node;    ///< the logic node's id

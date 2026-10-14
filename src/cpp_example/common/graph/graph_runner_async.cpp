@@ -796,7 +796,8 @@ struct AsyncExecutor::Engine {
                                          node.logic_states[ctx.stream].get());
         ctx.report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
         ctx.report.node_results[node.id] = out.result;
-        ctx.report.overlays[node.id] = out.overlay;
+        if (!IsEmpty(out.overlay)) ctx.report.overlays[node.id] = out.overlay;
+        ctx.report.logic_nodes.insert(node.id);
         if (!out.events.empty()) ctx.node_events[index] = out.events;
         if (!out.error.empty() && !HasEarlierError(ctx, index)) {
             ctx.node_errors[index] = "node \"" + node.id + "\": " + out.error;

@@ -217,9 +217,12 @@ ENGINE_INCLUDE_ALLOWLIST = frozenset([
     # surface and names no concrete registry and no task string.
     "cpu_reduce.hpp",
     # Logic nodes ("type": "logic"): the op catalog, the typed config, the
-    # per-stream state and RunLogic. Includes the graph surface, roi_router.hpp
-    # and common/processors/gallery_retrieval_postprocessor.hpp (the DXGAL1
-    # reader); names no concrete registry and no task string.
+    # per-stream state and RunLogic. The header includes only graph_config.hpp
+    # and shape.hpp and forward-declares RetrievalGallery; the DXGAL1 reader,
+    # common/processors/gallery_retrieval_postprocessor.hpp, is included by
+    # logic_ops.cpp (MakeLogicConfig, RunGallery) and graph_config.cpp
+    # (--check reads the gallery file). Names no concrete registry and no
+    # task string.
     "logic_ops.hpp",
 ])
 ENGINE_INCLUDE_PREFIXES = (

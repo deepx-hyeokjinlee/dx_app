@@ -274,6 +274,34 @@ std::vector<std::string> LogicOpNames() {
 
 std::string Quote(const std::string& text) { return "\"" + text + "\""; }
 
+/// The how-text for a logic node's param written as the wrong kind of JSON
+/// value (a boolean, an object): what that param takes, or the op's params
+/// when there is no such param.
+std::string LogicParamHint(const std::string& op, const std::string& key) {
+    const LogicOpInfo* info = FindLogicOp(op);
+    if (info == NULL) return "";
+    std::vector<std::string> names;
+    for (std::size_t p = 0; p < info->params.size(); ++p) {
+        const LogicParamInfo& param = info->params[p];
+        names.push_back(param.name);
+        if (param.name != key) continue;
+        switch (param.kind) {
+            case LogicParamInfo::kNumber:
+                return Quote(key) + " takes a number";
+            case LogicParamInfo::kText:
+                return Quote(key) + " takes a string";
+            case LogicParamInfo::kChoice:
+                return Quote(key) + " takes one of " + JoinList(param.choices);
+            case LogicParamInfo::kTextList:
+                return Quote(key) + " takes an array of strings";
+            case LogicParamInfo::kPolygon:
+            case LogicParamInfo::kLine:
+                return param.help;
+        }
+    }
+    return names.empty() ? op + " takes no params" : op + " accepts: " + JoinList(names);
+}
+
 /**
  * @brief The value errors of ONE JSON object, thrown as one GraphError.
  *
@@ -815,13 +843,16 @@ GraphSpec ParseGraphText(const std::string& json_text,
                         numbers.push_back(e->get<double>());
                     }
                 } else {
-                    const bool hint = value.is_boolean() && !switch_hinted;
+                    // A model's switch is a number; a logic param has its own kinds.
+                    const bool hint = !parsed.is_logic && value.is_boolean() && !switch_hinted;
                     switch_hinted = switch_hinted || hint;
                     const char* kinds = parsed.is_logic
                         ? " must be a number, a string, or an array of strings or of numbers, got "
                         : " must be a number, a string or an array of strings, got ";
                     bad.Add(Quote(it.key()) + kinds + value.dump(),
-                            hint ? "write a switch as 1 or 0" : "");
+                            parsed.is_logic ? LogicParamHint(parsed.op, it.key())
+                            : hint          ? "write a switch as 1 or 0"
+                                            : "");
                 }
             }
             bad.ThrowIfAny(Where(origin, detail.str() + " \"params\""));
@@ -1432,6 +1463,25 @@ void CheckLogicParams(const NodeSpec& node, Violations* bad) {
                 break;
         }
     }
+    // A count writes "total" and one number per listed class, so each name
+    // once, and never "total" itself (two numbers of one name in one row).
+    std::map<std::string, std::vector<std::string> >::const_iterator classes =
+        node.params.lists.find("classes");
+    if (node.op == "count" && classes != node.params.lists.end()) {
+        std::set<std::string> listed;
+        std::set<std::string> repeated;
+        for (std::size_t i = 0; i < classes->second.size(); ++i) {
+            const std::string& name = classes->second[i];
+            if (name == "total") {
+                if (!repeated.insert(name).second) continue;
+                bad->Add("\"classes\" holds \"total\", the name of the count of every listed "
+                         "class",
+                         "a class named total cannot be counted on its own: leave it out");
+            } else if (!listed.insert(name).second && repeated.insert(name).second) {
+                bad->Add("\"classes\" lists " + Quote(name) + " twice", "list each class once");
+            }
+        }
+    }
     // Names that end up in event lines and, in Phase 3, in exported code.
     std::map<std::string, std::string>::const_iterator text = node.params.text.find("event");
     if (node.op == "condition" && text != node.params.text.end() && !text->second.empty() &&
@@ -1487,6 +1537,12 @@ void CheckConditionValue(const NodeSpec& node, const LogicInputKind& in) {
     }
     if (in.numbers.empty()) return;  // records whose numbers are not known here
     if (std::find(in.numbers.begin(), in.numbers.end(), value) != in.numbers.end()) return;
+    if (it == node.params.text.end()) {  // the default, "count", is not one of them
+        throw GraphError(GraphErrorCode::kGraphSchema, where,
+                         "a condition on records needs \"value\": one of " +
+                             JoinList(in.numbers),
+                         "write \"value\": " + Quote(in.numbers[0]));
+    }
     throw GraphError(GraphErrorCode::kGraphSchema, where,
                      "\"value\" is " + Quote(value) + ", a number \"" + in.from +
                          "\" does not write",

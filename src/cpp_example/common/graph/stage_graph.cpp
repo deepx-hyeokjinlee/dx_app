@@ -763,6 +763,7 @@ bool operator==(const FrameReport& a, const FrameReport& b) {
     // (both executors compute them from the same inputs in stream order).
     if (a.time_s != b.time_s) return false;
     if (!SameEvents(a.events, b.events)) return false;
+    if (a.logic_nodes != b.logic_nodes) return false;
     if (a.overlays.size() != b.overlays.size()) return false;
     for (std::map<std::string, LogicOverlay>::const_iterator it = a.overlays.begin();
          it != a.overlays.end(); ++it) {

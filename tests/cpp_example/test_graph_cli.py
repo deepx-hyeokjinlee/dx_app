@@ -3457,6 +3457,10 @@ def test_list_ops_json_describes_every_op():
     assert [op["op"] for op in ops] == ["filter", "zone", "line", "count", "dwell",
                                         "condition", "gallery", "user", "headpose", "volume"]
     assert all(set(op) == OP_KEYS for op in ops)
+    # In the order the README documents, so a person can read it.
+    assert list(ops[1]) == ["op", "type", "summary", "inputs", "output", "tracking", "events",
+                            "numbers", "params"]
+    assert list(ops[1]["params"][0]) == ["name", "type", "required", "min_points", "help"]
     by = {op["op"]: op for op in ops}
     assert by["zone"]["type"] == "logic" and by["volume"]["type"] == "cpu"
     assert by["line"]["tracking"] is True and by["zone"]["tracking"] is False

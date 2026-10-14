@@ -96,7 +96,8 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
                          node.logic_states[stream].get());
             report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
             report.node_results[node.id] = out.result;
-            report.overlays[node.id] = out.overlay;
+            if (!IsEmpty(out.overlay)) report.overlays[node.id] = out.overlay;
+            report.logic_nodes.insert(node.id);
             report.events.insert(report.events.end(), out.events.begin(), out.events.end());
             if (!out.error.empty() && report.error.empty()) {
                 report.error = std::string("node \"") + node.id + "\": " + out.error;

@@ -96,8 +96,9 @@ cv::Point2f RestorePointWarped(const cv::Point2f& roi_local, const RoiRef& ref);
  * of the above: their polygons tinted and outlined, their lines with an
  * arrow to the "in" side (the right of A->B), highlighted boxes, then their
  * labels, at a point or stacked in a panel from the top left. A logic
- * node's own payload is not drawn by the shape passes: a zone's boxes are
- * its detector's boxes, already drawn.
+ * node's own payload (FrameReport::logic_nodes, or a node with an overlay)
+ * is not drawn by the shape passes: a zone's boxes are its detector's
+ * boxes, already drawn.
  *
  * An empty `source` returns it unchanged; a default (empty) `report`
  * draws nothing and returns a clone of `source`.

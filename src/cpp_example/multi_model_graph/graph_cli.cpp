@@ -588,18 +588,21 @@ nlohmann::json ModelRowJson(const ModelInfo& info, const std::string& model_dir)
 // --list-ops
 // ---------------------------------------------------------------------
 
-nlohmann::json ParamJson(const LogicParamInfo& param) {
+/// Keys in the order the README documents (op first), not sorted.
+typedef nlohmann::ordered_json OrderedJson;
+
+OrderedJson ParamJson(const LogicParamInfo& param) {
     using consumer::JsonNumber;
-    nlohmann::json out = nlohmann::json::object();
+    OrderedJson out = OrderedJson::object();
     out["name"] = param.name;
     out["type"] = ToString(param.kind);
     out["required"] = param.required;
     switch (param.kind) {
         case LogicParamInfo::kNumber:
-            if (!param.required) out["default"] = JsonNumber<nlohmann::json>(param.number_default);
-            if (param.low > -kLogicUnbounded) out["min"] = JsonNumber<nlohmann::json>(param.low);
+            if (!param.required) out["default"] = JsonNumber<OrderedJson>(param.number_default);
+            if (param.low > -kLogicUnbounded) out["min"] = JsonNumber<OrderedJson>(param.low);
             if (param.low_open) out["min_exclusive"] = true;
-            if (param.high < kLogicUnbounded) out["max"] = JsonNumber<nlohmann::json>(param.high);
+            if (param.high < kLogicUnbounded) out["max"] = JsonNumber<OrderedJson>(param.high);
             break;
         case LogicParamInfo::kText:
             if (!param.required) out["default"] = param.text_default;
@@ -609,7 +612,7 @@ nlohmann::json ParamJson(const LogicParamInfo& param) {
             out["choices"] = param.choices;
             break;
         case LogicParamInfo::kTextList:
-            out["default"] = nlohmann::json::array();
+            out["default"] = OrderedJson::array();
             break;
         case LogicParamInfo::kPolygon:
             out["min_points"] = 3;
@@ -622,19 +625,19 @@ nlohmann::json ParamJson(const LogicParamInfo& param) {
     return out;
 }
 
-nlohmann::json OpJson(const LogicOpInfo& info, const char* type) {
-    nlohmann::json out = nlohmann::json::object();
+OrderedJson OpJson(const LogicOpInfo& info, const char* type) {
+    OrderedJson out = OrderedJson::object();
     out["op"] = info.op;
     out["type"] = type;
     out["summary"] = info.summary;
-    nlohmann::json accepts = nlohmann::json::array();
+    OrderedJson accepts = OrderedJson::array();
     for (std::size_t i = 0; i < info.accepts.size(); ++i) {
-        nlohmann::json port = nlohmann::json::object();
+        OrderedJson port = OrderedJson::object();
         port["shape"] = ToString(info.accepts[i].shape);
         port["per_crop"] = info.accepts[i].per_crop;
         accepts.push_back(port);
     }
-    nlohmann::json inputs = nlohmann::json::object();
+    OrderedJson inputs = OrderedJson::object();
     inputs["min"] = info.min_inputs;
     inputs["max"] = info.max_inputs;
     inputs["accepts"] = accepts;
@@ -643,17 +646,21 @@ nlohmann::json OpJson(const LogicOpInfo& info, const char* type) {
     out["tracking"] = info.needs_tracking;
     out["events"] = info.events;
     out["numbers"] = info.numbers;
-    nlohmann::json params = nlohmann::json::array();
-    for (std::size_t p = 0; p < info.params.size(); ++p) params.push_back(ParamJson(info.params[p]));
+    OrderedJson params = OrderedJson::array();
+    for (std::size_t p = 0; p < info.params.size(); ++p) {
+        params.push_back(ParamJson(info.params[p]));
+    }
     out["params"] = params;
     return out;
 }
 
 /// --list-ops --json: logic ops, then cpu ops. Always 0.
 int PrintOpsJson() {
-    nlohmann::json ops = nlohmann::json::array();
-    for (std::size_t i = 0; i < LogicOps().size(); ++i) ops.push_back(OpJson(LogicOps()[i], "logic"));
-    for (std::size_t i = 0; i < CpuOpInfos().size(); ++i) ops.push_back(OpJson(CpuOpInfos()[i], "cpu"));
+    OrderedJson ops = OrderedJson::array();
+    const std::vector<LogicOpInfo>& logic = LogicOps();
+    const std::vector<LogicOpInfo>& cpu = CpuOpInfos();
+    for (std::size_t i = 0; i < logic.size(); ++i) ops.push_back(OpJson(logic[i], "logic"));
+    for (std::size_t i = 0; i < cpu.size(); ++i) ops.push_back(OpJson(cpu[i], "cpu"));
     std::printf("%s\n", ops.dump(2).c_str());
     return 0;
 }

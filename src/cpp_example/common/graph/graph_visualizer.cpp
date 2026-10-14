@@ -678,7 +678,10 @@ void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, Draw
     for (std::map<std::string, StageResult>::const_iterator it =
              report.node_results.begin();
          it != report.node_results.end(); ++it) {
-        if (report.overlays.count(it->first) != 0) continue;  // a logic node: pass 5
+        // A logic node: its overlay in pass 5, its payload is its input's.
+        if (report.logic_nodes.count(it->first) != 0 || report.overlays.count(it->first) != 0) {
+            continue;
+        }
         DrawResultAndPorts(it->second, canvas, shape, fn);
     }
     for (std::map<std::string, std::vector<StageResult> >::const_iterator it =

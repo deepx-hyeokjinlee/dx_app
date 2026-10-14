@@ -13434,7 +13434,7 @@ void TestUserNodePassesItsInputThrough() {
         if (od == NULL || user == NULL || user->items.size() != 1 || od->items.size() != 1) continue;
         GRAPH_CHECK(user->items[0].box == od->items[0].box);
         GRAPH_CHECK(user->items[0].track_id == od->items[0].track_id);
-        GRAPH_CHECK(reports[i].overlays.count("u") == 1);
+        GRAPH_CHECK(reports[i].overlays.count("u") == 0 && reports[i].logic_nodes.count("u") == 1);
     }
     GRAPH_CHECK(reports[2].events.size() == 1 && reports[2].events[0].node == "z");
     const std::vector<FrameReport> async = RunLogicFrames(text, ReversedLogicRegistry(), Keys(6), true);
@@ -13560,6 +13560,102 @@ void TestStreamReaderLoopsAVideo() {
     GRAPH_CHECK(ReadIndices(&still).size() == 1 && still.restarts(0) == 0);
     std::remove(video.c_str());
     std::remove(image.c_str());
+}
+
+void TestConditionOnRecordsNeedsAValue() {
+    // A line writes in, out and total, no "count": the default does not fit.
+    std::string m = LogicError(LogicJson(
+        std::string(kLineNode) + ConditionNode("{\"event\":\"busy\"}"),
+        std::string(kOdToL) + ",{\"from\":\"l\",\"to\":\"c\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("a condition on records needs \"value\": one of in, out, total") !=
+                std::string::npos);
+    GRAPH_CHECK(m.find("\"value\" is \"count\"") == std::string::npos);
+    GRAPH_CHECK(m.find("write \"value\": \"in\"") != std::string::npos);
+    // Written but wrong: the old message, naming what it wrote.
+    m = LogicError(LogicJson(
+        std::string(kLineNode) + ConditionNode("{\"value\":\"inside\"}"),
+        std::string(kOdToL) + ",{\"from\":\"l\",\"to\":\"c\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"value\" is \"inside\", a number \"l\" does not write") !=
+                std::string::npos);
+}
+
+void TestABooleanOnALogicNodeGetsItsParamsHint() {
+    std::string message;
+    GRAPH_CHECK(ThrowsWithCode(
+        LogicJson(",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"params\":"
+                  "{\"polygon\":[0,0,1,0,1,1],\"mode\":true}}", kOdToZ),
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"mode\" must be a number, a string, or an array of strings or of "
+                             "numbers, got true") != std::string::npos);
+    GRAPH_CHECK(message.find("\"mode\" takes one of inside, outside") != std::string::npos);
+    GRAPH_CHECK(message.find("switch") == std::string::npos);
+    GRAPH_CHECK(ThrowsWithCode(
+        LogicJson(",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\",\"params\":"
+                  "{\"min_score\":false,\"classes\":true,\"strict\":true}}",
+                  ",{\"from\":\"od\",\"to\":\"f\",\"carry\":\"result\"}"),
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"min_score\" takes a number") != std::string::npos);
+    GRAPH_CHECK(message.find("\"classes\" takes an array of strings") != std::string::npos);
+    GRAPH_CHECK(message.find("filter accepts: classes, min_score, min_area") != std::string::npos);
+    GRAPH_CHECK(message.find("switch") == std::string::npos);
+}
+
+void TestCountRejectsTotalAndRepeatedClasses() {
+    const std::string edges = ",{\"from\":\"od\",\"to\":\"n\",\"carry\":\"result\"}";
+    const auto count = [](const std::string& classes) {
+        return ",{\"id\":\"n\",\"type\":\"logic\",\"op\":\"count\",\"params\":{\"classes\":" +
+               classes + "}}";
+    };
+    GRAPH_CHECK(LogicError(LogicJson(count("[\"person\",\"car\"]"), edges)).empty());
+    std::string m = LogicError(LogicJson(count("[\"person\",\"total\"]"), edges));
+    GRAPH_CHECK(m.find("ERROR [GRAPH_SCHEMA] node \"n\" \"params\": \"classes\" holds \"total\", "
+                       "the name of the count of every listed class") != std::string::npos);
+    m = LogicError(LogicJson(count("[\"person\",\"car\",\"person\"]"), edges));
+    GRAPH_CHECK(m.find("\"classes\" lists \"person\" twice") != std::string::npos);
+    GRAPH_CHECK(m.find("list each class once") != std::string::npos);
+    // A filter may keep a class named total: it writes no numbers.
+    GRAPH_CHECK(LogicError(LogicJson(
+        ",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\",\"params\":{\"classes\":[\"total\"]}}",
+        ",{\"from\":\"od\",\"to\":\"f\",\"carry\":\"result\"}")).empty());
+}
+
+// Only a logic node that has something to draw gets an overlay entry; every
+// logic node that ran is in logic_nodes, so the shape passes skip its payload.
+void TestOnlyLogicNodesThatDrawHaveAnOverlay() {
+    const std::string text = LogicJson(
+        ",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\"}" + std::string(kZoneNode) +
+            ",{\"id\":\"d\",\"type\":\"logic\",\"op\":\"dwell\",\"params\":{\"threshold_s\":1}}",
+        ",{\"from\":\"od\",\"to\":\"f\",\"carry\":\"result\"},"
+        "{\"from\":\"f\",\"to\":\"z\",\"carry\":\"result\"},"
+        "{\"from\":\"z\",\"to\":\"d\",\"carry\":\"result\"}");
+    const std::vector<FrameReport> reports = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    for (std::size_t i = 0; i < 6; ++i) {
+        GRAPH_CHECK(reports[i].overlays.count("f") == 0);
+        GRAPH_CHECK(reports[i].overlays.count("z") == 1);
+        // dwell draws a timer only for a track inside the zone (frames 2-4).
+        GRAPH_CHECK(reports[i].overlays.count("d") == (i >= 2 && i <= 4 ? 1u : 0u));
+        GRAPH_CHECK(reports[i].logic_nodes.size() == 3 && reports[i].logic_nodes.count("f") == 1);
+        GRAPH_CHECK(reports[i].logic_nodes.count("od") == 0);
+    }
+    const std::vector<FrameReport> async = RunLogicFrames(text, ReversedLogicRegistry(), Keys(6), true);
+    GRAPH_CHECK(async.size() == 6);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
+    FrameReport other = reports[0];
+    other.logic_nodes.erase("f");
+    GRAPH_CHECK(!(other == reports[0]));
+    // A logic node with nothing to draw still keeps its boxes out of the shape passes.
+    const cv::Mat black = cv::Mat::zeros(100, 200, CV_8UC3);
+    FrameReport filtered;
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(120, 20, 40, 40, 0.9f, "person"));
+    StageResult kept;
+    kept.data = boxes;
+    filtered.node_results["f"] = kept;
+    GRAPH_CHECK(cv::countNonZero(RenderReport(black, filtered).reshape(1)) > 0);
+    filtered.logic_nodes.insert("f");
+    GRAPH_CHECK(cv::countNonZero(RenderReport(black, filtered).reshape(1)) == 0);
 }
 
 }  // namespace graph
@@ -13951,6 +14047,10 @@ int main() {
     TestRenderReportDrawsLogicOverlaysButNotTheirBoxes();
     TestEventFileWriterWritesOneLinePerEvent();
     TestStreamReaderLoopsAVideo();
+    TestConditionOnRecordsNeedsAValue();
+    TestABooleanOnALogicNodeGetsItsParamsHint();
+    TestCountRejectsTotalAndRepeatedClasses();
+    TestOnlyLogicNodesThatDrawHaveAnOverlay();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
