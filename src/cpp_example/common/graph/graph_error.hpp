@@ -38,9 +38,17 @@ class GraphError : public std::runtime_error {
     GraphError(GraphErrorCode code, const std::string& where,
                const std::string& what_happened, const std::string& how_to_fix)
         : std::runtime_error(Format(code, where, what_happened, how_to_fix)),
-          code_(code) {}
+          code_(code),
+          where_(where),
+          what_happened_(what_happened),
+          how_to_fix_(how_to_fix) {}
 
     GraphErrorCode code() const { return code_; }
+    /// The three parts what() joins, for a caller that reports them apart
+    /// (--check --json).
+    const std::string& where() const { return where_; }
+    const std::string& what_happened() const { return what_happened_; }
+    const std::string& how_to_fix() const { return how_to_fix_; }
 
  private:
     static std::string Format(GraphErrorCode code, const std::string& where,
@@ -60,6 +68,9 @@ class GraphError : public std::runtime_error {
     }
 
     GraphErrorCode code_;
+    std::string where_;
+    std::string what_happened_;
+    std::string how_to_fix_;
 };
 
 }  // namespace graph

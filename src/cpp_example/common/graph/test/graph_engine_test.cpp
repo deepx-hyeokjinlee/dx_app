@@ -12312,6 +12312,26 @@ void TestAFailedLoadClosesEveryEngineItOpened() {
     GRAPH_CHECK(message.find("\"buffers\"") != std::string::npos);
 }
 
+// --check --json reports where, what and how apart.
+void TestGraphErrorKeepsItsThreeParts() {
+    const GraphError error(GraphErrorCode::kGraphEdge, "edge \"a\"->\"b\"", "shapes differ",
+                           "use a detector");
+    GRAPH_CHECK(error.where() == "edge \"a\"->\"b\"");
+    GRAPH_CHECK(error.what_happened() == "shapes differ");
+    GRAPH_CHECK(error.how_to_fix() == "use a detector");
+    GRAPH_CHECK(std::string(error.what()) ==
+                "ERROR [GRAPH_EDGE] edge \"a\"->\"b\": shapes differ\n  -> use a detector");
+    std::string where;
+    try {
+        ParseGraphText("{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a\"},"
+                       "{\"id\":\"od\",\"modle\":\"x\"}],\"edges\":[]}",
+                       "g.json");
+    } catch (const GraphError& parse_error) {
+        where = parse_error.where();
+    }
+    GRAPH_CHECK(where == "g.json node[1] \"od\"");
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12670,6 +12690,7 @@ int main() {
     TestRealSharedEngineWithBuffers();
     TestSharedEngineRestrictions();
     TestAFailedLoadClosesEveryEngineItOpened();
+    TestGraphErrorKeepsItsThreeParts();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
