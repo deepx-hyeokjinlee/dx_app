@@ -75,7 +75,7 @@ Two binaries are built from one engine and differ in exactly one value:
 
 Both produce the same `FrameReport` for the same input — `--report` writes
 it as JSON, and `tests/cpp_example/test_graph_cli.py` compares the two files
-byte for byte on real hardware for **all thirteen shipped sample graphs**
+byte for byte on real hardware for **all nineteen shipped sample graphs**
 (a graph whose model file is missing is skipped), covering
 every payload shape they produce — `frame`, `boxes`, `obboxes`,
 `keypoints`, `labelmap`, `densemap`, `image`, `scores`, `vector` and
@@ -100,11 +100,22 @@ Shipped samples, next to the CLI sources in `src/cpp_example/multi_model_graph/`
 | `hand_cascade.json` | palm detector → per-palm crop → 21 hand landmarks | `mediapipe-hand-detector_192x192` → `mediapipe-hands-lite_224x224` |
 | `dms_headpose.json` | face detector → head pose (pitch, yaw, roll) on a cpu node | `scrfd-500m_640x640` → `headpose` |
 | `logistics_volume.json` | detector, instance mask and depth in parallel → package volume proxy on a cpu node | `yolo26-n_640x640` + `yolo26-n-seg_640x640` + `yolo26-depth-n_768x768` → `volume` |
+| `zone_intrusion.json` | people in a restricted zone raise an `intrusion` event (filter → zone → condition, cooldown 10 s) | `yolov8-n_640x640` → logic |
+| `line_counting.json` | tracked people crossing a line, counted per direction, a `cross` event each | `yolov8-n_640x640` → logic |
+| `ppe_zone_check.json` | people in a zone are cropped for attributes; one without a hat raises `no_hat` (zone → ROI → classifier → condition) | `yolov8-n_640x640` → `deepmar_resnet18_224x224` → logic |
+| `loitering_dwell.json` | how long each tracked person stays in a zone; a `dwell` event after 5 s | `yolov8-n_640x640` → logic |
+| `zone_people_count.json` | people counted in two zones | `yolov8-n_640x640` → logic |
+| `gallery_known_person.json` | each person's ReID embedding named after the nearest gallery entry, or `unknown` | `yolov8-n_640x640` → `repvgg-a0-reid_256x128` → logic |
 
 `hand_cascade.json`, `dms_headpose.json` and `logistics_volume.json` are
 shipped scenarios. The hand cascade is a crop chain. Head pose and volume
 are cpu nodes. CLIP prompt scores are not a graph node (see *Not in this
 release*).
+
+The last six are decision graphs (see *Logic nodes*). On their sample image
+they show one decision each; their scenes are videos, for example
+`--input assets/videos/person-pair-hallway.mp4` (two people walking a
+hallway) with `--loop` for a Live run.
 
 An ROI crop uses one rule, `PaddedCropRect` in `common/utility/roi_crop.hpp`:
 pad the box around its centre, clamp it to the frame in float, then truncate

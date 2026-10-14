@@ -63,6 +63,12 @@ SAMPLE_GRAPHS = [
     "hand_cascade.json",
     "dms_headpose.json",
     "logistics_volume.json",
+    "zone_intrusion.json",
+    "line_counting.json",
+    "ppe_zone_check.json",
+    "loitering_dwell.json",
+    "zone_people_count.json",
+    "gallery_known_person.json",
 ]
 # DX-M1 cannot load these together: realesrgan-x2 plus yolov8-n plus a third model.
 NPU_WEIGHT_EXCLUDED = (
@@ -1678,7 +1684,8 @@ def test_readmes_document_several_sources():
         assert needle in section, needle
     assert "multistream_od_two_sources.json" in text
     # The parity claim counts what SAMPLE_GRAPHS compares against what ships.
-    words = {11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen"}
+    words = {11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
+             16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen"}
     shipped = len(list(GRAPH_DIR.glob("*.json")))
     if len(SAMPLE_GRAPHS) == shipped:
         claim = "all {} shipped sample graphs".format(words[shipped])
@@ -3555,3 +3562,41 @@ def test_list_ops_is_a_mode_of_its_own():
     result = run(BINARIES[0], "--list-ops", "--list-models")
     assert result.returncode == 2, result.stdout + result.stderr
     assert "--list-ops is a mode of its own" in result.stderr
+
+
+# What each logic sample decides on its own sample image (sample_people.jpg:
+# two people, a dog). Node ids and event names as in the sample files.
+LOGIC_SAMPLE_EVENTS = {
+    "zone_intrusion.json": [("zone", "enter"), ("alarm", "intrusion")],
+    "line_counting.json": [],
+    "ppe_zone_check.json": [("zone", "enter"), ("alarm", "no_hat")],
+    "loitering_dwell.json": [("zone", "enter")],
+    "zone_people_count.json": [("left", "enter"), ("right", "enter")],
+    "gallery_known_person.json": [("known", "match"), ("known", "match")],
+}
+
+
+@pytest.mark.graph_e2e
+@pytest.mark.parametrize("graph", sorted(LOGIC_SAMPLE_EVENTS))
+def test_logic_samples_decide_on_their_sample_image(tmp_path, graph):
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    report = tmp_path / "report.json"
+    result = run("multi_model_graph_async", "--graph", "{}/{}".format(GRAPHS, graph),
+                 "--report", str(report))
+    assert result.returncode == 0, result.stdout + result.stderr
+    events = _event_lines(result.stdout)
+    assert [(e["node"], e["event"]) for e in events] == LOGIC_SAMPLE_EVENTS[graph], result.stdout
+    frame = json.loads(report.read_text())["frames"][0]
+    if graph == "line_counting.json":
+        numbers = frame["nodes"]["line"]["payload"]["items"][0]["numbers"]
+        assert numbers == {"in": 0, "out": 0, "total": 0}, numbers
+    if graph == "zone_people_count.json":
+        items = frame["nodes"]["count"]["payload"]["items"]
+        assert {i["text"]["node"]: i["numbers"]["total"] for i in items} == {"left": 1, "right": 1}
+    if graph == "ppe_zone_check.json":
+        assert len(frame["roi_nodes"]["attr"]) == 1, "one person stands in the zone"
+    if graph == "gallery_known_person.json":
+        assert sorted(e["data"]["name"] for e in events) == ["sample_people_p0", "sample_people_p1"]
+        assert all(e["data"]["score"] > 0.9 for e in events), events
