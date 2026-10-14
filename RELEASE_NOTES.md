@@ -3,7 +3,7 @@
 ## v3.3.0 / 2026-10-14
 
 ### 1. Changed
-- Reorganized C++ and Python examples into task/family/variant directories. The variant name is the .dxnn stem, and each C++ factory is namespaced `dxapp::v_<variant>
+- Reorganized C++ and Python examples into task/family/variant directories. The variant name is the .dxnn stem, and each C++ factory is namespaced `dxapp::v_<variant>`
 - Renamed tasks
     -  `classification` → `image_classification`,
     - `embedding` → `face_recognition` / `image_retrieval` / `visual_place_recognition` / `zero_shot_image_classification`
@@ -24,6 +24,10 @@
 - Multi-model graph engine and CLI `multi_model_graph_sync` / `multi_model_graph_async` (`--check`, `--list-models`, `--report`)
 - Registered 147 DX Model Zoo models, including RT-DETR, YOLOv12, YOLOv13, pre-optimized YOLO, anomaly detection, image matting, CLIP retrieval, person re-id, and visual place recognition
 - Sample galleries for re-id, image retrieval, and visual place recognition
+
+### 4. Removed
+- Ubuntu 18.04 support (Makefile, CI matrix, installation guide, `install_python_and_venv.sh`)
+- `setup.sh` options `--internal`, `--internal-path` and `--internal-video-path`; models and sample videos always come from S3
 
 ## DX-APP v3.2.2 / 2026-08-14
 
