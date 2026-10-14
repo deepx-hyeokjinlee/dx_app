@@ -12094,6 +12094,153 @@ void TestEngineBufferScopeSetsAndRestores() {
     GRAPH_CHECK(detail::EngineBuffersSlot() == 0);
 }
 
+// Graph Composer P1: nodes that share get ONE stage; each still gets its own
+// results, in both executors and with several frames in flight.
+void TestSharedNodesUseOneStage() {
+    const GraphSpec spec = ParseGraphText(SharedDetectorsJson("{\"share\":true}", ""), "s.json");
+    const cv::Mat frame = cv::Mat::zeros(480, 640, CV_8UC3);
+
+    FakeModelRegistry sync_registry = BuildCascadeRegistry();
+    ValidateGraph(spec, sync_registry);
+    StageGraph sync_graph;
+    sync_graph.Build(spec, sync_registry, "/models", false);
+    GRAPH_CHECK(sync_registry.stages_made("yolov8n") == 1);
+    const FrameReport expected = SyncExecutor().RunFrame(sync_graph, frame, 0);
+
+    FakeModelRegistry async_registry = BuildCascadeRegistry();
+    StageGraph async_graph;
+    async_graph.Build(spec, async_registry, "/models", false);
+    GRAPH_CHECK(async_registry.stages_made("yolov8n") == 1);
+    AsyncExecutor executor(StageJobs(4));
+    const FrameReport actual = executor.RunFrame(async_graph, frame, 0);
+
+    GRAPH_CHECK(expected.error.empty());
+    GRAPH_CHECK(expected == actual);
+    GRAPH_CHECK(expected.node_results.count("od") == 1 && expected.node_results.count("od2") == 1);
+    GRAPH_CHECK(expected.roi_results.count("reid") == 1 && expected.roi_results.at("reid").size() == 2);
+
+    // Without "share", one stage per node, as before.
+    FakeModelRegistry plain = BuildCascadeRegistry();
+    StageGraph plain_graph;
+    plain_graph.Build(ParseGraphText(TwoDetectorsJson(), "two.json"), plain, "/models", false);
+    GRAPH_CHECK(plain.stages_made("yolov8n") == 2);
+}
+
+void TestASharedStageKeepsEachNodesJobsApartUnderPipelining() {
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    registry.SetShuffleSeed("yolov8n", 7);
+    const GraphSpec spec = ParseGraphText(SharedDetectorsJson("{\"share\":true}", ""), "s.json");
+    StageGraph graph;
+    graph.Build(spec, registry, "/models", false);
+    GRAPH_CHECK(registry.stages_made("yolov8n") == 1);
+    AsyncOptions options;
+    options.max_frames_in_flight = 4;
+    AsyncExecutor executor(options);
+    for (std::size_t i = 0; i < 6; ++i) {
+        executor.Submit(graph, cv::Mat::zeros(480, 640, CV_8UC3), i);
+    }
+    executor.Finish(graph);
+    FrameReport report;
+    std::size_t seen = 0;
+    while (executor.TryNext(&report)) {
+        GRAPH_CHECK(report.frame_index == seen);
+        GRAPH_CHECK(report.error.empty());
+        GRAPH_CHECK(report.node_results.count("od") == 1 && report.node_results.count("od2") == 1);
+        GRAPH_CHECK(report.roi_results.count("reid") == 1 && report.roi_results["reid"].size() == 2);
+        ++seen;
+    }
+    GRAPH_CHECK(seen == 6);
+}
+
+namespace {
+
+/// sample_people.jpg moved right by 8 px per frame index.
+cv::Mat SharedTestFrame(const cv::Mat& image, std::size_t index) {
+    cv::Mat moved;
+    const cv::Mat shift = (cv::Mat_<float>(2, 3) << 1, 0, 8.0f * static_cast<float>(index), 0, 1, 0);
+    cv::warpAffine(image, moved, shift, image.size());
+    return moved;
+}
+
+}  // namespace
+
+// Real hardware: two nodes on one yolov8-n engine with 2 buffers, 8 frames
+// pipelined through DX-RT's own completion threads, against sync.
+void TestRealSharedEngineWithBuffers() {
+    const char* kTest = "TestRealSharedEngineWithBuffers";
+    StaticModelRegistry registry;
+    const std::string missing =
+        MissingArtifacts(registry, std::vector<std::string>(1, "yolov8-n_640x640"));
+    if (!missing.empty()) { Skip(kTest, missing); return; }
+    const cv::Mat image = cv::imread(ProjectRoot() + "/sample/img/sample_people.jpg");
+    GRAPH_CHECK(!image.empty());
+    if (image.empty()) return;
+    const GraphSpec spec = ParseGraphText(
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"x\"},"
+        "{\"id\":\"od\",\"model\":\"yolov8-n_640x640\",\"engine\":{\"share\":true,\"buffers\":2}},"
+        "{\"id\":\"od2\",\"model\":\"yolov8-n_640x640\",\"engine\":{\"share\":true,\"buffers\":2}}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"od\"},{\"from\":\"cam\",\"to\":\"od2\"}]}",
+        "real_shared.json");
+    ValidateGraph(spec, registry);
+
+    StageGraph sync_graph;
+    sync_graph.Build(spec, registry, ModelDir());
+    SyncExecutor sync_executor;
+    std::vector<FrameReport> expected;
+    for (std::size_t i = 0; i < 8; ++i) {
+        expected.push_back(sync_executor.RunFrame(sync_graph, SharedTestFrame(image, i), i));
+    }
+
+    StageGraph async_graph;
+    async_graph.Build(spec, registry, ModelDir());
+    AsyncOptions options;
+    options.max_frames_in_flight = 8;
+    AsyncExecutor async_executor(options);
+    for (std::size_t i = 0; i < 8; ++i) {
+        async_executor.Submit(async_graph, SharedTestFrame(image, i), i);
+    }
+    async_executor.Finish(async_graph);
+    FrameReport report;
+    std::size_t k = 0;
+    while (async_executor.TryNext(&report)) {
+        GRAPH_CHECK(k < expected.size() && report == expected[k]);
+        ++k;
+    }
+    GRAPH_CHECK(k == expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        GRAPH_CHECK(expected[i].error.empty());
+        const nlohmann::json out = consumer::ReportToJson(expected[i], false);
+        GRAPH_CHECK(out["nodes"]["od"]["payload"] == out["nodes"]["od2"]["payload"]);
+        GRAPH_CHECK(!out["nodes"]["od"]["payload"]["items"].empty());
+    }
+}
+
+// Graph Composer P1, the shared-engine restrictions (plan decision 5):
+// sharing never crosses StageGraphs, and max_jobs_per_stage counts per node,
+// so one shared engine may hold (sharers x N) jobs at once.
+void TestSharedEngineRestrictions() {
+    const GraphSpec spec = ParseGraphText(SharedDetectorsJson("{\"share\":true}", ""), "s.json");
+
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    ValidateGraph(spec, registry);
+    StageGraph first;
+    first.Build(spec, registry, "/models", false);
+    StageGraph second;
+    second.Build(spec, registry, "/models", false);
+    GRAPH_CHECK(registry.stages_made("yolov8n") == 2);  // one per graph, not one for both
+
+    FakeModelRegistry jobs = BuildCascadeRegistry();
+    StageGraph graph;
+    graph.Build(spec, jobs, "/models", false);
+    GRAPH_CHECK(jobs.stages_made("yolov8n") == 1);
+    AsyncExecutor executor(StageJobs(1));
+    const FrameReport report = executor.RunFrame(graph, cv::Mat::zeros(480, 640, CV_8UC3), 0);
+    GRAPH_CHECK(report.error.empty());
+    GRAPH_CHECK(jobs.last_stage("yolov8n") != NULL);
+    if (jobs.last_stage("yolov8n") == NULL) return;
+    GRAPH_CHECK(jobs.last_stage("yolov8n")->max_pending() == 2);  // od's 1 + od2's 1
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12446,6 +12593,10 @@ int main() {
     TestEngineKeyParsesAndValidates();
     TestEngineBuffersReachTheRegistry();
     TestEngineBufferScopeSetsAndRestores();
+    TestSharedNodesUseOneStage();
+    TestASharedStageKeepsEachNodesJobsApartUnderPipelining();
+    TestRealSharedEngineWithBuffers();
+    TestSharedEngineRestrictions();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

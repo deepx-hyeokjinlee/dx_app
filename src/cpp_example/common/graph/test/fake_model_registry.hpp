@@ -195,6 +195,15 @@ class FakeStage : public IStage {
 
     std::size_t pending() const { return pending_.size(); }
 
+    /// Count this stage in `live` until it is destroyed.
+    void SetLiveCounter(const std::shared_ptr<int>& live) {
+        live_ = live;
+        if (live_) ++*live_;
+    }
+    ~FakeStage() {
+        if (live_) --*live_;
+    }
+
     /// The most jobs this stage ever held at once. An executor honouring a
     /// back-pressure limit of N never lets this exceed N; without the
     /// limit the whole batch is outstanding at once and this reaches the
@@ -237,11 +246,12 @@ class FakeStage : public IStage {
     std::vector<std::pair<StageInput, StageCallback> > pending_;
     std::vector<StageInput> seen_;
     StagePorts ports_;
+    std::shared_ptr<int> live_;
 };
 
 class FakeModelRegistry : public IModelRegistry {
  public:
-    FakeModelRegistry() : meter_(new InflightMeter()) {}
+    FakeModelRegistry() : meter_(new InflightMeter()), live_(new int(0)) {}
 
     /// The most jobs that were outstanding at one instant across every
     /// stage this registry created. An executor that submits each node and
@@ -349,6 +359,15 @@ class FakeModelRegistry : public IModelRegistry {
         return stage;
     }
 
+    /// How many stages createStage() has handed out for this model.
+    int stages_made(const std::string& model_name) const {
+        std::map<std::string, int>::const_iterator it = made_.find(model_name);
+        return it == made_.end() ? 0 : it->second;
+    }
+
+    /// Stages this registry created that are not destroyed yet.
+    int live_stages() const { return *live_; }
+
     const ModelInfo* find(const std::string& model_name) const {
         std::map<std::string, ModelInfo>::const_iterator it =
             infos_.find(model_name);
@@ -424,6 +443,8 @@ class FakeModelRegistry : public IModelRegistry {
         }
         if (ports_.count(model_name) != 0) stage->SetPorts(ports_.find(model_name)->second);
 
+        stage->SetLiveCounter(live_);
+        ++made_[model_name];
         last_[model_name] = stage;
         params_[model_name] = params;
         return std::unique_ptr<IStage>(stage);
@@ -445,6 +466,8 @@ class FakeModelRegistry : public IModelRegistry {
     std::map<std::string, StagePorts> ports_;
     std::vector<std::string> order_;
     InflightMeterPtr meter_;
+    std::shared_ptr<int> live_;
+    mutable std::map<std::string, int> made_;
     mutable std::map<std::string, FakeStage*> last_;
     mutable std::map<std::string, StageParams> params_;
     mutable std::map<std::string, EngineOptions> engine_;

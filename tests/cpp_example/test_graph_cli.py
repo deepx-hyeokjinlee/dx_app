@@ -2994,3 +2994,44 @@ def test_check_fails_on_a_model_file_that_is_not_a_dxnn(tmp_path, content):
     assert 'ERROR [MODEL_LOAD] node "od": model "yolov8n" ({}) is not a loadable .dxnn: '.format(
         dxnn) in result.stderr, result.stderr
     assert "  -> download it again: ./setup.sh --models YoloV8N" in result.stderr, result.stderr
+
+
+SHARED_GRAPH = {
+    "version": 1, "name": "shared",
+    "nodes": [{"id": "cam", "type": "source", "uri": "sample/img/sample_people.jpg"},
+              {"id": "od", "model": "yolov8-n_640x640", "engine": {"share": True, "buffers": 2}},
+              {"id": "od2", "model": "yolov8-n_640x640", "engine": {"share": True, "buffers": 2}}],
+    "edges": [{"from": "cam", "to": "od"}, {"from": "cam", "to": "od2"}],
+}
+
+
+@pytest.mark.graph_parity
+def test_a_shared_engine_gives_each_node_what_it_gets_alone(tmp_path):
+    """Two nodes on one engine, sync and async (8 frames in flight), give the
+    same reports as two nodes with an engine each, and the same result on
+    both nodes."""
+    if not (MODEL_DIR / "yolov8-n_640x640.dxnn").is_file():
+        pytest.skip("yolov8-n_640x640.dxnn is absent - run ./setup.sh --models YoloV8N")
+    shared = tmp_path / "shared.json"
+    shared.write_text(json.dumps(SHARED_GRAPH))
+    unshared = json.loads(json.dumps(SHARED_GRAPH))
+    for node in unshared["nodes"]:
+        node.pop("engine", None)
+    plain = tmp_path / "plain.json"
+    plain.write_text(json.dumps(unshared))
+    video = write_moving_video(tmp_path / "moving.avi")
+    reports = {}
+    for name, graph in (("plain", plain), ("shared", shared)):
+        for binary, extra in (("multi_model_graph_sync", []),
+                              ("multi_model_graph_async", ["--max-inflight", "8"])):
+            out = tmp_path / "{}_{}.json".format(name, binary)
+            result = run(binary, "--graph", str(graph), "--input", str(video),
+                         "--report", str(out), *extra)
+            assert result.returncode == 0, result.stdout + result.stderr
+            reports[(name, binary)] = json.loads(out.read_text())["frames"]
+    first = reports[("plain", "multi_model_graph_sync")]
+    assert len(first) == 8
+    for key, frames in reports.items():
+        assert frames == first, key
+    for frame in first:
+        assert frame["nodes"]["od"]["payload"] == frame["nodes"]["od2"]["payload"]

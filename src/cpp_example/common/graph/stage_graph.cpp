@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 
@@ -298,6 +299,34 @@ bool SamePorts(const StagePorts& x, const StagePorts& y) {
     return true;
 }
 
+/**
+ * @brief One node's handle on a stage several nodes share ("engine":
+ *        {"share": true}).
+ *
+ * Every call forwards. The stage is owned jointly by its handles, so it is
+ * destroyed (and flushes, clause (5)) with the last of them, whatever order
+ * the nodes are torn down in. Safe because both executors call into stages
+ * from one driver thread only (clause (1) still holds for the shared
+ * instance) and route every completion by the callback passed to that one
+ * submit(), never by stage; see the rule in the Graph Composer plan and in
+ * README "Device memory".
+ */
+class SharedStage : public IStage {
+ public:
+    explicit SharedStage(const std::shared_ptr<IStage>& stage) : stage_(stage) {}
+    StageResult run(const StageInput& input) { return stage_->run(input); }
+    void submit(const StageInput& input, StageCallback callback) {
+        stage_->submit(input, callback);
+    }
+    void flush() { stage_->flush(); }
+    void poll() { stage_->poll(); }
+    Shape outputShape() const { return stage_->outputShape(); }
+    InputContract inputContract() const { return stage_->inputContract(); }
+
+ private:
+    std::shared_ptr<IStage> stage_;
+};
+
 }  // namespace
 
 EdgeCargo SelectEdgeCargo(const EdgeRuntime& edge, const StageDataPtr& produced,
@@ -328,6 +357,10 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
     std::map<std::string, std::size_t> index_of;
     nodes_.resize(spec.nodes.size());
     std::size_t engines_opened = 0;
+    // "engine": {"share": true}: node id -> owner id (validated: same
+    // variant, params and buffers), and owner id -> the one stage.
+    const std::map<std::string, std::string> owners = SharedEngineOwners(spec, registry);
+    std::map<std::string, std::shared_ptr<IStage> > shared;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
         NodeRuntime& runtime = nodes_[i];
@@ -391,6 +424,20 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
                     (info->download_name.empty() ? node.model
                                                  : info->download_name));
         }
+        std::map<std::string, std::string>::const_iterator owner = owners.find(node.id);
+        if (owner != owners.end() && owner->second != node.id) {
+            // The owner comes first in declaration order, so it is built.
+            std::map<std::string, std::shared_ptr<IStage> >::const_iterator stage =
+                shared.find(owner->second);
+            if (stage == shared.end()) {
+                throw std::logic_error("StageGraph::Build: node \"" + node.id +
+                                       "\" shares an engine that was not built");
+            }
+            runtime.stage.reset(new SharedStage(stage->second));
+            runtime.output_shape = info->output_shape;
+            runtime.tracked = node.track.present;
+            continue;
+        }
         try {
             EngineOptions engine;
             engine.buffers = node.engine.buffers;
@@ -425,6 +472,11 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
                              how.str());
         }
         ++engines_opened;
+        if (owner != owners.end()) {
+            // The first sharer: the stage becomes jointly owned.
+            shared[node.id] = std::shared_ptr<IStage>(runtime.stage.release());
+            runtime.stage.reset(new SharedStage(shared[node.id]));
+        }
         runtime.output_shape = info->output_shape;
 
         runtime.tracked = node.track.present;
