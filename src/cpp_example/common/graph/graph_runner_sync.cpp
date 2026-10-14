@@ -117,7 +117,9 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
                                    error.what();
                 }
             }
-            report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
+            // No crops: 0.0, as the async executor reports it.
+            report.node_ms[node.id] =
+                crops.empty() ? 0.0 : ElapsedMs(started, std::chrono::steady_clock::now());
             // Canonical order: both executors sort a node's ROI results
             // into ByOrigin order before storing them, so Task 10's parity
             // test compares like-ordered vectors regardless of either

@@ -1037,6 +1037,9 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
     cv::Mat frame;
     FrameReport report;
     cv::Mat shown;
+    // avg_fps counts from here (model load is out, pipeline fill is in): an input
+    // shorter than --max-inflight returns every report in one burst at Finish().
+    progress().start();
     while (!Interrupted() && reader.Next(&stream, &frame, &index)) {
         executor.Submit(graph, stream, frame, index);
         while (executor.TryNext(&report, &shown)) {

@@ -2932,6 +2932,9 @@ def test_progress_lines_carry_time_per_node(tmp_path, binary):
     last = lines[-1]
     assert _field(last, "frames") == "8", last
     assert _field(last, "avg_fps") is not None, last
+    # 8 frames fit under --max-inflight, so the async CLI returns every report in
+    # one burst: the rate counts from the first submit, not across the burst.
+    assert float(_field(last, "avg_fps")) < 1000, last
     times = _node_ms(last)
     assert set(times) == {"od", "reid"}, last
     assert all(ms > 0.0 for ms in times.values()), last

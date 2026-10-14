@@ -201,6 +201,7 @@ int main() {
             if (line.rfind("[PROGRESS] frames=", 0) != 0 || count(line, "[PROGRESS]") != 1) torn = true;
         CHECK(!torn, "every line is a whole [PROGRESS] line");
     }
+
     std::cout << "[test] node_ms: the window average live, the run average at the end\n";
     {
         auto out = capture([] {
@@ -274,6 +275,26 @@ int main() {
         auto ls = lines(out);
         CHECK(!ls.empty() && has(ls.back(), "frames=4000") && has(ls.back(), "node_ms=x:1.00"),
               "8 threads x 500 node ticks, run average 1.00");
+    }
+
+    std::cout << "[test] start(): the rates count from it, so a burst of reports is not a burst rate\n";
+    {
+        // A graph whose input is shorter than its in-flight cap hands every report
+        // back in one burst; frames after the first over the burst's span read 114k fps.
+        auto out = capture([] {
+            g_now = 5 * kSec;
+            dxapp::Progress p(1.0, fakeClock);
+            p.start();
+            g_now += kSec;
+            for (int i = 0; i < 8; ++i) {
+                p.tickNodes(dxapp::NodeMs{{"od", 1.0}});
+                g_now += 100;  // all 8 within 1 us
+            }
+            p.finish();
+        });
+        auto ls = lines(out);
+        CHECK(!ls.empty() && has(ls.back(), "frames=8") && has(ls.back(), "avg_fps=8.0") && has(ls.back(), "fps=8.0"),
+              "8 frames 1 s after start(): fps = avg_fps = 8.0 (" + (ls.empty() ? std::string() : ls.back()) + ")");
     }
     unsetenv("DXAPP_PROGRESS");
 

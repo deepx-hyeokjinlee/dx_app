@@ -8,8 +8,8 @@
 #ifndef DXAPP_GRAPH_STAGE_GRAPH_HPP
 #define DXAPP_GRAPH_STAGE_GRAPH_HPP
 
-#include <cstddef>
 #include <chrono>
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <string>

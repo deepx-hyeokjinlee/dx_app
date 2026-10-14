@@ -32,6 +32,12 @@
  * Ids are percent-encoded outside [A-Za-z0-9_.-] so ',' ':' '=' and spaces
  * cannot break the field.
  *
+ * A runner may call start() when its first frame enters the pipeline; avg_fps
+ * (and the final fps) are then frames / seconds since start(). The graph CLI
+ * does: an input shorter than its in-flight cap returns every report in one
+ * burst, and frames after the first over that burst's span read ~100k fps.
+ * Runners that never call start() keep the first-tick rule above.
+ *
  * stdoutMutex() is shared by everything that writes pipeline-parsed lines, so lines
  * from concurrent async callbacks are written whole ("3.50273.5913" was two scores
  * from two callbacks interleaved).
@@ -107,6 +113,13 @@ public:
         if (has_sums_ && n > 0) appendStages(line, last_sums_, StageSums{}, static_cast<double>(n));
         appendNodes(line, false);
         print(line);
+    }
+
+    /** The run starts now: avg_fps counts every frame from here. Thread-safe. */
+    void start() {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        start_ns_ = clock_();
+        has_start_ = true;
     }
 
     long frames() const { return frames_.load(); }
@@ -219,8 +232,13 @@ private:
         return StageSums{a.read_ms + b.read_ms, a.pre_ms + b.pre_ms, a.infer_ms + b.infer_ms, a.post_ms + b.post_ms};
     }
 
-    /** Frames after the first over the time since it; -1 when there is no span yet. */
+    /** Frames since start() over the time since it, or, without start(), frames
+     *  after the first over the time since it; -1 when there is no span yet. */
     double avgFps(long n, int64_t t) const {
+        if (has_start_) {
+            if (n < 1 || t <= start_ns_) return -1.0;
+            return n / (static_cast<double>(t - start_ns_) / 1e9);
+        }
         if (n < 2 || t <= first_ns_) return -1.0;
         return (n - 1) / (static_cast<double>(t - first_ns_) / 1e9);
     }
@@ -265,6 +283,8 @@ private:
     std::mutex state_mutex_;  // everything below
     bool printed_ = false;
     int64_t first_ns_ = 0;
+    int64_t start_ns_ = 0;
+    bool has_start_ = false;
     int64_t last_tick_ns_ = 0;
     int64_t prev_ns_ = 0;
     long prev_frames_ = 0;
