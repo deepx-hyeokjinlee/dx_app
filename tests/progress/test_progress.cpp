@@ -201,6 +201,80 @@ int main() {
             if (line.rfind("[PROGRESS] frames=", 0) != 0 || count(line, "[PROGRESS]") != 1) torn = true;
         CHECK(!torn, "every line is a whole [PROGRESS] line");
     }
+    std::cout << "[test] node_ms: the window average live, the run average at the end\n";
+    {
+        auto out = capture([] {
+            g_now = 5 * kSec;
+            dxapp::Progress p(0.0, fakeClock);
+            const double od[] = {10.0, 20.0};
+            const double seg[] = {4.0, 6.0};
+            for (int i = 0; i < 2; ++i) {
+                g_now += kSec / 10;
+                p.tickNodes(dxapp::NodeMs{{"od", od[i]}, {"seg", seg[i]}});
+            }
+            p.finish();
+        });
+        auto ls = lines(out);
+        CHECK(ls.size() == 3, "two ticks + finish");
+        if (ls.size() == 3) {
+            CHECK(ls[0] == "[PROGRESS] frames=1", "the first line has no window yet (" + ls[0] + ")");
+            CHECK(has(ls[1], "node_ms=od:20.00,seg:6.00"), "frame 2's window (" + ls[1] + ")");
+            CHECK(has(ls[2], "frames=2") && has(ls[2], "node_ms=od:15.00,seg:5.00"),
+                  "the final line: run averages (" + ls[2] + ")");
+            CHECK(ls[1].find("read_ms=") == std::string::npos, "no runner stage fields on a node tick");
+        }
+    }
+
+    std::cout << "[test] node_ms: a node is averaged over the frames that ran it\n";
+    {
+        auto out = capture([] {
+            g_now = 5 * kSec;
+            dxapp::Progress p(0.0, fakeClock);
+            g_now += kSec / 10;
+            p.tickNodes(dxapp::NodeMs{{"a", 10.0}, {"b", 2.0}});
+            g_now += kSec / 10;
+            p.tickNodes(dxapp::NodeMs{{"a", 10.0}});
+            g_now += kSec / 10;
+            p.tickNodes(dxapp::NodeMs{{"a", 10.0}, {"b", 4.0}});
+            p.finish();
+        });
+        auto ls = lines(out);
+        CHECK(ls.size() == 4, "three ticks + finish");
+        if (ls.size() == 4) {
+            CHECK(has(ls[1], "node_ms=a:10.00"), "b did not run in frame 2: left out (" + ls[1] + ")");
+            CHECK(has(ls[2], "node_ms=a:10.00,b:4.00"), "frame 3 (" + ls[2] + ")");
+            CHECK(has(ls[3], "node_ms=a:10.00,b:3.00"), "b over its own two frames (" + ls[3] + ")");
+        }
+    }
+
+    std::cout << "[test] node_ms: ids that would break the field are percent-encoded\n";
+    {
+        auto out = capture([] {
+            dxapp::Progress p(0.0);
+            p.tickNodes(dxapp::NodeMs{{"cam 1:x,y", 5.0}});
+            p.tickNodes(dxapp::NodeMs{{"cam 1:x,y", 5.0}});
+            p.finish();
+        });
+        CHECK(out.find(" node_ms=cam%201%3Ax%2Cy:5.00") != std::string::npos,
+              "space, colon and comma are %20 %3A %2C (" + out + ")");
+    }
+
+    std::cout << "[test] node_ms: concurrent node ticks are all counted\n";
+    {
+        auto out = capture([] {
+            dxapp::Progress p(0.0);
+            std::vector<std::thread> ts;
+            for (int t = 0; t < 8; ++t)
+                ts.emplace_back([&p] {
+                    for (int i = 0; i < 500; ++i) p.tickNodes(dxapp::NodeMs{{"x", 1.0}});
+                });
+            for (auto& t : ts) t.join();
+            p.finish();
+        });
+        auto ls = lines(out);
+        CHECK(!ls.empty() && has(ls.back(), "frames=4000") && has(ls.back(), "node_ms=x:1.00"),
+              "8 threads x 500 node ticks, run average 1.00");
+    }
     unsetenv("DXAPP_PROGRESS");
 
     if (g_failures) { std::cerr << "\n" << g_failures << " CHECK(s) FAILED\n"; return 1; }

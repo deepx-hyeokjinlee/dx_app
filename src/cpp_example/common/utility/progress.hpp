@@ -1,7 +1,9 @@
 /**
  * @file progress.hpp
  * @brief Machine-readable progress for front ends:
- *        "[PROGRESS] frames=N fps=F avg_fps=A read_ms=R pre_ms=P infer_ms=I post_ms=Q".
+ *        "[PROGRESS] frames=N fps=F avg_fps=A read_ms=R pre_ms=P infer_ms=I post_ms=Q",
+ *        or, from the multi-model graph binaries,
+ *        "[PROGRESS] frames=N fps=F avg_fps=A node_ms=<id>:<ms>,<id>:<ms>".
  *
  * A front end showing a running example (DX AI Studio's live view) cannot tell how
  * many frames have been processed: most runners print nothing per frame, and the
@@ -22,6 +24,14 @@
  * (fps = avg_fps, *_ms = sum / frames) up to the last frame. Without the variable
  * nothing is printed and the cost is one branch.
  *
+ * A graph runner ticks with tickNodes(): ONE frame's time per node, in the
+ * order the line should list them. node_ms is the average per node over the
+ * same window - over the frames of that window that ran the node, so a node
+ * of one stream is not diluted by the other stream's frames - and the run
+ * average on the final line. A node with no frame in the window is left out.
+ * Ids are percent-encoded outside [A-Za-z0-9_.-] so ',' ':' '=' and spaces
+ * cannot break the field.
+ *
  * stdoutMutex() is shared by everything that writes pipeline-parsed lines, so lines
  * from concurrent async callbacks are written whole ("3.50273.5913" was two scores
  * from two callbacks interleaved).
@@ -40,6 +50,8 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace dxapp {
 
@@ -56,6 +68,9 @@ struct StageSums {
     double infer_ms = 0.0;
     double post_ms = 0.0;
 };
+
+/** One frame's processing time per graph node, in the order a line lists them. */
+typedef std::vector<std::pair<std::string, double> > NodeMs;
 
 class Progress {
 public:
@@ -75,6 +90,9 @@ public:
     /** One frame finished; @p sums is the runner's running stage sums after it. Thread-safe. */
     void tick(const StageSums& sums) { tickImpl(&sums); }
 
+    /** One frame finished; @p node_ms is THAT frame's time per node (not a running sum). Thread-safe. */
+    void tickNodes(const NodeMs& node_ms) { tickImpl(nullptr, &node_ms); }
+
     /** Final line with the run averages; printed once. */
     void finish() {
         if (!enabled_ || finished_.exchange(true)) return;
@@ -87,13 +105,14 @@ public:
             appendField(line, "avg_fps", avg, 1);
         }
         if (has_sums_ && n > 0) appendStages(line, last_sums_, StageSums{}, static_cast<double>(n));
+        appendNodes(line, false);
         print(line);
     }
 
     long frames() const { return frames_.load(); }
 
 private:
-    void tickImpl(const StageSums* sums) {
+    void tickImpl(const StageSums* sums, const NodeMs* nodes = nullptr) {
         if (!enabled_) return;
         std::lock_guard<std::mutex> lock(state_mutex_);
         const long n = ++frames_;
@@ -110,6 +129,7 @@ private:
             last_sums_ = plus(base_sums_, raw_sums_);
             has_sums_ = true;
         }
+        if (nodes) addNodes(*nodes);
         if (printed_ && t - prev_ns_ < interval_ns_) return;
 
         std::string line = "[PROGRESS] frames=" + std::to_string(n);
@@ -121,6 +141,7 @@ private:
             if (avg >= 0) appendField(line, "avg_fps", avg, 1);
             if (sums && prev_has_sums_ && df > 0)
                 appendStages(line, last_sums_, prev_sums_, static_cast<double>(df));
+            if (nodes) appendNodes(line, true);
         }
         print(line);
         printed_ = true;
@@ -128,6 +149,70 @@ private:
         prev_frames_ = n;
         prev_sums_ = last_sums_;
         prev_has_sums_ = has_sums_;
+        for (NodeSum& s : node_sums_) {
+            s.prev_sum_ms = s.sum_ms;
+            s.prev_frames = s.frames;
+        }
+    }
+
+    /** Per node: the run's sum and frame count, and both as of the previous line. */
+    struct NodeSum {
+        std::string id;
+        double sum_ms = 0.0;
+        long frames = 0;
+        double prev_sum_ms = 0.0;
+        long prev_frames = 0;
+    };
+
+    void addNodes(const NodeMs& nodes) {
+        for (const auto& node : nodes) {
+            NodeSum* sum = nullptr;
+            for (NodeSum& s : node_sums_) {
+                if (s.id == node.first) { sum = &s; break; }
+            }
+            if (!sum) {
+                node_sums_.push_back(NodeSum());
+                sum = &node_sums_.back();
+                sum->id = node.first;
+            }
+            sum->sum_ms += node.second;
+            ++sum->frames;
+        }
+    }
+
+    /** " node_ms=<id>:<ms>,..." over the window (live) or the run (final); omitted when empty. */
+    void appendNodes(std::string& line, bool window) const {
+        std::string field;
+        for (const NodeSum& s : node_sums_) {
+            const long frames = window ? s.frames - s.prev_frames : s.frames;
+            if (frames <= 0) continue;
+            const double ms = (window ? s.sum_ms - s.prev_sum_ms : s.sum_ms) / frames;
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%.2f", ms);
+            if (!field.empty()) field += ",";
+            field += encodeId(s.id);
+            field += ":";
+            field += buf;
+        }
+        if (!field.empty()) line += " node_ms=" + field;
+    }
+
+    /** Every byte outside [A-Za-z0-9_.-] as %XX. */
+    static std::string encodeId(const std::string& id) {
+        static const char kHex[] = "0123456789ABCDEF";
+        std::string out;
+        for (unsigned char c : id) {
+            const bool plain = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                               (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-';
+            if (plain) {
+                out += static_cast<char>(c);
+            } else {
+                out += '%';
+                out += kHex[c >> 4];
+                out += kHex[c & 15];
+            }
+        }
+        return out;
     }
 
     static StageSums plus(const StageSums& a, const StageSums& b) {
@@ -189,6 +274,7 @@ private:
     StageSums prev_sums_;
     bool has_sums_ = false;
     bool prev_has_sums_ = false;
+    std::vector<NodeSum> node_sums_;  // first-seen order
 };
 
 /** The process-wide counter the runners tick. */
