@@ -12986,6 +12986,103 @@ void TestBuildGivesEachLogicNodeAStatePerStream() {
     GRAPH_CHECK(z.output_shape == Shape::kBoxes);
 }
 
+// A logic node runs on the driver thread, frame-ordered per stream; its
+// results, events and overlays equal SyncExecutor's whatever order the
+// detector's completions come back in.
+void TestAsyncLogicMatchesSyncOverFrames() {
+    const std::string text = LogicJson(
+        std::string(kZoneNode) + ",{\"id\":\"a\",\"model\":\"attr\"}",
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"a\",\"roi\":{}}");
+    const std::vector<FrameReport> expected = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    FakeModelRegistry reversed = LogicRegistry();
+    reversed.SetDeliveryOrder("det", FakeModelRegistry::kReverse);
+    reversed.SetShuffleSeed("attr", 5);
+    const std::vector<FrameReport> actual = RunLogicFrames(text, reversed, Keys(6), true);
+    GRAPH_CHECK(actual.size() == expected.size());
+    for (std::size_t i = 0; i < expected.size() && i < actual.size(); ++i) {
+        GRAPH_CHECK(actual[i].frame_index == i);
+        GRAPH_CHECK(expected[i] == actual[i]);
+        GRAPH_CHECK(actual[i].node_ms.count("z") == 1);
+    }
+}
+
+// Two zones raise events in one frame: both executors list them in the
+// stream's topological order.
+void TestAsyncListsEventsInNodeOrder() {
+    const std::string text = LogicJson(
+        ",{\"id\":\"right\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":"
+        "[0.5,0,1,0,1,1,0.5,1]}}"
+        ",{\"id\":\"left\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":"
+        "[0,0,0.5,0,0.5,1,0,1]}}",
+        ",{\"from\":\"od\",\"to\":\"right\",\"carry\":\"result\"},"
+        "{\"from\":\"od\",\"to\":\"left\",\"carry\":\"result\"}");
+    const std::vector<FrameReport> expected = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    const std::vector<FrameReport> actual = RunLogicFrames(text, LogicRegistry(), Keys(6), true);
+    GRAPH_CHECK(expected.size() == 6 && actual.size() == 6);
+    if (expected.size() != 6 || actual.size() != 6) return;
+    // Frame 2: the person crosses from left to right.
+    GRAPH_CHECK(expected[2].events.size() == 2);
+    if (expected[2].events.size() == 2) {
+        GRAPH_CHECK(expected[2].events[0].node == "right" && expected[2].events[0].event == "enter");
+        GRAPH_CHECK(expected[2].events[1].node == "left" && expected[2].events[1].event == "exit");
+    }
+    for (std::size_t i = 0; i < 6; ++i) GRAPH_CHECK(expected[i] == actual[i]);
+}
+
+// A logic node's boxes reach a cpu node on a "carry": "result" edge, in both
+// executors, as a model's would: headpose behind a filter sees only the
+// filter's boxes. Unfiltered, the larger landmark-less "car" wins
+// LargestBox and headpose writes no row.
+void TestCpuNodeBehindAFilterGetsOnlyTheFilteredBoxes() {
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(0.f, 0.f, 300.f, 300.f, 0.9f, "car"));
+    BoxItem face = MakeItem(200.f, 120.f, 80.f, 100.f, 0.9f, "face");
+    face.landmarks.push_back(Keypoint(220.f, 150.f, 1.f));
+    face.landmarks.push_back(Keypoint(260.f, 150.f, 1.f));
+    face.landmarks.push_back(Keypoint(240.f, 180.f, 1.f));
+    face.landmarks.push_back(Keypoint(225.f, 200.f, 1.f));
+    face.landmarks.push_back(Keypoint(255.f, 200.f, 1.f));
+    boxes->items.push_back(face);
+    const std::string head =
+        "{\"version\":1,\"name\":\"filtered_pose\",\"nodes\":["
+        "{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"face\",\"model\":\"face\"},";
+    const std::string filtered = head +
+        "{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\",\"params\":{\"classes\":[\"face\"]}},"
+        "{\"id\":\"pose\",\"type\":\"cpu\",\"op\":\"headpose\"}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"face\"},"
+        "{\"from\":\"face\",\"to\":\"f\",\"carry\":\"result\"},"
+        "{\"from\":\"f\",\"to\":\"pose\",\"carry\":\"result\"}]}";
+    const std::string direct = head +
+        "{\"id\":\"pose\",\"type\":\"cpu\",\"op\":\"headpose\"}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"face\"},"
+        "{\"from\":\"face\",\"to\":\"pose\",\"carry\":\"result\"}]}";
+    const cv::Mat frame = cv::Mat::zeros(480, 640, CV_8UC3);
+
+    FakeModelRegistry sync_registry;
+    sync_registry.AddModel(CpuFixtureModel("face", Shape::kBoxes), boxes);
+    const FrameReport expected = RunSync(filtered, &sync_registry, frame);
+    FakeModelRegistry async_registry;
+    async_registry.AddModel(CpuFixtureModel("face", Shape::kBoxes), boxes);
+    const FrameReport actual = RunAsync(filtered, &async_registry, frame);
+
+    GRAPH_CHECK(expected.error.empty());
+    GRAPH_CHECK(expected == actual);
+    const BoxesData* kept = BoxesOf(expected, "f");
+    GRAPH_CHECK(kept != NULL && kept->items.size() == 1);
+    const RecordsData* records = RecordsOf(expected, "pose");
+    GRAPH_CHECK(records != NULL && records->items.size() == 1);
+    if (records != NULL && records->items.size() == 1) {
+        double yaw = 0.0;
+        GRAPH_CHECK(NamedNumber(records->items[0], "yaw", &yaw) && std::isfinite(yaw));
+    }
+    FakeModelRegistry direct_registry;
+    direct_registry.AddModel(CpuFixtureModel("face", Shape::kBoxes), boxes);
+    const FrameReport unfiltered = RunSync(direct, &direct_registry, frame);
+    const RecordsData* none = RecordsOf(unfiltered, "pose");
+    GRAPH_CHECK(none != NULL && none->items.empty());
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13360,6 +13457,9 @@ int main() {
     TestFilterKeepsClassScoreAndArea();
     TestZoneKeepsTheBoxesInsideAndRaisesEnterAndExit();
     TestBuildGivesEachLogicNodeAStatePerStream();
+    TestAsyncLogicMatchesSyncOverFrames();
+    TestAsyncListsEventsInNodeOrder();
+    TestCpuNodeBehindAFilterGetsOnlyTheFilteredBoxes();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

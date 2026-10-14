@@ -29,14 +29,17 @@
  *  1. Completions arrive in whatever order the runtime hands them back, so a
  *     node's ROI results are stable_sorted into ByOrigin order - the single
  *     comparator declared in stage_graph.hpp and shared with SyncExecutor.
- *  2. The tracker is stateful and must see frames in order. Each (stream,
- *     tracked node) pair has a gate holding the next frame of that stream it
- *     may track, counted in that stream's admission order; a completion for
- *     a later frame of the stream is parked until every earlier frame of the
- *     stream has passed - harvested, or skipped because it never reached
- *     that node (an empty frame). Frames of other streams never touch it.
- *     Only this CPU step is serialized; later frames' inference keeps
- *     running. ApplyTrackIds stays the sole writer of track_id in the tree.
+ *  2. Trackers and logic nodes are stateful and must see frames in order.
+ *     Each (stream, tracked or logic node) pair has a gate holding the next
+ *     frame of that stream it may run, counted in that stream's admission
+ *     order; a completion for a later frame of the stream (for a logic node:
+ *     its dispatch) is parked until every earlier frame of the stream has
+ *     passed - harvested, or skipped because it never reached that node (an
+ *     empty frame). Frames of other streams never touch it. Only this CPU
+ *     step is serialized; later frames' inference keeps running.
+ *     ApplyTrackIds stays the sole writer of track_id in the tree. A logic
+ *     node runs on the driver thread at its turn (HarvestLogic); its events
+ *     join the report in topological order when the frame finishes.
  *  3. Nothing here accumulates floating point across stages.
  *
  * Reports are emitted in admission order: a frame that finishes early waits

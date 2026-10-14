@@ -174,10 +174,11 @@ typedef std::shared_ptr<CompletionQueue> CompletionQueuePtr;
 struct NodeRun {
     JobCollectorPtr jobs;
     bool is_roi;
+    bool is_logic;  ///< a logic node: no jobs, it runs at its gate turn (Harvest)
     std::size_t total;      ///< jobs this run owns
     std::size_t completed;  ///< accepted completions processed so far
     std::chrono::steady_clock::time_point started;  ///< when Dispatch ran (node_ms)
-    NodeRun() : is_roi(false), total(0), completed(0) {}
+    NodeRun() : is_roi(false), is_logic(false), total(0), completed(0) {}
 };
 
 /// Everything one frame needs while it is in flight (spec 4.5 FrameContext).
@@ -190,6 +191,8 @@ struct FrameCtx {
     std::vector<int> pending_inputs;
     std::vector<std::vector<RoiCrop> > inbox;
     std::vector<std::vector<StageDataPtr> > result_in;  ///< carry-result payloads, per node
+    std::vector<std::vector<LogicInput> > logic_in;  ///< what a logic node's edges brought
+    std::map<std::size_t, std::vector<GraphEvent> > node_events;  ///< per logic node
     std::vector<char> got_frame;
     /// The view a released plain edge delivered; valid where got_frame is 1.
     std::vector<FrameView> frame_in;
@@ -268,7 +271,18 @@ void ReleaseSuccessors(const StageGraph& graph, std::size_t index,
         if (produced) {
             const EdgeCargo cargo = SelectEdgeCargo(edge, produced, boxes, ports);
             if (edge.carry_result) {
-                if (cargo.payload) ctx.result_in[edge.to].push_back(cargo.payload);
+                if (cargo.payload && graph.nodes()[edge.to].is_logic) {
+                    LogicInput input;
+                    input.edge = outgoing[e];
+                    input.from = producer_id;
+                    input.data = cargo.payload;
+                    std::map<std::string, StageResult>::const_iterator mine =
+                        ctx.report.node_results.find(producer_id);
+                    if (mine != ctx.report.node_results.end()) input.origin = mine->second.origin;
+                    ctx.logic_in[edge.to].push_back(input);
+                } else if (cargo.payload) {
+                    ctx.result_in[edge.to].push_back(cargo.payload);
+                }
             } else if (!edge.roi.present) {
                 if (graph.nodes()[index].is_source) {
                     ctx.frame_in[edge.to] = ctx.view[index];
@@ -380,7 +394,7 @@ struct AsyncExecutor::Engine {
         gates.assign(streams, std::map<std::size_t, TrackGate>());
         for (std::size_t s = 0; s < streams; ++s) {
             for (std::size_t i = 0; i < nodes.size(); ++i) {
-                if (nodes[i].tracked && target.streams()[s].member[i]) {
+                if ((nodes[i].tracked || nodes[i].is_logic) && target.streams()[s].member[i]) {
                     gates[s][i].next_seq = next_stream_seq[s];
                 }
             }
@@ -416,6 +430,7 @@ struct AsyncExecutor::Engine {
         ctx->pending_inputs = plan.in_edges;
         ctx->inbox.assign(n, std::vector<RoiCrop>());
         ctx->result_in.assign(n, std::vector<StageDataPtr>());
+        ctx->logic_in.assign(n, std::vector<LogicInput>());
         ctx->got_frame.assign(n, 0);
         ctx->frame_in.assign(n, FrameView());
         ctx->view.assign(n, FrameView());
@@ -426,6 +441,18 @@ struct AsyncExecutor::Engine {
         DispatchReady(ctx);
         FinishIfQuiet(ctx);
         return ctx;
+    }
+
+    /// True when this frame already holds an error from before node `index`
+    /// in its stream's topological order: a cpu or logic node's own error
+    /// then does not replace it, as in SyncExecutor.
+    bool HasEarlierError(const FrameCtx& ctx, std::size_t index) const {
+        if (!ctx.report.error.empty()) return true;
+        const std::vector<std::size_t>& order = graph->streams()[ctx.stream].order;
+        for (std::size_t o = 0; o < order.size() && order[o] != index; ++o) {
+            if (ctx.node_errors.count(order[o]) != 0) return true;
+        }
+        return false;
     }
 
     void DispatchReady(const FrameCtxPtr& ctx) {
@@ -455,12 +482,7 @@ struct AsyncExecutor::Engine {
                     ReduceCpu(node.op, node.params, ctx->result_in[index], ctx->frame.size());
                 ctx->report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
                 ctx->report.node_results[node.id] = reduced.result;
-                bool earlier_error = !ctx->report.error.empty();
-                const std::vector<std::size_t>& order = graph->streams()[ctx->stream].order;
-                for (std::size_t o = 0; o < order.size() && order[o] != index && !earlier_error; ++o) {
-                    earlier_error = ctx->node_errors.count(order[o]) != 0;
-                }
-                if (!reduced.error.empty() && !earlier_error) {
+                if (!reduced.error.empty() && !HasEarlierError(*ctx, index)) {
                     ctx->node_errors[index] =
                         std::string("node \"") + node.id + "\": " + reduced.error;
                 }
@@ -468,6 +490,17 @@ struct AsyncExecutor::Engine {
                 source.image = ctx->frame;
                 ctx->view[index] = source;
                 ReleaseSuccessors(*graph, index, reduced.result.data, NULL, StagePorts(), *ctx);
+                continue;
+            }
+            if (node.is_logic) {
+                // Gated like a tracked node (Bind): its state must see this
+                // stream's frames in order. CompleteRun runs it now or parks
+                // the frame until its turn; the run keeps the frame open.
+                NodeRun run;
+                run.is_logic = true;
+                run.started = std::chrono::steady_clock::now();
+                ctx->runs[index] = run;
+                CompleteRun(ctx, index);
                 continue;
             }
             Dispatch(ctx, index);
@@ -665,6 +698,10 @@ struct AsyncExecutor::Engine {
     }
 
     void Harvest(FrameCtx& ctx, std::size_t index) {
+        if (graph->nodes()[index].is_logic) {
+            HarvestLogic(ctx, index);
+            return;
+        }
         NodeRuntime& node = graph->mutable_nodes()[index];
         const NodeRun run = ctx.runs[index];
         ctx.runs.erase(index);
@@ -729,6 +766,35 @@ struct AsyncExecutor::Engine {
         ReleaseSuccessors(*graph, index, produced, boxes, ports, ctx);
     }
 
+    /// A logic node's turn in this frame (its gate let it through): run it on
+    /// the driver thread with this stream's state, record what it produced
+    /// and release its successors.
+    void HarvestLogic(FrameCtx& ctx, std::size_t index) {
+        NodeRuntime& node = graph->mutable_nodes()[index];
+        ctx.runs.erase(index);
+        LogicFrame at;
+        at.frame_size = ctx.frame.size();
+        at.time_s = ctx.report.time_s;
+        const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+        const LogicOutput out = RunLogic(*node.logic, ctx.logic_in[index], at,
+                                         node.logic_states[ctx.stream].get());
+        ctx.report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
+        ctx.report.node_results[node.id] = out.result;
+        ctx.report.overlays[node.id] = out.overlay;
+        if (!out.events.empty()) ctx.node_events[index] = out.events;
+        if (!out.error.empty() && !HasEarlierError(ctx, index)) {
+            ctx.node_errors[index] = "node \"" + node.id + "\": " + out.error;
+        }
+        FrameView source;
+        source.image = ctx.frame;
+        ctx.view[index] = source;  // its boxes are in source pixels
+        const BoxesData* boxes =
+            out.result.data && ProducesRoi(out.result.data->shape())
+                ? dynamic_cast<const BoxesData*>(out.result.data.get())
+                : NULL;
+        ReleaseSuccessors(*graph, index, out.result.data, boxes, StagePorts(), ctx);
+    }
+
     /// True when no stream runs node `index`: reachable from no source,
     /// which only an unvalidated graph can have.
     bool InNoStream(std::size_t index) const {
@@ -774,6 +840,15 @@ struct AsyncExecutor::Engine {
         for (std::map<std::size_t, TrackGate>::iterator g = stream_gates.begin();
              g != stream_gates.end(); ++g) {
             if (!ctx->done[g->first]) SkipGate(ctx->stream, g->first, ctx->stream_seq);
+        }
+        // Events in the stream's topological order, as SyncExecutor appends
+        // them, whatever order the logic nodes ran in here.
+        for (std::size_t o = 0; o < order.size(); ++o) {
+            std::map<std::size_t, std::vector<GraphEvent> >::const_iterator raised =
+                ctx->node_events.find(order[o]);
+            if (raised == ctx->node_events.end()) continue;
+            ctx->report.events.insert(ctx->report.events.end(), raised->second.begin(),
+                                      raised->second.end());
         }
         Finished done;
         done.report = ctx->report;

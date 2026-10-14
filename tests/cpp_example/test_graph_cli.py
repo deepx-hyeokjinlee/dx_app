@@ -3292,3 +3292,50 @@ def test_check_json_pins_a_logic_error_to_its_node(tmp_path):
     error = out["errors"][0]
     assert error["code"] == "GRAPH_SCHEMA" and error["node"] == "zone", error
     assert '"polygon" must hold at least 3 points' in error["what"], error
+
+
+def _filtered_headpose(min_score):
+    return {
+        "version": 1, "name": "filtered_headpose",
+        "nodes": [{"id": "cam", "type": "source", "uri": "sample/img/sample_face.jpg"},
+                  {"id": "face", "model": "scrfd-500m_640x640"},
+                  {"id": "f", "type": "logic", "op": "filter",
+                   "params": {"min_score": min_score}},
+                  {"id": "headpose", "type": "cpu", "op": "headpose"}],
+        "edges": [{"from": "cam", "to": "face"},
+                  {"from": "face", "to": "f", "carry": "result"},
+                  {"from": "f", "to": "headpose", "carry": "result"}],
+    }
+
+
+@pytest.mark.graph_parity
+def test_a_cpu_node_behind_a_filter_gets_only_the_filtered_boxes(tmp_path):
+    """A logic node's boxes reach a cpu node in both executors: with every
+    face kept, headpose equals the plain dms_headpose graph's; with none kept,
+    it writes no row."""
+    absent = missing_artifacts("dms_headpose.json")
+    if absent:
+        pytest.skip(absent)
+    plain = tmp_path / "plain.json"
+    result = run("multi_model_graph_sync", "--graph", "{}/dms_headpose.json".format(GRAPHS),
+                 "--report", str(plain))
+    assert result.returncode == 0, result.stdout + result.stderr
+    direct = json.loads(plain.read_text())["frames"][0]["nodes"]["headpose"]
+    rows = {}
+    for min_score in (0.5, 0.99):
+        graph = tmp_path / "filtered_{}.json".format(min_score)
+        graph.write_text(json.dumps(_filtered_headpose(min_score)))
+        reports = {}
+        for binary in ("multi_model_graph_sync", "multi_model_graph_async"):
+            out = tmp_path / "{}_{}.json".format(binary, min_score)
+            result = run(binary, "--graph", str(graph), "--report", str(out))
+            assert result.returncode == 0, result.stdout + result.stderr
+            reports[binary] = json.loads(out.read_text())["frames"]
+        assert reports["multi_model_graph_sync"] == reports["multi_model_graph_async"]
+        frame = reports["multi_model_graph_sync"][0]
+        assert frame["error"] == "", frame["error"]
+        rows[min_score] = frame["nodes"]["headpose"]
+        kept = frame["nodes"]["f"]["payload"]["items"]
+        assert all(item["score"] >= min_score for item in kept)
+    assert rows[0.5]["payload"] == direct["payload"]
+    assert rows[0.99]["payload"]["items"] == []
