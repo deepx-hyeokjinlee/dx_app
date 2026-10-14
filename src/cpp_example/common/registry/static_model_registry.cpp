@@ -1,4 +1,5 @@
 #include "common/registry/static_model_registry.hpp"
+#include "common/registry/engine_options.hpp"
 
 #include <cstddef>
 #include <stdexcept>
@@ -101,6 +102,13 @@ std::unique_ptr<IStage> StaticModelRegistry::createStage(
     } catch (...) {
         throw std::runtime_error("unknown error");
     }
+}
+
+std::unique_ptr<IStage> StaticModelRegistry::createStageWith(
+    const std::string& model_name, const std::string& model_path,
+    const StageParams& params, const EngineOptions& engine) const {
+    detail::EngineBufferScope scope(engine.buffers);
+    return createStage(model_name, model_path, params);
 }
 
 }  // namespace graph

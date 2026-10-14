@@ -332,6 +332,23 @@ class FakeModelRegistry : public IModelRegistry {
         return it == params_.end() ? NULL : &it->second;
     }
 
+    /// The EngineOptions the last stage for this model was created with
+    /// through createStageWith, or NULL when it never was.
+    const EngineOptions* last_engine(const std::string& model_name) const {
+        std::map<std::string, EngineOptions>::const_iterator it = engine_.find(model_name);
+        return it == engine_.end() ? NULL : &it->second;
+    }
+
+    /// Records the options, then creates the stage as createStage does.
+    std::unique_ptr<IStage> createStageWith(const std::string& model_name,
+                                            const std::string& model_path,
+                                            const StageParams& params,
+                                            const EngineOptions& engine) const {
+        std::unique_ptr<IStage> stage = createStage(model_name, model_path, params);
+        engine_[model_name] = engine;
+        return stage;
+    }
+
     const ModelInfo* find(const std::string& model_name) const {
         std::map<std::string, ModelInfo>::const_iterator it =
             infos_.find(model_name);
@@ -430,6 +447,7 @@ class FakeModelRegistry : public IModelRegistry {
     InflightMeterPtr meter_;
     mutable std::map<std::string, FakeStage*> last_;
     mutable std::map<std::string, StageParams> params_;
+    mutable std::map<std::string, EngineOptions> engine_;
 };
 
 /**

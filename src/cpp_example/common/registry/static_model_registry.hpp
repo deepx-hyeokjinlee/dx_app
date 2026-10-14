@@ -69,6 +69,11 @@ class StaticModelRegistry : public IModelRegistry {
     std::unique_ptr<IStage> createStage(const std::string& model_name,
                                         const std::string& model_path,
                                         const StageParams& params) const;
+    /// createStage with the node's buffer count in effect while the engine opens.
+    std::unique_ptr<IStage> createStageWith(const std::string& model_name,
+                                            const std::string& model_path,
+                                            const StageParams& params,
+                                            const EngineOptions& engine) const;
 
  private:
     std::map<std::string, ModelInfo> infos_;

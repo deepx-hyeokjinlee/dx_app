@@ -392,7 +392,9 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
                                                  : info->download_name));
         }
         try {
-            runtime.stage = registry.createStage(node.model, path, node.params);
+            EngineOptions engine;
+            engine.buffers = node.engine.buffers;
+            runtime.stage = registry.createStageWith(node.model, path, node.params, engine);
         } catch (const ModelContainerError& error) {
             // A container this DX-RT cannot load (R12): no engine was
             // opened, and downloading it again fetches the same file.

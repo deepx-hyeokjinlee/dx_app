@@ -299,8 +299,8 @@ class TiledSrStage : public IStage {
 template <class FactoryT>
 std::unique_ptr<IStage> MakeRestorationStage(const std::string& model_path, const ModelInfo& info,
                                              const StageParams& params) {
-    std::unique_ptr<dxrt::InferenceEngine> engine(
-        new dxrt::InferenceEngine(detail::LoadableModelPath(model_path)));
+    std::unique_ptr<dxrt::InferenceEngine> engine =
+        detail::OpenEngine(detail::LoadableModelPath(model_path));
     int scale_x = 1, scale_y = 1;
     const dxrt::Tensors inputs = engine->GetInputs();
     if (!inputs.empty()) {

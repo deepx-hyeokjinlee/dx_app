@@ -12033,6 +12033,67 @@ void TestEngineKeyParsesAndValidates() {
     GRAPH_CHECK(owners.count("reid") == 0);
 }
 
+// Graph Composer P1: a node's "buffers" reaches the registry; a registry that
+// cannot honour it says so instead of ignoring it.
+void TestEngineBuffersReachTheRegistry() {
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    const GraphSpec spec = ParseGraphText(
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"od\",\"model\":\"yolov8n\",\"engine\":{\"buffers\":2}},"
+        "{\"id\":\"reid\",\"model\":\"casvit_t\"}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"od\"},"
+        "{\"from\":\"od\",\"to\":\"reid\",\"roi\":{}}]}",
+        "b.json");
+    ValidateGraph(spec, registry);
+    StageGraph graph;
+    graph.Build(spec, registry, "/models", false);
+    GRAPH_CHECK(registry.last_engine("yolov8n") != NULL &&
+                registry.last_engine("yolov8n")->buffers == 2);
+    GRAPH_CHECK(registry.last_engine("casvit_t") != NULL &&
+                registry.last_engine("casvit_t")->buffers == 0);
+
+    EngineOptions two;
+    two.buffers = 2;
+    bool refused = false;
+    try {
+        registry.IModelRegistry::createStageWith("yolov8n", "/models/yolov8n.dxnn",
+                                                 StageParams(), two);
+    } catch (const std::runtime_error& error) {
+        refused = std::string(error.what()).find("buffer count") != std::string::npos;
+    }
+    GRAPH_CHECK(refused);
+    const std::unique_ptr<IStage> plain = registry.IModelRegistry::createStageWith(
+        "yolov8n", "/models/yolov8n.dxnn", StageParams(), EngineOptions());
+    GRAPH_CHECK(plain.get() != NULL);
+}
+
+// The zoo side opens every engine through OpenEngine, which reads the count
+// StaticModelRegistry::createStageWith scoped onto this thread.
+void TestEngineBufferScopeSetsAndRestores() {
+    GRAPH_CHECK(detail::EngineBuffersSlot() == 0);
+    GRAPH_CHECK(detail::EngineOptionForThisThread().bufferCount == 0);
+    {
+        detail::EngineBufferScope outer(2);
+        GRAPH_CHECK(detail::EngineOptionForThisThread().bufferCount == 2);
+        {
+            detail::EngineBufferScope inner(5);
+            GRAPH_CHECK(detail::EngineBuffersSlot() == 5);
+        }
+        GRAPH_CHECK(detail::EngineBuffersSlot() == 2);
+        int seen_elsewhere = -1;
+        std::thread other([&seen_elsewhere] { seen_elsewhere = detail::EngineBuffersSlot(); });
+        other.join();
+        GRAPH_CHECK(seen_elsewhere == 0);
+    }
+    GRAPH_CHECK(detail::EngineBuffersSlot() == 0);
+    try {
+        detail::EngineBufferScope failing(3);
+        throw std::runtime_error("load failed");
+    } catch (const std::runtime_error&) {
+    }
+    GRAPH_CHECK(detail::EngineBuffersSlot() == 0);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12383,6 +12444,8 @@ int main() {
     TestAsyncExecutorTimesEveryNode();
     TestReportToJsonWritesNodeMsOnlyWhenAsked();
     TestEngineKeyParsesAndValidates();
+    TestEngineBuffersReachTheRegistry();
+    TestEngineBufferScopeSetsAndRestores();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

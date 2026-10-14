@@ -81,6 +81,14 @@ struct StageParams {
     std::map<std::string, std::vector<std::string> > lists;   ///< arrays of strings
 };
 
+/// Per-node engine settings from the graph's "engine" key, handed to the
+/// registry with the stage request.
+struct EngineOptions {
+    int buffers;  ///< DX-RT I/O buffer count; 0 = the runtime's default
+
+    EngineOptions() : buffers(0) {}
+};
+
 /**
  * @brief A model, type-erased. The only model abstraction the engine sees.
  *
@@ -482,6 +490,24 @@ class IModelRegistry {
     virtual std::unique_ptr<IStage> createStage(const std::string& model_name,
                                                 const std::string& model_path,
                                                 const StageParams& params) const = 0;
+
+    /// createStage with this node's engine settings (StageGraph::Build calls
+    /// this one). The default serves registries that predate EngineOptions:
+    /// it creates the stage as createStage does when nothing is asked of the
+    /// engine, and throws std::runtime_error rather than silently ignoring a
+    /// buffer count it cannot apply. Same lifetime and threading rules as
+    /// createStage.
+    virtual std::unique_ptr<IStage> createStageWith(const std::string& model_name,
+                                                    const std::string& model_path,
+                                                    const StageParams& params,
+                                                    const EngineOptions& engine) const {
+        if (engine.buffers != 0) {
+            throw std::runtime_error(
+                "this model registry cannot set an engine's buffer count "
+                "(\"engine\": {\"buffers\": ...}); remove it from the node");
+        }
+        return createStage(model_name, model_path, params);
+    }
 };
 
 /**

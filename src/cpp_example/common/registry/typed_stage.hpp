@@ -78,6 +78,7 @@
 #include <vector>
 
 #include "common/base/i_factory.hpp"
+#include "common/registry/engine_options.hpp"
 #include "common/base/i_processor.hpp"
 #include "common/config/model_config.hpp"
 #include "common/graph/i_registry.hpp"
@@ -543,8 +544,7 @@ class TypedStage : public IStage {
     TypedStage(std::unique_ptr<FactoryT> factory, const std::string& model_path,
                const ModelInfo& info, const StageParams& params)
         : TypedStage(std::move(factory),
-                     std::unique_ptr<dxrt::InferenceEngine>(
-                         new dxrt::InferenceEngine(detail::LoadableModelPath(model_path))),
+                     detail::OpenEngine(detail::LoadableModelPath(model_path)),
                      info, params) {}
 
     /// Over an engine the caller already opened (MakeRestorationStage probes
