@@ -1002,6 +1002,7 @@ happens, remove a node or use a smaller model.
 | `--frames <N>` | all | stop after N frames; with several sources, after N frames of each stream |
 | `--check [<file>]` | — | validate and report without opening the NPU, then exit: 0 for a valid graph (missing `.dxnn` files are listed, not an error), 1 for an invalid graph or a present `.dxnn` that cannot load here (not a `.dxnn`, or a container this DX-RT cannot load) |
 | `--list-models` | — | every model, then the `alias of` rows; filter with `--consumes` / `--produces`; `--model-dir` sets the directory the `file` column reads |
+| `--json` | off | with `--check` or `--list-models`: one JSON document on stdout instead of the tables (see *`--list-models --json`* and *`--check --json`*). With anything else it is a usage error (exit 2) |
 | `--help` | — | |
 
 `--max-jobs-per-stage` and `--stall-timeout-ms` are `dx_graph`'s

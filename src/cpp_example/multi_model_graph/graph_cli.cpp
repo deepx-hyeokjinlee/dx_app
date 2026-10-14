@@ -101,6 +101,7 @@ struct GraphCliArgs {
     bool display;           ///< show each rendered frame in a window
     bool help;
     bool report_timing;   ///< --report-timing: node_ms in --report
+    bool json;            ///< --check / --list-models: JSON on stdout
 
     GraphCliArgs()
         : model_dir(DefaultModelDir()),
@@ -112,7 +113,8 @@ struct GraphCliArgs {
           list_models(false),
           display(false),
           help(false),
-          report_timing(false) {}
+          report_timing(false),
+          json(false) {}
 };
 
 void PrintUsage(const char* program) {
@@ -121,10 +123,10 @@ void PrintUsage(const char* program) {
         "file. Changing which models run is a text edit, never a rebuild.\n"
         "\n"
         "Usage: %s --graph <file.json> [options]\n"
-        "       %s --check <file.json> [--model-dir <dir>]\n"
+        "       %s --check <file.json> [--model-dir <dir>] [--json]\n"
         "       %s --list-models [--consumes <roi|frame|either>]"
         " [--produces <shape>]\n"
-        "                     [--model-dir <dir>]\n"
+        "                     [--model-dir <dir>] [--json]\n"
         "\n"
         "Options:\n"
         "  --graph <file>        the node-graph JSON to run\n"
@@ -198,6 +200,8 @@ void PrintUsage(const char* program) {
         "                        keypoints, labelmap, densemap, image,"
         " scores,\n"
         "                        vector, boxes3d\n"
+        "  --json                with --check or --list-models: one JSON document\n"
+        "                        on stdout instead of the tables (shapes: README)\n"
         "  --help                this message\n"
         "\n"
         "Sample graphs: src/cpp_example/multi_model_graph/\n"
@@ -234,6 +238,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         }
         if (option == "--report-timing") {
             args->report_timing = true;
+            continue;
+        }
+        if (option == "--json") {
+            args->json = true;
             continue;
         }
         if (option == "--check") {
@@ -332,6 +340,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
     }
     if (args->report_timing && args->report.empty()) {
         *error = "--report-timing needs --report <file>";
+        return false;
+    }
+    if (args->json && !args->list_models && !args->check_only) {
+        *error = "--json applies to --check and --list-models";
         return false;
     }
     return true;
@@ -491,6 +503,61 @@ int PrintModels(const IModelRegistry& registry, const GraphCliArgs& args) {
             << aliases[a].variant << "\n";
     }
     std::fputs(out.str().c_str(), stdout);
+    return 0;
+}
+
+/// One --list-models --json row: the table's columns, typed.
+nlohmann::json ModelRowJson(const ModelInfo& info, const std::string& model_dir) {
+    nlohmann::json row = nlohmann::json::object();
+    row["model"] = info.model_name;
+    row["task"] = info.task;
+    row["produces"] = ToString(info.output_shape);
+    row["consumes"] = ToString(info.input_contract);
+    nlohmann::json input = nlohmann::json::object();
+    input["width"] = info.input_width;
+    input["height"] = info.input_height;
+    row["input"] = input;
+    row["published"] = info.published;
+    row["file"] = info.dxnn_file;
+    row["container"] = ContainerColumn(info, model_dir);
+    row["ready"] = info.ready;
+    row["reason"] = info.not_ready_reason;
+    nlohmann::json ports = nlohmann::json::array();
+    for (std::size_t p = 0; p < info.ports.size(); ++p) {
+        nlohmann::json port = nlohmann::json::object();
+        port["name"] = info.ports[p].name;
+        port["shape"] = ToString(info.ports[p].shape);
+        ports.push_back(port);
+    }
+    row["ports"] = ports;
+    row["alias_of"] = nullptr;
+    return row;
+}
+
+/// --list-models --json: the table as one array. 0, or 2 on a bad filter.
+int PrintModelsJson(const IModelRegistry& registry, const GraphCliArgs& args) {
+    std::string filter_error;
+    if (!ValidateFilters(args, &filter_error)) {
+        std::fprintf(stderr, "%s\n", filter_error.c_str());
+        return 2;
+    }
+    nlohmann::json rows = nlohmann::json::array();
+    const std::vector<ModelInfo> models = registry.list();
+    for (std::size_t i = 0; i < models.size(); ++i) {
+        if (!ListedByFilters(models[i], args)) continue;
+        rows.push_back(ModelRowJson(models[i], args.model_dir));
+    }
+    const std::vector<ModelAlias> aliases = registry.aliases();
+    for (std::size_t a = 0; a < aliases.size(); ++a) {
+        if (aliases[a].kind != ModelAlias::kAliasOf) continue;
+        const ModelInfo* info = registry.find(aliases[a].variant);
+        if (info == NULL || !ListedByFilters(*info, args)) continue;
+        nlohmann::json row = ModelRowJson(*info, args.model_dir);
+        row["model"] = aliases[a].name;
+        row["alias_of"] = aliases[a].variant;
+        rows.push_back(row);
+    }
+    std::printf("%s\n", rows.dump(2).c_str());
     return 0;
 }
 
@@ -1139,7 +1206,9 @@ int Main(int argc, char** argv, ExecutorKind kind) {
     // one line is the entire cost of naming a concrete registry.
     StaticModelRegistry registry;
 
-    if (args.list_models) return PrintModels(registry, args);
+    if (args.list_models) {
+        return args.json ? PrintModelsJson(registry, args) : PrintModels(registry, args);
+    }
 
     // First Ctrl-C or SIGTERM: stop reading, finish in-flight frames, write
     // the report. A later Ctrl-C terminates. See graph_cli_interrupt.hpp.

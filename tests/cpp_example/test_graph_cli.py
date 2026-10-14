@@ -330,7 +330,7 @@ def test_help_lists_every_option(binary):
     for option in ("--graph", "--input", "--output", "--model-dir",
                    "--max-inflight", "--report", "--check", "--list-models",
                    "--max-jobs-per-stage", "--stall-timeout-ms", "--display",
-                   "--report-timing"):
+                   "--report-timing", "--json"):
         assert option in result.stdout
 
 
@@ -3035,3 +3035,54 @@ def test_a_shared_engine_gives_each_node_what_it_gets_alone(tmp_path):
         assert frames == first, key
     for frame in first:
         assert frame["nodes"]["od"]["payload"] == frame["nodes"]["od2"]["payload"]
+
+
+LIST_KEYS = {"model", "task", "produces", "consumes", "input", "published", "file",
+             "container", "ready", "reason", "ports", "alias_of"}
+
+
+def _list_json(*args):
+    result = run(BINARIES[0], "--list-models", "--json", *args)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stderr == "", result.stderr
+    return json.loads(result.stdout)
+
+
+@pytest.mark.graph
+def test_list_models_json_has_one_object_per_table_row():
+    table = _list_rows(run(BINARIES[0], "--list-models").stdout)
+    rows = _list_json()
+    assert [row["model"] for row in rows] == list(table)
+    assert all(set(row) == LIST_KEYS for row in rows)
+    by = {row["model"]: row for row in rows}
+    od = by["yolov8-n_640x640"]
+    assert (od["task"], od["produces"], od["consumes"]) == ("object_detection", "boxes", "full_frame")
+    assert od["input"] == {"width": 640, "height": 640}
+    assert od["published"] is True and od["ready"] is True and od["reason"] == ""
+    assert od["file"] == "yolov8-n_640x640.dxnn"
+    assert od["container"] in table["yolov8-n_640x640"]
+    assert od["ports"] == [] and od["alias_of"] is None
+    assert by["yolopv2_384x640"]["ports"] == [{"name": "drivable", "shape": "labelmap"},
+                                               {"name": "lane", "shape": "labelmap"}]
+    alias = by["deit_base384_distilled"]
+    assert alias["alias_of"] == "deit-b_384x384_distilled"
+    assert alias["task"] == by["deit-b_384x384_distilled"]["task"]
+    assert by["patchcore_224x224"]["ready"] is False and by["patchcore_224x224"]["reason"]
+
+
+@pytest.mark.graph
+def test_list_models_json_honours_the_filters():
+    rows = _list_json("--consumes", "roi", "--produces", "scores")
+    assert rows
+    assert all(row["produces"] == "scores" and row["consumes"] in ("roi", "either") for row in rows)
+    result = run(BINARIES[0], "--list-models", "--json", "--produces", "bogus_shape")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert result.stdout == ""
+    assert "--produces expects one of" in result.stderr
+
+
+@pytest.mark.graph
+def test_json_is_only_for_check_and_list_models():
+    result = run(BINARIES[0], "--graph", "{}/cascade_od_reid_track.json".format(GRAPHS), "--json")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--json applies to --check and --list-models" in result.stderr
