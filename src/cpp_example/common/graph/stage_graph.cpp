@@ -332,6 +332,30 @@ bool SameStageParams(const StageParams& a, const StageParams& b) {
     return a.numeric == b.numeric && a.text == b.text && a.lists == b.lists;
 }
 
+/// `word` as one shell word: unchanged when it is plain, else single-quoted.
+std::string ShellWord(const std::string& word) {
+    static const char kPlain[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-./:+,=@%";
+    if (!word.empty() && word.find_first_not_of(kPlain) == std::string::npos) return word;
+    std::string quoted = "'";
+    for (std::size_t i = 0; i < word.size(); ++i) {
+        if (word[i] == '\'') quoted += "'\\''";
+        else quoted += word[i];
+    }
+    return quoted + "'";
+}
+
+/// The command that fetches one model into model_dir, as the CLI's
+/// consumer::DownloadCommand prints it (multi_model_graph/graph_consumer.hpp;
+/// the engine does not depend on that file). download_models.py, never
+/// "./setup.sh --models": setup.sh also re-fetches the sample videos, and
+/// under its default --force scripts/get_resource.sh rm -rf's an
+/// assets/videos symlink.
+std::string DownloadCommand(const std::string& name, const std::string& model_dir) {
+    return "python3 scripts/download_models.py --models " + ShellWord(name) + " --output " +
+           ShellWord(model_dir);
+}
+
 }  // namespace
 
 EdgeCargo SelectEdgeCargo(const EdgeRuntime& edge, const StageDataPtr& produced,
@@ -406,29 +430,26 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
 
         const std::string path = model_dir + "/" + info->dxnn_file;
         if (require_artifacts && !FileExists(path) && !info->published) {
-            // The model zoo has no file for it yet: setup.sh cannot help.
+            // The model zoo has no file for it yet: no downloader can help.
             throw GraphError(GraphErrorCode::kModelMissing, "node \"" + node.id + "\"",
                              info->dxnn_file + " not found in " + model_dir,
                              info->model_name +
-                                 " is not published by the model zoo yet; setup.sh "
-                                 "cannot download it");
+                                 " is not published by the model zoo yet; "
+                                 "download_models.py cannot download it");
         }
         if (require_artifacts && !FileExists(path)) {
             throw GraphError(
                 GraphErrorCode::kModelMissing, "node \"" + node.id + "\"",
                 info->dxnn_file + " not found in " + model_dir,
-                // The space form. setup.sh takes "--models <name>" and
-                // "--models=<name>" alike (one case matches both), so either
-                // recovers; the space form is the one every other recovery
-                // line and the docs print. The name is the model zoo's
-                // (ModelInfo::download_name, which is not always the
-                // registry's), the same one the CLI's PrepareGraph prints in
-                // its richer version of this line (every absent model at
-                // once) before Build() is reached; this is the fallback for
-                // a caller that builds directly.
-                "./setup.sh --models " +
-                    (info->download_name.empty() ? node.model
-                                                 : info->download_name));
+                // The name is the model zoo's (ModelInfo::download_name,
+                // which is not always the registry's), the same one the
+                // CLI's PrepareGraph prints in its richer version of this
+                // line (every absent model at once) before Build() is
+                // reached; this is the fallback for a caller that builds
+                // directly.
+                DownloadCommand(info->download_name.empty() ? node.model
+                                                            : info->download_name,
+                                model_dir));
         }
         std::map<std::string, std::string>::const_iterator owner = owners.find(node.id);
         if (owner != owners.end() && owner->second != node.id) {
@@ -473,8 +494,9 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
             if (engines_opened == 0) {
                 how << "check the NPU with dxrt-cli -s, and that " << info->dxnn_file
                     << " was compiled for this DX-RT version; to download it again: "
-                    << "./setup.sh --models "
-                    << (info->download_name.empty() ? node.model : info->download_name);
+                    << DownloadCommand(
+                           info->download_name.empty() ? node.model : info->download_name,
+                           model_dir);
             } else {
                 how << "the NPU's device memory may be full: this graph loaded "
                     << engines_opened << " model(s) before this one, and every node "

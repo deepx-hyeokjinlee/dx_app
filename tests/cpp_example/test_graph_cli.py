@@ -36,6 +36,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from test_helpers.proc import run_bounded, wait_until_blocked_opening_a_fifo  # noqa: E402
 
 BINARIES = ["multi_model_graph_sync", "multi_model_graph_async"]
+# The recovery command every graph message prints for a .dxnn to fetch. Not
+# ./setup.sh --models: setup.sh also re-fetches the sample videos and, under
+# its default --force, rm -rf's an assets/videos symlink (get_resource.sh).
+DOWNLOAD = "python3 scripts/download_models.py --models"
 GRAPHS = "src/cpp_example/multi_model_graph"
 GRAPH_DIR = PROJECT_ROOT / "src" / "cpp_example" / "multi_model_graph"
 MODEL_DIR = PROJECT_ROOT / "assets" / "models"
@@ -130,8 +134,8 @@ def missing_artifacts(graph):
                         .format(graph, name))
         path = MODEL_DIR / entry["dxnn_file"]
         if not path.is_file():
-            return "{} needs {} ({} is absent) - run ./setup.sh --models {}".format(
-                graph, name, path, name)
+            return "{} needs {} ({} is absent) - run {} {}".format(
+                graph, name, path, DOWNLOAD, name)
     return ""
 
 
@@ -915,10 +919,10 @@ def test_check_names_missing_artifacts_with_a_recovery_command(tmp_path):
                  "{}/cascade_od_reid_track.json".format(GRAPHS),
                  "--model-dir", str(tmp_path))
     assert "missing" in result.stdout.lower()
-    # The space form, not "--models=<name>": setup.sh's own parser rejects
-    # "--models=x" with "Invalid option", so the equals form would print a
-    # recovery command that does not run. See task-13-report.md.
-    assert "./setup.sh --models " in result.stdout
+    # download_models.py, not setup.sh (see DOWNLOAD), into --model-dir.
+    assert DOWNLOAD + " " in result.stdout
+    assert "--output {}\n".format(tmp_path) in result.stdout, result.stdout
+    assert "setup.sh" not in result.stdout, result.stdout
     assert "casvit_t" in result.stdout
 
 
@@ -929,33 +933,35 @@ def test_missing_models_are_named_as_the_model_zoo_spells_them(tmp_path):
                  "{}/cascade_od_reid_track.json".format(GRAPHS),
                  "--model-dir", str(tmp_path))
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "  -> ./setup.sh --models YoloV8N casvit_t\n" in result.stdout, result.stdout
+    assert "  -> {} YoloV8N casvit_t --output {}\n".format(DOWNLOAD, tmp_path) in result.stdout, \
+        result.stdout
 
 
-SWAG_DOWNLOAD = "  -> ./setup.sh --models vit_l_p16_512x512_swag\n"
+def swag_download(model_dir):
+    return "  -> {} vit_l_p16_512x512_swag --output {}\n".format(DOWNLOAD, model_dir)
 
 
 @pytest.mark.graph
 def test_missing_published_swag_is_offered_a_download(tmp_path):
     """vit-l-p16_512x512_swag is published. A missing file is offered
-    setup.sh under the manifest download name, in --check and in a run."""
+    download_models.py under the manifest download name, in --check and in a run."""
     graph = _write_graph(tmp_path, [{"id": "od", "model": "yolov8n"},
                                     {"id": "cls", "model": "vit-l-p16_512x512_swag"}])
     empty = tmp_path / "models"
     empty.mkdir()
     check = run(BINARIES[0], "--check", str(graph), "--model-dir", str(empty))
     assert check.returncode == 0, check.stdout + check.stderr
-    assert "  -> ./setup.sh --models YoloV8N vit_l_p16_512x512_swag\n" in check.stdout, check.stdout
+    both = "  -> {} YoloV8N vit_l_p16_512x512_swag --output {}\n".format(DOWNLOAD, empty)
+    assert both in check.stdout, check.stdout
     assert "is not published" not in check.stdout
     for binary in BINARIES:
         result = run(binary, "--graph", str(graph), "--model-dir", str(empty))
         assert result.returncode == 1, result.stdout + result.stderr
-        assert result.stderr.endswith("  -> ./setup.sh --models YoloV8N vit_l_p16_512x512_swag\n"), \
-            result.stderr
+        assert result.stderr.endswith(both), result.stderr
 
     alone = _write_graph(tmp_path, [{"id": "cls", "model": "vit-l-p16_512x512_swag"}])
     check = run(BINARIES[0], "--check", str(alone), "--model-dir", str(empty))
-    assert check.stdout.endswith(SWAG_DOWNLOAD), check.stdout
+    assert check.stdout.endswith(swag_download(empty)), check.stdout
     assert "is not published" not in check.stdout
 
 
@@ -1765,7 +1771,8 @@ def test_model_dir_without_the_artifacts_fails_with_a_recovery_command(tmp_path)
     assert result.returncode == 1
     combined = result.stdout + result.stderr
     assert "MODEL_MISSING" in combined or "missing" in combined.lower()
-    assert "./setup.sh --models " in combined
+    assert DOWNLOAD + " " in combined
+    assert "setup.sh" not in combined
     assert not (tmp_path / "out.png").exists()
 
 
@@ -2664,6 +2671,9 @@ def test_v9_model_on_an_older_runtime_fails_before_loading(tmp_path, model):
         # I3: the hint names the v8 file; downloading again fetches this v9 file.
         assert "  -> use the v8 file (dxnn/2_4_0) or upgrade DX-RT to >= 3.5.0" in result.stderr
         assert "setup.sh" not in result.stderr, result.stderr
+        assert "download_models" not in result.stderr, result.stderr
+        # --check says what to do too, the same hint as the run.
+        assert "  -> use the v8 file (dxnn/2_4_0) or upgrade DX-RT to >= 3.5.0" in check.stderr
 
 
 @pytest.mark.graph
@@ -2993,7 +3003,9 @@ def test_check_fails_on_a_model_file_that_is_not_a_dxnn(tmp_path, content):
     assert "{}  [present, invalid]".format(dxnn) in result.stdout, result.stdout
     assert 'ERROR [MODEL_LOAD] node "od": model "yolov8n" ({}) is not a loadable .dxnn: '.format(
         dxnn) in result.stderr, result.stderr
-    assert "  -> download it again: ./setup.sh --models YoloV8N" in result.stderr, result.stderr
+    assert "  -> download it again: {} YoloV8N --output {}\n".format(DOWNLOAD, models) \
+        in result.stderr, result.stderr
+    assert "setup.sh" not in result.stderr, result.stderr
 
 
 SHARED_GRAPH = {
@@ -3011,7 +3023,7 @@ def test_a_shared_engine_gives_each_node_what_it_gets_alone(tmp_path):
     same reports as two nodes with an engine each, and the same result on
     both nodes."""
     if not (MODEL_DIR / "yolov8-n_640x640.dxnn").is_file():
-        pytest.skip("yolov8-n_640x640.dxnn is absent - run ./setup.sh --models YoloV8N")
+        pytest.skip("yolov8-n_640x640.dxnn is absent - run {} YoloV8N".format(DOWNLOAD))
     shared = tmp_path / "shared.json"
     shared.write_text(json.dumps(SHARED_GRAPH))
     unshared = json.loads(json.dumps(SHARED_GRAPH))
@@ -3138,6 +3150,11 @@ CHECK_JSON_ERRORS = [
                 {"id": "a", "model": "yolov8n"}, {"id": "b", "model": "yolov8n"}],
       "edges": [{"from": "cam", "to": "a"}, {"from": "a", "to": "b"}, {"from": "b", "to": "a"}]},
      "GRAPH_CYCLE", None, None),
+    ({"version": 1,
+      "nodes": [{"id": "cam", "type": "source", "uri": "a.jpg"},
+                {"id": "od", "model": "yolov8n"}, {"id": "od", "model": "resnet50"}],
+      "edges": [{"from": "cam", "to": "od"}]},
+     "GRAPH_SCHEMA", "od", None),
 ]
 
 
@@ -3161,6 +3178,7 @@ def test_check_json_of_a_file_that_is_not_json(tmp_path):
     status, out = _check_json(path)
     assert status == 1 and out["ok"] is False
     assert out["errors"][0]["code"] == "GRAPH_SCHEMA" and out["errors"][0]["node"] is None
+    assert "JSON" in out["errors"][0]["how"], out["errors"][0]
     assert out["models"] == []
     assert out["graph"] == str(path)
 
@@ -3186,3 +3204,39 @@ def test_check_json_reports_model_files_and_engines(tmp_path):
     assert by["cls"]["state"] == "missing"
     assert by["cls"]["engine"] == {"buffers": 0, "share": False, "shared_with": None}
     assert any('"yolov8n" is the old name of "yolov8-n_640x640"' in note for note in out["notes"])
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("args", [
+    ["--check", "--json"],
+    ["--json", "--check"],
+    ["--list-models", "--json", "--check", "x.json"],
+    ["--check", "x.json", "--json", "--frames", "abc"],
+], ids=["check-json-no-path", "json-check-no-path", "list-models-and-check", "bad-value"])
+def test_json_usage_errors_keep_stdout_empty(args):
+    """--json promises one JSON document on stdout: a usage error prints its
+    message and the usage text on stderr, exit 2, and nothing on stdout."""
+    for binary in BINARIES:
+        result = run(binary, *args)
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert result.stdout == "", result.stdout
+        assert "Usage:" in result.stderr, result.stderr
+
+
+@pytest.mark.graph
+def test_list_models_and_check_are_separate_modes():
+    result = run(BINARIES[0], "--list-models", "--check", "{}/{}".format(GRAPHS, MULTISTREAM))
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--list-models and --check" in result.stderr, result.stderr
+
+
+@pytest.mark.graph
+def test_check_json_duplicate_node_id_names_the_node_index(tmp_path):
+    graph = _write_graph(tmp_path, [{"id": "od", "model": "yolov8n"},
+                                    {"id": "od", "model": "resnet50"}],
+                         edges=[{"from": "cam", "to": "od"}])
+    status, out = _check_json(graph)
+    assert status == 1
+    error = out["errors"][0]
+    assert error["where"].endswith(' node[2] "od"'), error
+    assert error["node"] == "od", error

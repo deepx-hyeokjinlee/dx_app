@@ -218,10 +218,21 @@ std::vector<MissingArtifact> CollectMissing(const GraphSpec& spec,
                                             const std::string& model_dir);
 
 /// One line per absent artifact, one line per unpublished model (which
-/// setup.sh cannot fetch), then the one command that fetches the rest.
-/// Each caller prints its own header line first, because --check reports
-/// this and a real run fails on it.
-std::string FormatMissingList(const std::vector<MissingArtifact>& missing);
+/// the model zoo cannot serve), then the one command that fetches the rest
+/// into model_dir (DownloadCommand). Each caller prints its own header line
+/// first, because --check reports this and a real run fails on it.
+std::string FormatMissingList(const std::vector<MissingArtifact>& missing,
+                              const std::string& model_dir);
+
+/// "python3 scripts/download_models.py --models <names...> --output <dir>",
+/// the recovery command for absent or broken .dxnn files. Not
+/// "./setup.sh --models": setup.sh also re-fetches the sample videos, and
+/// under its default --force scripts/get_resource.sh rm -rf's an
+/// assets/videos symlink. download_models.py takes the manifest name, the
+/// .dxnn name or the registry name, and overwrites by default. A name or
+/// directory with characters a shell would split or expand is single-quoted.
+std::string DownloadCommand(const std::vector<std::string>& names,
+                            const std::string& model_dir);
 
 /// "2 model files are not in <model_dir>".
 std::string MissingHeadline(std::size_t count, const std::string& model_dir);

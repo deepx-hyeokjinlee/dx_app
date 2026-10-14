@@ -22,7 +22,7 @@ detector, change one string:
 ```
 
 ```bash
-./setup.sh --models yolo26-s_640x640   # fetch the .dxnn, once (see "Model files" below)
+python3 scripts/download_models.py --models yolo26-s_640x640   # fetch the .dxnn, once (see "Model files" below)
 ./bin/multi_model_graph_async --graph .../fanout_od_seg_pose.json --output result.png
 ```
 
@@ -42,7 +42,9 @@ line per node (`note: node "od": "yolov8n" is the old name of
 stderr, and the table at the end of `docs/graph_models.md` lists every old
 name. The shipped samples use variant names.
 
-**Model files**: `./setup.sh --models` downloads all 497 registered models: 493
+**Model files**: `python3 scripts/download_models.py --models <name...>` fetches
+models into `assets/models` (`--output <dir>` elsewhere), and `--all` fetches
+all 497 registered models: 493
 from the model zoo's current release, `q-lite-dxnn/2_5_0`, and 4 that 2_5_0
 does not publish from `2_4_0` (`beit-l-p16_384x384`, `levit-128s_224x224`,
 `vit-b-p16_384x384`, `vit-t-p16_224x224`).
@@ -513,14 +515,14 @@ each, for edge ports and node params. Each example below is real output from
 | `MODEL_UNKNOWN` | the name is not in the registry | `ERROR [MODEL_UNKNOWN] node "od": unknown model "YoloV8N" - not in config/model_registry.json`<br>`  -> did you mean "yolov8-n_640x640"? run --list-models, or see docs/graph_models.md` |
 | `MODEL_NO_TASK` | registered without a task *(no model this build ships is in this state; not real output)* | `ERROR [MODEL_NO_TASK] node "od": model "X" has no task registered`<br>`  -> ./scripts/add_model.sh --model X --task <task>` |
 | `MODEL_NOT_READY` | registered, but the graph engine cannot run it: no factory, no postprocessor, or an interface with no graph stage (the four anomaly models in this release) | `ERROR [MODEL_NOT_READY] node "ad": model "patchcore_224x224" is registered but cannot run: anomaly detection is not graph-ready in this release`<br>`  -> see docs/graph_models.md for models usable in graphs` |
-| `MODEL_MISSING` | the `.dxnn` is not in `--model-dir` | *(from a run: `--check` lists the same files and the same command without failing)*<br>`ERROR [MODEL_MISSING] graph "person-reid": 2 model files are not in ./no_models`<br>`  node "od"  model yolov8-n_640x640  ->  ./no_models/yolov8-n_640x640.dxnn`<br>`  node "reid"  model casvit-t_224x224  ->  ./no_models/casvit-t_224x224.dxnn`<br>`  -> ./setup.sh --models YoloV8N casvit_t` |
+| `MODEL_MISSING` | the `.dxnn` is not in `--model-dir` | *(from a run: `--check` lists the same files and the same command without failing)*<br>`ERROR [MODEL_MISSING] graph "person-reid": 2 model files are not in ./no_models`<br>`  node "od"  model yolov8-n_640x640  ->  ./no_models/yolov8-n_640x640.dxnn`<br>`  node "reid"  model casvit-t_224x224  ->  ./no_models/casvit-t_224x224.dxnn`<br>`  -> python3 scripts/download_models.py --models YoloV8N casvit_t --output ./no_models` |
 | `MODEL_LOAD` | the `.dxnn` is present but the runtime cannot load it (device memory, device state, an incompatible file). `--check` reports the cases it can see without the NPU, a file that is not a `.dxnn` and a v9 file on DX-RT older than 3.5.0 (see *Model files*), and exits 1; whether the models fit in device memory shows only when they load | *(real output on DX-M1, from a run, not from `--check`, of a graph that names its models by their old names)*<br>`ERROR [MODEL_LOAD] node "sr2": model "realesrgan_x2" (realesrgan-x2_192x192.dxnn) could not be loaded: [dxrt-exception] Invalid model exception {"failed to register task":lib/task.cpp:145:Task}`<br>`  -> the NPU's device memory may be full: this graph loaded 3 model(s) before this one, and every node loads its own copy, even of the same model, unless the nodes set "engine": {"share": true} (another process on the NPU uses memory too); share an engine, lower a node's "engine": {"buffers": N} (DX-RT's default is 6), remove a node or use a smaller model - DX-M1 cannot hold a second realesrgan-x2_192x192 next to yolov8-n_640x640 and resnet50_224x224` |
 
 `MODEL_LOAD` names the node and keeps the runtime's own reason whole. Its
 hint depends on how far loading got: after other models loaded, it is the
 device-memory hint above (see *Device memory*); for the first model of the
 graph it is `check the NPU with dxrt-cli -s, and that <file> was compiled
-for this DX-RT version; to download it again: ./setup.sh --models <name>`.
+for this DX-RT version; to download it again: python3 scripts/download_models.py --models <name> --output <model-dir>`.
 For a `.dxnn` container v9 on DX-RT older than 3.5.0 (see *Model files*) it
 is `use the v8 file (dxnn/2_4_0) or upgrade DX-RT to >= 3.5.0` instead:
 downloading again would fetch the same v9 file.
@@ -528,7 +530,7 @@ downloading again would fetch the same v9 file.
 Note the download command in `MODEL_MISSING`: the name it prints is the
 **model zoo's** spelling, which is almost never the variant (`yolov8-n_640x640`
 is `YoloV8N` there, `yolo26-l-obb_1024x1024` is `yolo26l-obb`): 488 of the
-497 registered models differ this way. `setup.sh --models` accepts the zoo's
+497 registered models differ this way. `download_models.py --models` accepts the zoo's
 name, the `.dxnn` file name with or without `.dxnn` (which is the variant),
 or the old registry name, in any letter case, but the zoo's name is the
 manifest's own spelling, so that is the one the CLI prints. It is compiled into
@@ -536,7 +538,14 @@ the binary from `scripts/modelzoo_manifest.json` at build time, so a binary
 deployed without a source tree prints the same name. Every registered model is
 published, so a missing file is always offered that command. A future row with
 `published` false is left out of the command and gets its own line:
-`is not published by the model zoo yet; setup.sh cannot download it`.
+`is not published by the model zoo yet; download_models.py cannot download it`.
+
+The command is `scripts/download_models.py`, never `./setup.sh --models`:
+`setup.sh` also fetches the sample videos, and under its default `--force`
+`scripts/get_resource.sh` deletes an `assets/videos` symlink (`rm -rf`) to
+recreate it. `download_models.py` touches only the files it is asked for and
+overwrites them by default, so the same line repairs a file that is there but
+broken. `--output` is the `--model-dir` the graph was checked against.
 
 **Every bad value in one object is reported at once**, as unknown keys are
 (below): one `roi`, `track` or `params` object with three bad values gives
@@ -622,7 +631,8 @@ be able to ask — so a missing `.dxnn` is reported but does not make
 recovery command. A `.dxnn` that is present but cannot load here does make `--check` fail:
 a file that is not a `.dxnn` at all (empty, cut short, no `DXNN` header;
 the artifact column says `[present, invalid]`, and the error says
-`download it again: ./setup.sh --models <name>`), or one this DX-RT cannot
+`download it again: python3 scripts/download_models.py --models <name> --output <model-dir>`),
+or one this DX-RT cannot
 load: the artifact column says
 `[present, v9 (needs DX-RT >= 3.5.0)]`, one line per such node follows on
 stderr, and the exit code is 1 (output on DX-RT 3.4.1):
@@ -644,27 +654,45 @@ models load (`MODEL_LOAD`, see *Device memory*).
 ### `--check --json`
 
 One JSON object on stdout, nothing on stderr; exit 0 when `errors` is
-empty, else 1:
+empty, else 1. A usage error (`--check --json` with no path, `--list-models`
+together with `--check`, a bad option value) is exit 2 with the message and
+the usage text on stderr and nothing on stdout. Real output, for a graph
+`two-od` whose `od` (old name `yolov8n`) and `od2` share one engine and a
+0-byte `yolov8-n_640x640.dxnn`, feeding a `cls` (`resnet50`, not downloaded)
+with a crop edge from `od` and a plain edge from `od2`; `what` is shortened:
+
+```console
+$ ./bin/multi_model_graph_sync --check two_od.json --json --model-dir models
+```
 
 ```json
 {
   "ok": false,
-  "graph": "person-reid",
+  "graph": "two-od",
   "errors": [
-    {"code": "GRAPH_EDGE", "where": "edge \"seg\"->\"reid\"", "what": "...", "how": "...",
-     "node": null, "edge": {"from": "seg", "to": "reid"}},
-    {"code": "MODEL_LOAD", "where": "node \"od\"", "what": "...", "how": "download it again: ./setup.sh --models YoloV8N",
-     "node": "od", "edge": null}
+    {"code": "GRAPH_EDGE", "where": "edge \"od2\"->\"cls\"", "what": "\"od2\" produces boxes, and a plain edge carries only ...",
+     "how": "add \"roi\": {} to crop \"od2\"'s boxes, or feed \"cls\" from a source node",
+     "node": null, "edge": {"from": "od2", "to": "cls"}},
+    {"code": "MODEL_LOAD", "where": "node \"od\"", "what": "model \"yolov8n\" (yolov8-n_640x640.dxnn) is not a loadable .dxnn: ...",
+     "how": "download it again: python3 scripts/download_models.py --models YoloV8N --output models",
+     "node": "od", "edge": null},
+    {"code": "MODEL_LOAD", "where": "node \"od2\"", "what": "model \"yolov8-n_640x640\" (yolov8-n_640x640.dxnn) is not a loadable .dxnn: ...",
+     "how": "download it again: python3 scripts/download_models.py --models YoloV8N --output models",
+     "node": "od2", "edge": null}
   ],
   "models": [
     {"node": "od", "model": "yolov8-n_640x640", "file": "yolov8-n_640x640.dxnn",
-     "state": "present", "container": "v9",
+     "state": "invalid", "container": null,
      "engine": {"buffers": 2, "share": true, "shared_with": null}},
     {"node": "od2", "model": "yolov8-n_640x640", "file": "yolov8-n_640x640.dxnn",
-     "state": "present", "container": "v9",
-     "engine": {"buffers": 2, "share": true, "shared_with": "od"}}
+     "state": "invalid", "container": null,
+     "engine": {"buffers": 2, "share": true, "shared_with": "od"}},
+    {"node": "cls", "model": "resnet50_224x224", "file": "resnet50_224x224.dxnn",
+     "state": "missing", "container": null,
+     "engine": {"buffers": 0, "share": false, "shared_with": null}}
   ],
-  "notes": ["note: node \"od\": \"yolov8n\" is the old name of \"yolov8-n_640x640\""]
+  "notes": ["note: node \"od\": \"yolov8n\" is the old name of \"yolov8-n_640x640\"",
+            "note: node \"cls\": \"resnet50\" is the old name of \"resnet50_224x224\""]
 }
 ```
 
@@ -1303,7 +1331,7 @@ This is the claim the example exists to make, so it is worth trying:
 
 ```bash
 # edit cascade_od_reid_track.json: "model": "yolov8-n_640x640" -> "yolo26-s_640x640"
-./setup.sh --models yolo26-s_640x640     # a v9 file: needs DX-RT >= 3.5.0 (see "Model files")
+python3 scripts/download_models.py --models yolo26-s_640x640   # a v9 file: needs DX-RT >= 3.5.0 (see "Model files")
 ./bin/multi_model_graph_async \
     --graph src/cpp_example/multi_model_graph/cascade_od_reid_track.json \
     --output /tmp/swapped.png

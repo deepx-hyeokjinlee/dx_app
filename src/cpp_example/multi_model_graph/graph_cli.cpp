@@ -60,6 +60,7 @@ using consumer::AliasNotes;
 using consumer::AsyncFrameExecutor;
 using consumer::CollectMissing;
 using consumer::DefaultModelDir;
+using consumer::DownloadCommand;
 using consumer::FileExists;
 using consumer::FormatMissingList;
 using consumer::FrameExecutor;
@@ -117,8 +118,12 @@ struct GraphCliArgs {
           json(false) {}
 };
 
-void PrintUsage(const char* program) {
-    std::printf(
+/// The usage text, on `out`: stdout for --help and for a usage error,
+/// stderr for a usage error when --json was asked for, whose stdout holds
+/// one JSON document or nothing.
+void PrintUsage(std::FILE* out, const char* program) {
+    std::fprintf(
+        out,
         "Run a multi-model pipeline described entirely by a node-graph JSON\n"
         "file. Changing which models run is a text edit, never a rebuild.\n"
         "\n"
@@ -344,6 +349,12 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
     }
     if (args->json && !args->list_models && !args->check_only) {
         *error = "--json applies to --check and --list-models";
+        return false;
+    }
+    if (args->list_models && args->check_only) {
+        // Each prints its own report, and --list-models used to win
+        // silently, leaving the graph unchecked.
+        *error = "--list-models and --check are separate modes: pass one of them";
         return false;
     }
     return true;
@@ -706,7 +717,7 @@ void PrintCheckSummary(const GraphSpec& spec, const IModelRegistry& registry,
     if (!missing.empty()) {
         std::printf("\nMISSING: %s\n",
                     MissingHeadline(missing.size(), model_dir).c_str());
-        std::fputs(FormatMissingList(missing).c_str(), stdout);
+        std::fputs(FormatMissingList(missing, model_dir).c_str(), stdout);
     }
 }
 
@@ -738,16 +749,21 @@ std::vector<GraphError> ModelFileProblems(const GraphSpec& spec,
                 GraphErrorCode::kModelLoad, "node \"" + node.id + "\"",
                 "model \"" + node.model + "\" (" + info->dxnn_file +
                     ") is not a loadable .dxnn: " + header_error,
-                "download it again: ./setup.sh --models " +
-                    (info->download_name.empty() ? node.model : info->download_name)));
+                "download it again: " +
+                    DownloadCommand(std::vector<std::string>(
+                                        1, info->download_name.empty() ? node.model
+                                                                       : info->download_name),
+                                    model_dir)));
             continue;
         }
         const std::string error = ContainerLoadError(path, RuntimeVersion());
         if (error.empty()) continue;
+        // The run's hint for the same file (typed_stage.hpp): downloading
+        // again would fetch the same container.
         problems.push_back(GraphError(GraphErrorCode::kModelLoad, "node \"" + node.id + "\"",
                                       "model \"" + node.model + "\" (" + info->dxnn_file +
                                           ") cannot be loaded here: " + error,
-                                      ""));
+                                      ContainerSupportHint(version)));
     }
     return problems;
 }
@@ -1372,12 +1388,16 @@ int Main(int argc, char** argv, ExecutorKind kind) {
     GraphCliArgs args;
     std::string error;
     if (!ParseArgs(argc, argv, kind, &args, &error)) {
+        // Searched in argv, not args.json: ParseArgs may stop before it
+        // reads a later --json.
+        bool json = false;
+        for (int i = 1; i < argc; ++i) json = json || std::strcmp(argv[i], "--json") == 0;
         std::fprintf(stderr, "%s\n\n", error.c_str());
-        PrintUsage(argv[0]);
+        PrintUsage(json ? stderr : stdout, argv[0]);
         return 2;
     }
     if (args.help) {
-        PrintUsage(argv[0]);
+        PrintUsage(stdout, argv[0]);
         return 0;
     }
 
@@ -1418,7 +1438,7 @@ int Main(int argc, char** argv, ExecutorKind kind) {
             std::fprintf(stderr, "--display needs a window system, and neither DISPLAY "
                                  "nor WAYLAND_DISPLAY is set: run it in a desktop session, "
                                  "or save the result with --output\n\n");
-            PrintUsage(argv[0]);
+            PrintUsage(stdout, argv[0]);
             return 2;
         }
         if (args.display && !DisplayOpens()) {
@@ -1426,7 +1446,7 @@ int Main(int argc, char** argv, ExecutorKind kind) {
                                  "system answered there; run it in a desktop session, or "
                                  "save the result with --output\n\n",
                          DisplayEnvironment().c_str());
-            PrintUsage(argv[0]);
+            PrintUsage(stdout, argv[0]);
             return 2;
         }
         // Which uri every stream reads, and the usage errors that depend on
@@ -1438,7 +1458,7 @@ int Main(int argc, char** argv, ExecutorKind kind) {
         const std::string binding = ParseInputOverrides(early, args.inputs, &overrides);
         if (!binding.empty()) {
             std::fprintf(stderr, "%s\n\n", binding.c_str());
-            PrintUsage(argv[0]);
+            PrintUsage(stdout, argv[0]);
             return 2;
         }
         std::vector<StreamUri> streams;
@@ -1447,7 +1467,7 @@ int Main(int argc, char** argv, ExecutorKind kind) {
             // ParseInputOverrides binds only source ids, so this is not
             // expected; if it ever happens it is a usage error all the same.
             std::fprintf(stderr, "%s\n\n", unresolved.c_str());
-            PrintUsage(argv[0]);
+            PrintUsage(stdout, argv[0]);
             return 2;
         }
         if (!args.output.empty()) {
@@ -1457,7 +1477,7 @@ int Main(int argc, char** argv, ExecutorKind kind) {
                     OutputProblem(args.output, streams[s].uri, args.frames);
                 if (!problem.empty()) {
                     std::fprintf(stderr, "%s\n\n", problem.c_str());
-                    PrintUsage(argv[0]);
+                    PrintUsage(stdout, argv[0]);
                     return 2;
                 }
             }

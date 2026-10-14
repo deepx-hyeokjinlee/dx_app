@@ -1702,7 +1702,7 @@ void TestBuildFallbackPrintsTheModelZooName() {
     obb.task = "obb_detection";
     obb.dxnn_file = "yolo26-l-obb_1024x1024.dxnn";
     obb.download_name = "yolo26l-obb";
-    obb.published = true;  // an unpublished model gets no setup.sh line (M1)
+    obb.published = true;  // an unpublished model gets no download line (M1)
     obb.output_shape = Shape::kObBoxes;
     obb.input_contract = InputContract::kFullFrame;
     obb.ready = true;
@@ -1720,7 +1720,11 @@ void TestBuildFallbackPrintsTheModelZooName() {
     } catch (const GraphError& error) {
         message = error.what();
     }
-    GRAPH_CHECK(message.find("-> ./setup.sh --models yolo26l-obb") != std::string::npos);
+    // download_models.py into the model dir, never setup.sh: setup.sh also
+    // re-fetches the sample videos and can rm -rf an assets/videos symlink.
+    GRAPH_CHECK(message.find("-> python3 scripts/download_models.py --models yolo26l-obb "
+                             "--output /definitely/not/a/real/model/dir") != std::string::npos);
+    GRAPH_CHECK(message.find("setup.sh") == std::string::npos);
     GRAPH_CHECK(message.find("--models yolo26l_obb") == std::string::npos);
 
     // No download name: the registry name, as before.
@@ -1733,7 +1737,8 @@ void TestBuildFallbackPrintsTheModelZooName() {
     } catch (const GraphError& error) {
         message = error.what();
     }
-    GRAPH_CHECK(message.find("-> ./setup.sh --models yolov8n") != std::string::npos);
+    GRAPH_CHECK(message.find("-> python3 scripts/download_models.py --models yolov8n --output "
+                             "/definitely/not/a/real/model/dir") != std::string::npos);
 }
 
 namespace {
@@ -1802,7 +1807,9 @@ void TestBuildReportsAnEngineThatWillNotLoadAsModelLoad() {
     GRAPH_CHECK(code == GraphErrorCode::kModelLoad);
     GRAPH_CHECK(message.find("node \"od\"") != std::string::npos);
     GRAPH_CHECK(message.find("dxrt-cli -s") != std::string::npos);
-    GRAPH_CHECK(message.find("./setup.sh --models yolov8n") != std::string::npos);
+    GRAPH_CHECK(message.find("python3 scripts/download_models.py --models yolov8n --output /models") !=
+                std::string::npos);
+    GRAPH_CHECK(message.find("setup.sh") == std::string::npos);
     GRAPH_CHECK(message.find("device memory") == std::string::npos);
 }
 
@@ -3604,7 +3611,8 @@ std::string MissingArtifacts(const IModelRegistry& registry,
         if (!info->ready) return "model \"" + models[i] + "\" is not graph-ready";
         const std::string path = ModelDir() + "/" + info->dxnn_file;
         if (!FileIsReadable(path)) {
-            return path + " not present (run ./setup.sh --models " + models[i] + ")";
+            return path + " not present (run python3 scripts/download_models.py --models " +
+                   models[i] + ")";
         }
     }
     return std::string();
@@ -11286,7 +11294,7 @@ void TestAStageRefusesAV9FileBeforeOpeningAnEngine() {
     std::remove(v9.c_str());
 
     // StageGraph::Build turns it into MODEL_LOAD with that hint and no
-    // download line: ./setup.sh --models would fetch the same v9 file.
+    // download line: downloading again would fetch the same v9 file.
     const std::string dir = ScratchPath("v9_models");
     ::mkdir(dir.c_str(), 0700);
     const std::string file = dir + "/yolov8-n_640x640.dxnn";
@@ -11317,6 +11325,7 @@ void TestAStageRefusesAV9FileBeforeOpeningAnEngine() {
                            v9_on_341) == 0);
     GRAPH_CHECK(built.find("\n  -> " + v9_hint) != std::string::npos);
     GRAPH_CHECK(built.find("setup.sh") == std::string::npos);
+    GRAPH_CHECK(built.find("download_models") == std::string::npos);
     GRAPH_CHECK(built.find("dxrt-cli -s") == std::string::npos);
     std::remove(file.c_str());
     ::rmdir(dir.c_str());
@@ -11411,7 +11420,7 @@ void TestRegistryCarriesPublishedAndResources() {
     GRAPH_CHECK(plain != NULL && plain->resources.empty());
 }
 
-// A published model's missing file is offered setup.sh. vit-l-p16_512x512_swag
+// A published model's missing file is offered a download. vit-l-p16_512x512_swag
 // used to be the unpublished exception; the zoo now serves it.
 void TestBuildOffersADownloadOfAPublishedModel() {
     StaticModelRegistry registry;
@@ -11434,7 +11443,8 @@ void TestBuildOffersADownloadOfAPublishedModel() {
             GRAPH_CHECK(error.code() == GraphErrorCode::kModelMissing);
             message = error.what();
         }
-        GRAPH_CHECK(message.find(std::string("\n  -> ./setup.sh --models ") + downloads[m]) !=
+        GRAPH_CHECK(message.find(std::string("\n  -> python3 scripts/download_models.py --models ") +
+                                 downloads[m] + " --output /nonexistent_model_dir") !=
                     std::string::npos);
         GRAPH_CHECK(message.find("is not published") == std::string::npos);
     }

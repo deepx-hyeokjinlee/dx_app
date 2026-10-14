@@ -602,7 +602,10 @@ GraphSpec ParseGraphText(const std::string& json_text,
         root = json::parse(json_text);
     } catch (const std::exception& error) {
         throw GraphError(GraphErrorCode::kGraphSchema, origin,
-                         std::string("not valid JSON: ") + error.what(), "");
+                         std::string("not valid JSON: ") + error.what(),
+                         "fix the JSON syntax at the line and column above: a missing "
+                         "or extra comma, an unclosed bracket or brace, or an unquoted "
+                         "key or text value is the usual cause");
     }
     RequireObject(root, origin, "");
 
@@ -673,7 +676,9 @@ GraphSpec ParseGraphText(const std::string& json_text,
         parsed.id = RequireString(node, "id", origin, node_label,
                                   "add \"id\": a name unique within this graph");
         if (!seen.insert(parsed.id).second) {
-            throw GraphError(GraphErrorCode::kGraphSchema, origin,
+            // node[i] "id" in where, as every other per-node parse error:
+            // --check --json's "node" reads the index from it.
+            throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
                              "duplicate node id \"" + parsed.id + "\"",
                              "node ids must be unique");
         }

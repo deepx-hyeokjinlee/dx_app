@@ -344,36 +344,58 @@ std::vector<MissingArtifact> CollectMissing(const GraphSpec& spec,
     return missing;
 }
 
+namespace {
+
+/// `word` as one shell word: unchanged when it is plain, else single-quoted.
+std::string ShellWord(const std::string& word) {
+    static const char kPlain[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-./:+,=@%";
+    if (!word.empty() && word.find_first_not_of(kPlain) == std::string::npos) return word;
+    std::string quoted = "'";
+    for (std::size_t i = 0; i < word.size(); ++i) {
+        if (word[i] == '\'') quoted += "'\\''";
+        else quoted += word[i];
+    }
+    return quoted + "'";
+}
+
+}  // namespace
+
+std::string DownloadCommand(const std::vector<std::string>& names,
+                            const std::string& model_dir) {
+    std::string command = "python3 scripts/download_models.py --models";
+    for (std::size_t i = 0; i < names.size(); ++i) command += " " + ShellWord(names[i]);
+    return command + " --output " + ShellWord(model_dir);
+}
+
 // The text is built from the graph file's own strings, and JSON may spell a
 // NUL ("\u0000") inside a node id. The std::string keeps it, but every reader
 // goes through a C string - MissingModelsError::what(), the CLI's fputs of
 // it (a run) or of this text (--check), dx_graph's GraphError message - so
 // each one ends the text at the first NUL. They end it at the same byte, so
 // the CLI and dx_graph still agree; what follows the NUL is lost in both.
-std::string FormatMissingList(const std::vector<MissingArtifact>& missing) {
+std::string FormatMissingList(const std::vector<MissingArtifact>& missing,
+                              const std::string& model_dir) {
     std::string text;
     std::string unpublished;
-    std::string command = "./setup.sh --models";
-    bool downloadable = false;
+    std::vector<std::string> names;
     for (std::size_t i = 0; i < missing.size(); ++i) {
         text += "  node \"" + missing[i].node + "\"  model " +
                 missing[i].model + "  ->  " + missing[i].path + "\n";
         if (!missing[i].published) {
-            // The manifest has no file for it ("pending"): setup.sh would
-            // download nothing, so it is not in the command.
+            // The manifest has no file for it ("pending"): the downloader
+            // would fetch nothing, so it is not in the command.
             unpublished += "  node \"" + missing[i].node + "\": " + missing[i].variant +
-                           " is not published by the model zoo yet; setup.sh cannot "
-                           "download it\n";
+                           " is not published by the model zoo yet; download_models.py "
+                           "cannot download it\n";
             continue;
         }
-        command += " " + missing[i].download_name;
-        downloadable = true;
+        names.push_back(missing[i].download_name);
     }
     text += unpublished;
-    // The space form, so several names follow one option. setup.sh takes
-    // "--models a b" and "--models=a,b" alike; the space form is the one
-    // StageGraph::Build's fallback line and the docs print too.
-    if (downloadable) text += "  -> " + command + "\n";
+    // One command for every downloadable name, the form StageGraph::Build's
+    // fallback line and the docs print too.
+    if (!names.empty()) text += "  -> " + DownloadCommand(names, model_dir) + "\n";
     return text;
 }
 
@@ -437,7 +459,7 @@ void PrepareGraph(const std::string& graph_path, const std::string& model_dir,
         throw MissingModelsError(
             "ERROR [MODEL_MISSING] graph \"" + spec->name + "\": " +
             MissingHeadline(missing.size(), model_dir) + "\n" +
-            FormatMissingList(missing));
+            FormatMissingList(missing, model_dir));
     }
 
     graph->Build(*spec, registry, model_dir);

@@ -399,7 +399,7 @@ struct ModelInfo {
     bool produces_landmarks;
     bool ready;
     std::string not_ready_reason;
-    /// The model zoo's name for this model: what `./setup.sh --models` accepts
+    /// The model zoo's name for this model: what `scripts/download_models.py --models` accepts
     /// (scripts/modelzoo_manifest.json, joined on the .dxnn filename at build
     /// time by scripts/gen_model_registry.py). Empty when the manifest has no
     /// entry for dxnn_file; callers then fall back to model_name.
