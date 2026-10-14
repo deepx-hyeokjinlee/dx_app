@@ -509,6 +509,17 @@ LogicOutput RunZone(const LogicConfig& c, const std::vector<LogicInput>& inputs,
     return out;
 }
 
+/// The op's own run; RunLogic sorts the inputs and checks the events.
+LogicOutput RunOp(const LogicConfig& config, const std::vector<LogicInput>& inputs,
+                  const LogicFrame& frame, LogicState* s) {
+    if (config.op == "filter") return RunFilter(config, inputs);
+    if (config.op == "zone") return RunZone(config, inputs, frame, s);
+    LogicOutput out;
+    out.result.data.reset(new RecordsData());
+    out.error = "logic op \"" + config.op + "\" cannot run";
+    return out;
+}
+
 }  // namespace
 
 LogicConfig MakeLogicConfig(const NodeSpec& node) {
@@ -555,17 +566,43 @@ LogicConfig MakeLogicConfig(const NodeSpec& node) {
     return config;
 }
 
+std::string DropRepeatedKeys(RecordItem* data) {
+    std::set<std::string> seen;
+    std::string first;
+    std::vector<std::pair<std::string, double> > numbers;
+    for (std::size_t i = 0; i < data->numbers.size(); ++i) {
+        if (seen.insert(data->numbers[i].first).second) {
+            numbers.push_back(data->numbers[i]);
+        } else if (first.empty()) {
+            first = data->numbers[i].first;
+        }
+    }
+    std::vector<std::pair<std::string, std::string> > text;
+    for (std::size_t i = 0; i < data->text.size(); ++i) {
+        if (seen.insert(data->text[i].first).second) {
+            text.push_back(data->text[i]);
+        } else if (first.empty()) {
+            first = data->text[i].first;
+        }
+    }
+    data->numbers.swap(numbers);
+    data->text.swap(text);
+    return first;
+}
+
 LogicOutput RunLogic(const LogicConfig& config, std::vector<LogicInput> inputs,
                      const LogicFrame& frame, LogicState* state) {
     std::stable_sort(inputs.begin(), inputs.end(),
                      [](const LogicInput& a, const LogicInput& b) { return a.edge < b.edge; });
     LogicState scratch;
-    LogicState* s = state != NULL ? state : &scratch;
-    if (config.op == "filter") return RunFilter(config, inputs);
-    if (config.op == "zone") return RunZone(config, inputs, frame, s);
-    LogicOutput out;
-    out.result.data.reset(new RecordsData());
-    out.error = "logic op \"" + config.op + "\" cannot run";
+    LogicOutput out = RunOp(config, inputs, frame, state != NULL ? state : &scratch);
+    for (std::size_t e = 0; e < out.events.size(); ++e) {
+        const std::string repeated = DropRepeatedKeys(&out.events[e].data);
+        if (!repeated.empty() && out.error.empty()) {
+            out.error = "event \"" + out.events[e].event + "\" repeats the data key \"" +
+                        repeated + "\"";
+        }
+    }
     return out;
 }
 

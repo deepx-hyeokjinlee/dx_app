@@ -206,6 +206,11 @@ LogicConfig MakeLogicConfig(const NodeSpec& node);
 LogicOutput RunLogic(const LogicConfig& config, std::vector<LogicInput> inputs,
                      const LogicFrame& frame, LogicState* state);
 
+/// Keeps the first use of each key across `data`'s numbers, then its text
+/// (an event's "data" is one JSON object, so a repeated key would silently
+/// replace a value) and drops the others. Returns the first key dropped, or "".
+std::string DropRepeatedKeys(RecordItem* data);
+
 }  // namespace graph
 }  // namespace dxapp
 

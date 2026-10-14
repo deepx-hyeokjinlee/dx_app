@@ -13083,6 +13083,25 @@ void TestCpuNodeBehindAFilterGetsOnlyTheFilteredBoxes() {
     GRAPH_CHECK(none != NULL && none->items.empty());
 }
 
+// An event's "data" is one JSON object: numbers then text. A key used twice
+// would let the later value replace the earlier one silently, so RunLogic
+// keeps the first and reports the repeat.
+void TestEventDataKeepsEachKeyOnce() {
+    RecordItem data;
+    data.numbers.push_back(std::make_pair(std::string("count"), 1.0));
+    data.text.push_back(std::make_pair(std::string("name"), std::string("bob")));
+    GRAPH_CHECK(DropRepeatedKeys(&data).empty());
+    GRAPH_CHECK(data.numbers.size() == 1 && data.text.size() == 1);
+    data.text.push_back(std::make_pair(std::string("count"), std::string("two")));
+    data.numbers.push_back(std::make_pair(std::string("count"), 3.0));
+    data.numbers.push_back(std::make_pair(std::string("score"), 0.5));
+    GRAPH_CHECK(DropRepeatedKeys(&data) == "count");
+    GRAPH_CHECK(data.numbers.size() == 2 && data.numbers[0].second == 1.0 &&
+                data.numbers[1].first == "score");
+    GRAPH_CHECK(data.text.size() == 1 && data.text[0].first == "name");
+    GRAPH_CHECK(DropRepeatedKeys(&data).empty());
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13460,6 +13479,7 @@ int main() {
     TestAsyncLogicMatchesSyncOverFrames();
     TestAsyncListsEventsInNodeOrder();
     TestCpuNodeBehindAFilterGetsOnlyTheFilteredBoxes();
+    TestEventDataKeepsEachKeyOnce();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
