@@ -334,7 +334,7 @@ def test_help_lists_every_option(binary):
     for option in ("--graph", "--input", "--output", "--model-dir",
                    "--max-inflight", "--report", "--check", "--list-models",
                    "--max-jobs-per-stage", "--stall-timeout-ms", "--display",
-                   "--report-timing", "--json"):
+                   "--report-timing", "--json", "--events"):
         assert option in result.stdout
 
 
@@ -3339,3 +3339,71 @@ def test_a_cpu_node_behind_a_filter_gets_only_the_filtered_boxes(tmp_path):
         assert all(item["score"] >= min_score for item in kept)
     assert rows[0.5]["payload"] == direct["payload"]
     assert rows[0.99]["payload"]["items"] == []
+
+
+def _needs_model(name):
+    """Skip unless assets/models/<name>.dxnn is a real file (the host keeps
+    0-byte placeholders for models it has not downloaded)."""
+    path = MODEL_DIR / (name + ".dxnn")
+    if not path.is_file() or path.stat().st_size == 0:
+        pytest.skip("{} is absent - run {} {}".format(path, DOWNLOAD, name))
+
+
+def _event_lines(stdout):
+    return [json.loads(line[len("[EVENT] "):]) for line in stdout.splitlines()
+            if line.startswith("[EVENT] ")]
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("mode", [("--check",), ("--list-models",)])
+def test_events_apply_to_a_run(tmp_path, mode):
+    path = tmp_path / "intrusion.json"
+    path.write_text(json.dumps(INTRUSION_GRAPH))
+    args = list(mode) + ([str(path)] if mode[0] == "--check" else [])
+    result = run(BINARIES[0], *(args + ["--events", str(tmp_path / "e.jsonl")]))
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--events applies to a run (--graph), not to a listing or --check" in result.stderr
+
+
+@pytest.mark.graph_e2e
+@pytest.mark.parametrize("binary", BINARIES)
+def test_events_go_to_stdout_the_events_file_and_the_report(tmp_path, binary):
+    _needs_model("yolov8-n_640x640")
+    graph = tmp_path / "intrusion.json"
+    graph.write_text(json.dumps(INTRUSION_GRAPH))
+    events, report = tmp_path / "events.jsonl", tmp_path / "report.json"
+    result = run(binary, "--graph", str(graph), "--events", str(events), "--report", str(report))
+    assert result.returncode == 0, result.stdout + result.stderr
+    printed = _event_lines(result.stdout)
+    assert [(e["node"], e["event"]) for e in printed] == [("zone", "enter"), ("alarm", "intrusion")]
+    assert list(printed[0]) == ["frame", "time", "stream", "node", "event", "track_id", "data"]
+    assert printed[0]["frame"] == 0 and printed[0]["time"] == 0 and printed[0]["stream"] == "cam"
+    assert printed[0]["track_id"] >= 0 and printed[0]["data"] == {"count": 1}
+    assert printed[1]["track_id"] == printed[0]["track_id"]
+    assert printed[1]["data"] == {"value": 1, "threshold": 0,
+                                  "track_ids": str(printed[0]["track_id"])}
+    assert [json.loads(line) for line in events.read_text().splitlines()] == printed
+    frame = json.loads(report.read_text())["frames"][0]
+    assert [(e["node"], e["event"]) for e in frame["events"]] == [("zone", "enter"),
+                                                                  ("alarm", "intrusion")]
+    assert len(frame["nodes"]["zone"]["payload"]["items"]) == 1
+    lines = result.stdout.splitlines()
+    first = next(i for i, line in enumerate(lines) if line.startswith("frame 0:"))
+    assert lines[first + 1].startswith("[EVENT] "), lines[first:first + 3]
+    assert "zone boxes=1" in lines[first], lines[first]
+
+
+@pytest.mark.graph_parity
+def test_sync_and_async_write_the_same_events(tmp_path):
+    _needs_model("yolov8-n_640x640")
+    graph = tmp_path / "intrusion.json"
+    graph.write_text(json.dumps(INTRUSION_GRAPH))
+    video = write_moving_video(tmp_path / "moving.avi")
+    files = {}
+    for binary in BINARIES:
+        files[binary] = tmp_path / (binary + ".jsonl")
+        result = run(binary, "--graph", str(graph), "--input", str(video),
+                     "--events", str(files[binary]))
+        assert result.returncode == 0, result.stdout + result.stderr
+    assert files[BINARIES[0]].read_bytes() == files[BINARIES[1]].read_bytes()
+    assert files[BINARIES[0]].read_text().count("\n") >= 2

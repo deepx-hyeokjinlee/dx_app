@@ -13493,6 +13493,29 @@ void TestRenderReportDrawsLogicOverlaysButNotTheirBoxes() {
     GRAPH_CHECK(cv::countNonZero(log(cv::Rect(0, 0, 200, 40)).reshape(1)) == 0);
 }
 
+void TestEventFileWriterWritesOneLinePerEvent() {
+    const std::string path = ScratchPath("events.jsonl");
+    {
+        cli::EventFileWriter writer;
+        std::string problem;
+        GRAPH_CHECK(writer.Open(path, &problem));
+        GRAPH_CHECK(writer.Append("{\"a\":1}", &problem));
+        GRAPH_CHECK(writer.Append("{\"b\":2}", &problem));
+    }
+    std::ifstream in(path.c_str());
+    std::string first;
+    std::string second;
+    std::string third;
+    std::getline(in, first);
+    std::getline(in, second);
+    GRAPH_CHECK(first == "{\"a\":1}" && second == "{\"b\":2}" && !std::getline(in, third));
+    std::remove(path.c_str());
+    cli::EventFileWriter bad;
+    std::string problem;
+    GRAPH_CHECK(!bad.Open("/nonexistent_dir_for_graph_test/e.jsonl", &problem));
+    GRAPH_CHECK(problem == "could not write /nonexistent_dir_for_graph_test/e.jsonl");
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13880,6 +13903,7 @@ int main() {
     TestGalleryNamesEachCropAndAnnouncesNameChanges();
     TestUserNodePassesItsInputThrough();
     TestRenderReportDrawsLogicOverlaysButNotTheirBoxes();
+    TestEventFileWriterWritesOneLinePerEvent();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

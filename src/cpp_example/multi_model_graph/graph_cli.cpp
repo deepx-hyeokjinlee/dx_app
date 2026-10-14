@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -61,6 +62,7 @@ using consumer::AsyncFrameExecutor;
 using consumer::CollectMissing;
 using consumer::DefaultModelDir;
 using consumer::DownloadCommand;
+using consumer::EventLineJson;
 using consumer::FileExists;
 using consumer::FormatMissingList;
 using consumer::FrameExecutor;
@@ -90,6 +92,7 @@ struct GraphCliArgs {
     std::vector<std::string> inputs;  ///< --input values: [<source>=]<uri>, in order
     std::string output;     ///< rendered result: one video, or images
     std::string report;     ///< FrameReport as JSON
+    std::string events;     ///< --events: one JSON line per event
     std::string model_dir;
     std::string consumes;   ///< --list-models filter
     std::string produces;   ///< --list-models filter
@@ -162,6 +165,9 @@ void PrintUsage(std::FILE* out, const char* program) {
         "  --report-timing       with --report: add each frame's \"node_ms\", the\n"
         "                        time per node. Off by default, so the sync and\n"
         "                        async reports stay byte-identical\n"
+        "  --events <file>       write every event of the graph's logic nodes, one\n"
+        "                        JSON object per line (JSONL); they are printed as\n"
+        "                        [EVENT] {...} lines too\n"
         "  --model-dir <dir>     where the .dxnn files live\n"
         "                        (default: %s)\n"
         "  --max-inflight <N>    frames in flight at once (default: %u, at"
@@ -272,6 +278,7 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         if (option == "--graph") text = &args->graph_path;
         else if (option == "--output") text = &args->output;
         else if (option == "--report") text = &args->report;
+        else if (option == "--events") text = &args->events;
         else if (option == "--model-dir") text = &args->model_dir;
         else if (option == "--consumes") text = &args->consumes;
         else if (option == "--produces") text = &args->produces;
@@ -355,6 +362,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         // Each prints its own report, and --list-models used to win
         // silently, leaving the graph unchecked.
         *error = "--list-models and --check are separate modes: pass one of them";
+        return false;
+    }
+    if (!args->events.empty() && (args->check_only || args->list_models)) {
+        *error = "--events applies to a run (--graph), not to a listing or --check";
         return false;
     }
     return true;
@@ -1216,6 +1227,18 @@ NodeMs ProgressNodeMs(const GraphSpec& spec, const FrameReport& report) {
     return out;
 }
 
+/// Events the recent-events panel keeps per stream.
+const std::size_t kRecentEvents = 5;
+
+/// One line of that panel: "12.3s zone enter #4".
+std::string EventPanelLine(const GraphEvent& event) {
+    char time[32];
+    std::snprintf(time, sizeof(time), "%.1fs", event.time_s);
+    std::string line = std::string(time) + " " + event.node + " " + event.event;
+    if (event.track_id >= 0) line += " #" + std::to_string(event.track_id);
+    return line;
+}
+
 int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& spec,
                  const GraphCliArgs& args, const std::vector<StreamUri>& uris) {
     // Every stream is opened before the report file: a uri that will not
@@ -1229,6 +1252,12 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
         inputs.push_back(std::move(input));
     }
     StreamReader reader(std::move(inputs), args.frames);
+    // Logic nodes count seconds per stream: a file's frame index over its
+    // frame rate, a camera's or an RTSP stream's wall clock.
+    for (std::size_t s = 0; s < reader.size(); ++s) {
+        const InputSourcePtr& input = reader.input(s).input;
+        graph.SetStreamClock(s, input->getFPS(), input->isLiveSource());
+    }
     // One source: every line, file name and window name is the one the loop
     // printed before streams existed (SP2 decision 3).
     const bool several = NamesStreams(graph);
@@ -1238,6 +1267,11 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
     ReportFileWriter report_file;
     std::string problem;
     if (!args.report.empty() && !report_file.Open(args.report, spec.name, &problem)) {
+        std::fprintf(stderr, "%s\n", problem.c_str());
+        return 1;
+    }
+    EventFileWriter events_file;
+    if (!args.events.empty() && !events_file.Open(args.events, &problem)) {
         std::fprintf(stderr, "%s\n", problem.c_str());
         return 1;
     }
@@ -1255,6 +1289,7 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
 
     const OutputKind output_kind = ClassifyOutput(args.output);
     std::vector<StreamSink> sinks(reader.size());
+    std::vector<std::deque<std::string> > recent(reader.size());  // the event panel, per stream
     for (std::size_t s = 0; s < reader.size(); ++s) {
         const StreamInput& input = reader.input(s);
         sinks[s].single_frame = input.input->getTotalFrames() == 1;
@@ -1273,7 +1308,8 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
     // frame just read, so every report is rendered onto ITS OWN frame, which
     // the executor hands back with it, and into ITS OWN stream's sink.
     auto handle = [&](const FrameReport& report, const cv::Mat& shown) -> bool {
-        StreamSink& sink = sinks.at(graph.StreamIndex(report.stream));
+        const std::size_t stream_index = graph.StreamIndex(report.stream);
+        StreamSink& sink = sinks.at(stream_index);
         if (!report.error.empty()) {
             ++failed_frames;
             ++sink.failed;
@@ -1286,6 +1322,20 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
             }
         }
         PrintFrameLine(spec, report, several);
+        // Each event right after its frame's line: on stdout always (Studio
+        // reads it), in --events when asked, and in the window's panel.
+        for (std::size_t e = 0; e < report.events.size(); ++e) {
+            const std::string line = EventLineJson(report.events[e], report).dump();
+            std::printf("[EVENT] %s\n", line.c_str());
+            if (events_file.is_open() && !events_file.Append(line, &problem)) {
+                std::fprintf(stderr, "%s\n", problem.c_str());
+                return false;
+            }
+            std::deque<std::string>& panel = recent.at(stream_index);
+            panel.push_back(EventPanelLine(report.events[e]));
+            if (panel.size() > kRecentEvents) panel.pop_front();
+        }
+        if (!report.events.empty()) std::fflush(stdout);
         progress().tickNodes(ProgressNodeMs(spec, report));  // DXAPP_PROGRESS=1 only
         WarnAboutEmptyRoiEdges(spec, report, &warned_edges);
         if (report_file.is_open() &&
@@ -1294,7 +1344,9 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
             return false;
         }
         if (output_kind != OutputKind::kNone || sink.window) {
-            const cv::Mat rendered = RenderReport(shown, report);
+            cv::Mat rendered = RenderReport(shown, report);
+            DrawEventLog(&rendered, std::vector<std::string>(recent.at(stream_index).begin(),
+                                                             recent.at(stream_index).end()));
             if (sink.video) {
                 if (!sink.video->Write(rendered, &problem)) {
                     std::fprintf(stderr, "%s\n", problem.c_str());

@@ -116,6 +116,56 @@ class ReportFileWriter {
     std::size_t frames_;
 };
 
+/**
+ * @brief --events: one JSON object per line (JSONL), the same objects the
+ *        CLI prints after "[EVENT] ".
+ *
+ * Unbuffered, one fwrite per line, so a reader tailing the file (Studio,
+ * Live) never sees half an event, and every event written before a kill is
+ * whole. Opened before the first frame, closed by the destructor.
+ */
+class EventFileWriter {
+ public:
+    EventFileWriter() : file_(NULL) {}
+    ~EventFileWriter() { Close(); }
+
+    bool Open(const std::string& path, std::string* error) {
+        Close();
+        path_ = path;
+        file_ = std::fopen(path.c_str(), "w");
+        if (file_ == NULL) return Fail(error);
+        std::setvbuf(file_, NULL, _IONBF, 0);
+        return true;
+    }
+
+    bool Append(const std::string& line, std::string* error) {
+        if (file_ == NULL) return Fail(error);
+        const std::string text = line + "\n";
+        if (std::fwrite(text.data(), 1, text.size(), file_) != text.size()) return Fail(error);
+        return true;
+    }
+
+    void Close() {
+        if (file_ == NULL) return;
+        std::fclose(file_);
+        file_ = NULL;
+    }
+
+    bool is_open() const { return file_ != NULL; }
+
+ private:
+    EventFileWriter(const EventFileWriter&) = delete;
+    EventFileWriter& operator=(const EventFileWriter&) = delete;
+
+    bool Fail(std::string* error) const {
+        if (error != NULL) *error = "could not write " + path_;
+        return false;
+    }
+
+    std::FILE* file_;
+    std::string path_;
+};
+
 }  // namespace cli
 }  // namespace graph
 }  // namespace dxapp
