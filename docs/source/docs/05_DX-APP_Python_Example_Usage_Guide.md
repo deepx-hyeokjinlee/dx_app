@@ -269,6 +269,7 @@ bash scripts/validate_models.sh --lang py
 | `DXAPP_SAVE_IMAGE` | Save visualization to the specified file path (no `--save` required) |
 | `DXAPP_VERIFY` | When `1`, dump JSON verification data |
 | `DXAPP_VERIFY_DIR` | Directory for `DXAPP_VERIFY` output (default `logs/verify`) |
+| `DXAPP_PROGRESS` | When `1`, print `[PROGRESS] frames=N fps=F avg_fps=A read_ms=… pre_ms=… infer_ms=… post_ms=…` once a second and at exit (front ends) |
 
 ---
 
