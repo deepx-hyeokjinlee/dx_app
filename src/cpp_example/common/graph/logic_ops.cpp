@@ -627,6 +627,177 @@ LogicOutput RunCount(const LogicConfig& c, const std::vector<LogicInput>& inputs
     return out;
 }
 
+LogicOutput RunDwell(const LogicConfig& c, const std::vector<LogicInput>& inputs,
+                     const LogicFrame& at, LogicState* s) {
+    LogicOutput out;
+    const double threshold = Number(c, "threshold_s");
+    const double grace = Number(c, "grace_s");
+    const LogicInput* input = FirstFullFrame(inputs);
+    const std::shared_ptr<BoxesData> boxes =
+        input == NULL ? std::shared_ptr<BoxesData>() : SourceBoxes(*input);
+    if (!boxes) out.error = "missing boxes input";
+    std::shared_ptr<RecordsData> records(new RecordsData());
+    std::set<int> seen;
+    if (boxes) {
+        for (std::size_t i = 0; i < boxes->items.size(); ++i) {
+            const BoxItem& item = boxes->items[i];
+            if (item.track_id < 0) continue;
+            seen.insert(item.track_id);
+            std::map<int, TrackMemo>::iterator found = s->tracks.find(item.track_id);
+            if (found == s->tracks.end() || at.time_s - found->second.last_s > grace) {
+                TrackMemo stay;  // a new stay: first seen now
+                stay.first_s = at.time_s;
+                s->tracks[item.track_id] = stay;
+                found = s->tracks.find(item.track_id);
+            }
+            TrackMemo& memo = found->second;
+            memo.last_s = at.time_s;
+            memo.point = Anchor(item.box, "bottom");
+            const double seconds = at.time_s - memo.first_s;
+            RecordItem row;
+            AddNumber(&row, "track_id", static_cast<double>(item.track_id));
+            AddNumber(&row, "seconds", seconds);
+            records->items.push_back(row);
+            const bool over = seconds >= threshold;
+            if (over && !memo.reported) {
+                memo.reported = true;
+                GraphEvent event = MakeEvent(c, "dwell", item.track_id, at);
+                AddNumber(&event.data, "seconds", seconds);
+                out.events.push_back(event);
+            }
+            if (over) out.overlay.highlights.push_back(item.box);
+            OverlayText label;
+            label.at = cv::Point2f(item.box.x, item.box.y + item.box.height);
+            char text[64];
+            std::snprintf(text, sizeof(text), "#%d %.1fs", item.track_id, seconds);
+            label.text = text;
+            label.alert = over;
+            out.overlay.texts.push_back(label);
+        }
+    }
+    Forget(s, seen, at.time_s, std::max(kForgetAfterS, grace), [](int, const TrackMemo&) {});
+    out.overlay.alert = !out.overlay.highlights.empty();
+    out.result.data = records;
+    return out;
+}
+
+bool Compare(double value, const std::string& comparator, double threshold) {
+    if (comparator == ">") return value > threshold;
+    if (comparator == ">=") return value >= threshold;
+    if (comparator == "<") return value < threshold;
+    if (comparator == "<=") return value <= threshold;
+    if (comparator == "==") return value == threshold;
+    if (comparator == "!=") return value != threshold;
+    return false;
+}
+
+/// The value a condition reads this frame, and the tracks behind it; false
+/// when the input holds none (records without that number).
+bool ConditionValue(const LogicConfig& c, const LogicInput& input, double* value,
+                    std::vector<int>* tracks) {
+    const std::string name = Text(c, "value");
+    if (input.per_crop) {
+        const bool with = name.compare(0, 5, "with:") == 0;
+        const bool without = name.compare(0, 8, "without:") == 0;
+        const std::string label = with ? name.substr(5) : without ? name.substr(8) : std::string();
+        std::size_t matched = 0;
+        for (std::size_t i = 0; i < input.crops.size(); ++i) {
+            bool counts = true;
+            if (with || without) {
+                const ScoresData* scores =
+                    dynamic_cast<const ScoresData*>(input.crops[i].data.get());
+                bool named = false;
+                for (std::size_t k = 0; scores != NULL && k < scores->items.size(); ++k) {
+                    named = named || scores->items[k].class_name == label;
+                }
+                counts = with ? named : !named;
+            }
+            if (!counts) continue;
+            ++matched;
+            tracks->push_back(input.crops[i].origin.track_id);
+        }
+        *value = static_cast<double>(matched);
+        return true;
+    }
+    if (!input.data) return false;
+    const BoxesData* boxes = dynamic_cast<const BoxesData*>(input.data.get());
+    if (boxes != NULL) {
+        *value = static_cast<double>(boxes->items.size());
+        for (std::size_t i = 0; i < boxes->items.size(); ++i) {
+            tracks->push_back(boxes->items[i].track_id);
+        }
+        return true;
+    }
+    const RecordsData* records = dynamic_cast<const RecordsData*>(input.data.get());
+    if (records == NULL) return false;
+    const std::string reduce = Text(c, "reduce");
+    bool found = false;
+    double result = 0.0;
+    for (std::size_t i = 0; i < records->items.size(); ++i) {
+        for (std::size_t n = 0; n < records->items[i].numbers.size(); ++n) {
+            if (records->items[i].numbers[n].first != name) continue;
+            const double v = records->items[i].numbers[n].second;
+            if (!found) {
+                result = v;
+            } else if (reduce == "sum") {
+                result += v;
+            } else if (reduce == "min") {
+                result = std::min(result, v);
+            } else {
+                result = std::max(result, v);
+            }
+            found = true;
+        }
+    }
+    *value = result;
+    return found;
+}
+
+LogicOutput RunCondition(const LogicConfig& c, const std::vector<LogicInput>& inputs,
+                         const LogicFrame& at, LogicState* s) {
+    LogicOutput out;
+    double value = 0.0;
+    std::vector<int> tracks;
+    const bool has_value = !inputs.empty() && ConditionValue(c, inputs[0], &value, &tracks);
+    if (inputs.empty()) out.error = "missing input";
+    const double threshold = Number(c, "threshold");
+    const std::string comparator = Text(c, "comparator");
+    const bool active = has_value && Compare(value, comparator, threshold);
+    const double cooldown = Number(c, "cooldown_s");
+    // cooldown 0: once, when it becomes true; else at most every cooldown_s while true.
+    const bool fire = active && (cooldown <= 0.0
+                                     ? !s->was_true
+                                     : (!s->fired || at.time_s - s->last_fire_s >= cooldown));
+    s->was_true = active;
+    const std::string name = Text(c, "event").empty() ? c.id : Text(c, "event");
+    if (fire) {
+        s->fired = true;
+        s->last_fire_s = at.time_s;
+        std::string ids;
+        for (std::size_t i = 0; i < tracks.size(); ++i) {
+            if (tracks[i] < 0) continue;
+            ids += (ids.empty() ? "" : ",") + std::to_string(tracks[i]);
+        }
+        GraphEvent event = MakeEvent(c, name, tracks.size() == 1 ? tracks[0] : -1, at);
+        AddNumber(&event.data, "value", value);
+        AddNumber(&event.data, "threshold", threshold);
+        if (!ids.empty()) AddText(&event.data, "track_ids", ids);
+        out.events.push_back(event);
+    }
+    std::shared_ptr<RecordsData> records(new RecordsData());
+    RecordItem row;
+    AddNumber(&row, "value", value);
+    AddNumber(&row, "active", active ? 1.0 : 0.0);
+    records->items.push_back(row);
+    out.result.data = records;
+    OverlayText label;  // a line in the top-left panel
+    label.text = name + ": " + (has_value ? Short(value) : std::string("-")) + " " + comparator +
+                 " " + Short(threshold);
+    label.alert = active;
+    out.overlay.texts.push_back(label);
+    return out;
+}
+
 /// The op's own run; RunLogic sorts the inputs and checks the events.
 LogicOutput RunOp(const LogicConfig& config, const std::vector<LogicInput>& inputs,
                   const LogicFrame& frame, LogicState* s) {
@@ -634,6 +805,8 @@ LogicOutput RunOp(const LogicConfig& config, const std::vector<LogicInput>& inpu
     if (config.op == "zone") return RunZone(config, inputs, frame, s);
     if (config.op == "line") return RunLine(config, inputs, frame, s);
     if (config.op == "count") return RunCount(config, inputs);
+    if (config.op == "dwell") return RunDwell(config, inputs, frame, s);
+    if (config.op == "condition") return RunCondition(config, inputs, frame, s);
     LogicOutput out;
     out.result.data.reset(new RecordsData());
     out.error = "logic op \"" + config.op + "\" cannot run";

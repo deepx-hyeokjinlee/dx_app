@@ -13194,6 +13194,154 @@ void TestCountCountsEachInputAndClass() {
     for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
 }
 
+namespace {
+
+std::string ConditionNode(const std::string& params) {
+    return ",{\"id\":\"c\",\"type\":\"logic\",\"op\":\"condition\",\"params\":" + params + "}";
+}
+
+std::vector<std::size_t> FramesWithEvents(const std::vector<FrameReport>& reports) {
+    std::vector<std::size_t> frames;
+    for (std::size_t i = 0; i < reports.size(); ++i) {
+        if (!reports[i].events.empty()) frames.push_back(i);
+    }
+    return frames;
+}
+
+}  // namespace
+
+void TestDwellTimesEachStayAndRaisesOneEvent() {
+    const std::string text = LogicJson(
+        std::string(kZoneNode) +
+            ",{\"id\":\"d\",\"type\":\"logic\",\"op\":\"dwell\",\"params\":"
+            "{\"threshold_s\":0.15,\"grace_s\":1}}",
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"d\",\"carry\":\"result\"}");
+    const std::vector<FrameReport> reports = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    const std::size_t rows[] = {0, 0, 1, 1, 1, 0};
+    const double seconds[] = {0, 0, 0.0, 0.1, 0.2, 0};
+    for (std::size_t i = 0; i < 6; ++i) {
+        const RecordsData* records = RecordsOf(reports[i], "d");
+        GRAPH_CHECK(records != NULL && records->items.size() == rows[i]);
+        if (records == NULL || records->items.size() != 1) continue;
+        GRAPH_CHECK(NumberOf(records->items[0], "track_id") == 0.0);
+        GRAPH_CHECK(std::fabs(NumberOf(records->items[0], "seconds") - seconds[i]) < 1e-9);
+    }
+    // Frames 2 (zone enter) and 4 (0.2 s >= 0.15 s): one dwell event, once.
+    std::size_t dwell_events = 0;
+    for (std::size_t i = 0; i < 6; ++i) {
+        for (std::size_t e = 0; e < reports[i].events.size(); ++e) {
+            if (reports[i].events[e].event != "dwell") continue;
+            ++dwell_events;
+            GRAPH_CHECK(i == 4 && reports[i].events[e].node == "d");
+            GRAPH_CHECK(std::fabs(NumberOf(reports[i].events[e].data, "seconds") - 0.2) < 1e-9);
+        }
+    }
+    GRAPH_CHECK(dwell_events == 1);
+    GRAPH_CHECK(reports[4].overlays.at("d").highlights.size() == 1);
+    GRAPH_CHECK(reports[3].overlays.at("d").highlights.empty());
+    const std::vector<FrameReport> async = RunLogicFrames(text, ReversedLogicRegistry(), Keys(6), true);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
+}
+
+void TestConditionRaisesOnTheRisingEdgeOrEveryCooldown() {
+    const std::string edges =
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"c\",\"carry\":\"result\"}";
+    const std::string rising = LogicJson(
+        std::string(kZoneNode) + ConditionNode("{\"event\":\"intrusion\"}"), edges);
+    const std::vector<FrameReport> reports = RunLogicFrames(rising, LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    // Zone events (enter at 2, exit at 5) come first: z precedes c.
+    GRAPH_CHECK(reports[2].events.size() == 2);
+    if (reports[2].events.size() == 2) {
+        const GraphEvent& alarm = reports[2].events[1];
+        GRAPH_CHECK(alarm.node == "c" && alarm.event == "intrusion" && alarm.track_id == 0);
+        GRAPH_CHECK(NumberOf(alarm.data, "value") == 1.0 && NumberOf(alarm.data, "threshold") == 0.0);
+        GRAPH_CHECK(alarm.data.text.size() == 1 && alarm.data.text[0].first == "track_ids" &&
+                    alarm.data.text[0].second == "0");
+    }
+    const double active[] = {0, 0, 1, 1, 1, 0};
+    for (std::size_t i = 0; i < 6; ++i) {
+        const RecordsData* records = RecordsOf(reports[i], "c");
+        GRAPH_CHECK(records != NULL && records->items.size() == 1);
+        if (records != NULL && records->items.size() == 1) {
+            GRAPH_CHECK(NumberOf(records->items[0], "active") == active[i]);
+        }
+        GRAPH_CHECK(reports[i].overlays.at("c").texts.size() == 1);
+    }
+    // cooldown 0.15 s: frame 2, then frame 4 (0.2 s later), not frame 3.
+    const std::vector<FrameReport> repeated = RunLogicFrames(LogicJson(
+        std::string(kZoneNode) + ConditionNode("{\"event\":\"intrusion\",\"cooldown_s\":0.15}"),
+        edges), LogicRegistry(), Keys(6), false);
+    std::vector<std::size_t> alarms;
+    for (std::size_t i = 0; i < repeated.size(); ++i) {
+        for (std::size_t e = 0; e < repeated[i].events.size(); ++e) {
+            if (repeated[i].events[e].node == "c") alarms.push_back(i);
+        }
+    }
+    GRAPH_CHECK(alarms.size() == 2 && alarms[0] == 2 && alarms[1] == 4);
+    const std::vector<FrameReport> async = RunLogicFrames(rising, ReversedLogicRegistry(), Keys(6), true);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
+}
+
+// An untracked detector whose completions come back in reverse: only the
+// per-stream gate keeps a condition's rising edge on frame 1. Without it the
+// condition would see frame 2 first and raise its event there.
+void TestAsyncLogicGateOrdersReversedCompletions() {
+    FakeModelRegistry registry = LogicCheckRegistry();
+    registry.SetScriptByFirstPixel("det", 0, LogicPersonAt(-1.f));
+    registry.SetScriptByFirstPixel("det", 1, LogicPersonAt(100.f));
+    registry.SetScriptByFirstPixel("det", 2, LogicPersonAt(110.f));
+    const std::string text = LogicJson(ConditionNode("{\"event\":\"seen\"}"),
+                                       ",{\"from\":\"od\",\"to\":\"c\",\"carry\":\"result\"}", false);
+    const std::vector<FrameReport> expected = RunLogicFrames(text, registry, Keys(3), false);
+    const std::vector<std::size_t> fired = FramesWithEvents(expected);
+    GRAPH_CHECK(fired.size() == 1 && fired[0] == 1);
+    FakeModelRegistry reversed = registry;
+    reversed.SetDeliveryOrder("det", FakeModelRegistry::kReverse);
+    const std::vector<FrameReport> actual = RunLogicFrames(text, reversed, Keys(3), true);
+    GRAPH_CHECK(actual.size() == 3);
+    for (std::size_t i = 0; i < 3 && i < actual.size(); ++i) GRAPH_CHECK(expected[i] == actual[i]);
+}
+
+void TestPerCropScoresReachACondition() {
+    const std::string edges =
+        ",{\"from\":\"od\",\"to\":\"a\",\"roi\":{}},{\"from\":\"a\",\"to\":\"c\",\"carry\":\"result\"}";
+    const auto graph = [&edges](const std::string& value) {
+        return LogicJson(",{\"id\":\"a\",\"model\":\"attr\"}" +
+                             ConditionNode("{\"value\":\"" + value + "\",\"event\":\"no_hat\"}"),
+                         edges);
+    };
+    // Every crop wears a Jacket and no Hat.
+    const std::vector<FrameReport> without = RunLogicFrames(graph("without:Hat"), LogicRegistry(),
+                                                            Keys(6), false);
+    GRAPH_CHECK(without.size() == 6);
+    if (without.size() != 6) return;
+    const std::vector<std::size_t> fired = FramesWithEvents(without);
+    GRAPH_CHECK(fired.size() == 1 && fired[0] == 0);
+    if (!without[0].events.empty()) {
+        GRAPH_CHECK(without[0].events[0].event == "no_hat" && without[0].events[0].track_id == 0);
+    }
+    for (std::size_t i = 0; i < 6; ++i) {
+        const RecordsData* records = RecordsOf(without[i], "c");
+        GRAPH_CHECK(records != NULL && records->items.size() == 1 &&
+                    NumberOf(records->items[0], "value") == 1.0);
+    }
+    const std::vector<FrameReport> with_hat = RunLogicFrames(graph("with:Hat"), LogicRegistry(),
+                                                             Keys(6), false);
+    GRAPH_CHECK(FramesWithEvents(with_hat).empty());
+    const std::vector<FrameReport> with_jacket = RunLogicFrames(graph("with:Jacket"),
+                                                                LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(FramesWithEvents(with_jacket).size() == 1);
+    FakeModelRegistry shuffled = ReversedLogicRegistry();
+    shuffled.SetShuffleSeed("attr", 9);
+    const std::vector<FrameReport> async = RunLogicFrames(graph("without:Hat"), shuffled, Keys(6), true);
+    GRAPH_CHECK(async.size() == 6);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(without[i] == async[i]);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13574,6 +13722,10 @@ int main() {
     TestEventDataKeepsEachKeyOnce();
     TestLineCountsCrossingsBothWays();
     TestCountCountsEachInputAndClass();
+    TestDwellTimesEachStayAndRaisesOneEvent();
+    TestConditionRaisesOnTheRisingEdgeOrEveryCooldown();
+    TestAsyncLogicGateOrdersReversedCompletions();
+    TestPerCropScoresReachACondition();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

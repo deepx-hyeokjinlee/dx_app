@@ -150,7 +150,20 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             // many parents fed this node — see the roi_inbox append below).
             std::stable_sort(results.begin(), results.end(), ByOrigin);
             report.roi_results[node.id] = results;
-            continue;  // ROI stages are leaves in every supported graph
+            // A per-crop node feeds only logic nodes: every crop's result, in
+            // ByOrigin order, on each "carry": "result" edge into one.
+            const std::vector<std::size_t> roi_outgoing = graph.OutgoingEdges(index);
+            for (std::size_t e = 0; e < roi_outgoing.size(); ++e) {
+                const EdgeRuntime& edge = graph.edges()[roi_outgoing[e]];
+                if (!edge.carry_result || !graph.nodes()[edge.to].is_logic) continue;
+                LogicInput input;
+                input.edge = roi_outgoing[e];
+                input.from = node.id;
+                input.per_crop = true;
+                input.crops = results;
+                logic_inbox[edge.to].push_back(input);
+            }
+            continue;  // no frame, boxes or payload to hand on
         }
 
         if (!produced) continue;

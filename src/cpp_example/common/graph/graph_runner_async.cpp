@@ -257,18 +257,31 @@ struct Finished {
  * the consumer's error the same way. What an edge carries is SelectEdgeCargo's
  * choice: `produced` (and `boxes`), or the payload of the port it names.
  *
+ * `crops`: a per-crop node's results (ByOrigin order), handed to each logic
+ * node on a "carry": "result" edge; NULL for every other producer.
+ *
  * Shared by the source path and the harvest path so the two cannot drift.
  */
 void ReleaseSuccessors(const StageGraph& graph, std::size_t index,
                        const StageDataPtr& produced, const BoxesData* boxes,
-                       const StagePorts& ports, FrameCtx& ctx) {
+                       const StagePorts& ports, const std::vector<StageResult>* crops,
+                       FrameCtx& ctx) {
     const std::vector<EdgeRuntime>& edges = graph.edges();
     const std::vector<std::size_t> outgoing = graph.OutgoingEdges(index);
     const std::string& producer_id = graph.nodes()[index].id;
 
     for (std::size_t e = 0; e < outgoing.size(); ++e) {
         const EdgeRuntime& edge = edges[outgoing[e]];
-        if (produced) {
+        if (crops != NULL && edge.carry_result) {
+            if (graph.nodes()[edge.to].is_logic) {
+                LogicInput input;
+                input.edge = outgoing[e];
+                input.from = producer_id;
+                input.per_crop = true;
+                input.crops = *crops;
+                ctx.logic_in[edge.to].push_back(input);
+            }
+        } else if (produced) {
             const EdgeCargo cargo = SelectEdgeCargo(edge, produced, boxes, ports);
             if (edge.carry_result) {
                 if (cargo.payload && graph.nodes()[edge.to].is_logic) {
@@ -472,7 +485,8 @@ struct AsyncExecutor::Engine {
                 FrameView source;
                 source.image = ctx->frame;
                 ctx->view[index] = source;
-                ReleaseSuccessors(*graph, index, StageDataPtr(data), NULL, StagePorts(), *ctx);
+                ReleaseSuccessors(*graph, index, StageDataPtr(data), NULL, StagePorts(), NULL,
+                                  *ctx);
                 continue;
             }
             if (node.is_cpu) {
@@ -489,7 +503,8 @@ struct AsyncExecutor::Engine {
                 FrameView source;
                 source.image = ctx->frame;
                 ctx->view[index] = source;
-                ReleaseSuccessors(*graph, index, reduced.result.data, NULL, StagePorts(), *ctx);
+                ReleaseSuccessors(*graph, index, reduced.result.data, NULL, StagePorts(), NULL,
+                                  *ctx);
                 continue;
             }
             if (node.is_logic) {
@@ -763,7 +778,8 @@ struct AsyncExecutor::Engine {
             boxes = dynamic_cast<const BoxesData*>(produced.get());
         }
 
-        ReleaseSuccessors(*graph, index, produced, boxes, ports, ctx);
+        ReleaseSuccessors(*graph, index, produced, boxes, ports, run.is_roi ? &results : NULL,
+                          ctx);
     }
 
     /// A logic node's turn in this frame (its gate let it through): run it on
@@ -792,7 +808,7 @@ struct AsyncExecutor::Engine {
             out.result.data && ProducesRoi(out.result.data->shape())
                 ? dynamic_cast<const BoxesData*>(out.result.data.get())
                 : NULL;
-        ReleaseSuccessors(*graph, index, out.result.data, boxes, StagePorts(), ctx);
+        ReleaseSuccessors(*graph, index, out.result.data, boxes, StagePorts(), NULL, ctx);
     }
 
     /// True when no stream runs node `index`: reachable from no source,
