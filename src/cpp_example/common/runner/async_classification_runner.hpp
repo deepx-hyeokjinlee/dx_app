@@ -250,6 +250,8 @@ public:
             auto now = std::chrono::high_resolution_clock::now();
             {
                 std::lock_guard<std::mutex> lock(metrics_.metrics_mutex);
+                // Measure inference time (submit → callback), like the other async runners
+                metrics_.sum_inference += std::chrono::duration<double, std::milli>(now - ud->submit_ts).count();
                 metrics_.inflight_current--;
                 if (!metrics_.first_inference) {
                     auto elapsed = std::chrono::duration<double>(now - metrics_.inflight_last_ts).count();
@@ -310,6 +312,7 @@ public:
                 if (metrics_.inflight_current > metrics_.inflight_max) metrics_.inflight_max = metrics_.inflight_current;
             }
             static_cast<AsyncUserData*>(user_data)->frame_index = static_cast<uint64_t>(buffer_index);
+            static_cast<AsyncUserData*>(user_data)->submit_ts = std::chrono::high_resolution_clock::now();
             last_job_id = ie.RunAsync(buf.data(), user_data);
             buffer_index++;
             processCount++;
@@ -371,6 +374,7 @@ public:
                         if (metrics_.inflight_current > metrics_.inflight_max) metrics_.inflight_max = metrics_.inflight_current;
                     }
                     ud->frame_index = static_cast<uint64_t>(buffer_index);
+                    ud->submit_ts = std::chrono::high_resolution_clock::now();
                     last_job_id = ie.RunAsync(buf.data(), static_cast<void*>(ud.release()));
                     buffer_index++;
                     processCount++;
