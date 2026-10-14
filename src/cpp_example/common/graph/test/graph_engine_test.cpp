@@ -12721,6 +12721,106 @@ void TestNodeOutputShapeFollowsFilterZoneAndUser() {
     GRAPH_CHECK(BoxSourceNode(spec, "c") == NULL);
 }
 
+void TestFrameTimeCountsFramesOrWallSeconds() {
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    StageGraph graph;
+    graph.Build(ParseGraphText(CascadeJson(), "t.json"), registry, "/models", false);
+    GRAPH_CHECK(graph.FrameTime(0, 15) == 15.0 / kDefaultStreamFps);
+    graph.SetStreamClock(0, 10.0, false);
+    GRAPH_CHECK(graph.FrameTime(0, 15) == 15.0 / 10.0);
+    graph.SetStreamClock(0, 0.0, false);  // an image: no rate, the default
+    GRAPH_CHECK(graph.FrameTime(0, 3) == 3.0 / kDefaultStreamFps);
+    graph.SetStreamClock(0, 25.0, true);  // a live source: seconds since its first frame
+    const double first = graph.FrameTime(0, 100);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    const double later = graph.FrameTime(0, 101);
+    GRAPH_CHECK(first >= 0.0 && first < 0.02);
+    GRAPH_CHECK(later >= 0.025 && later < 5.0);
+    bool threw = false;
+    try {
+        graph.SetStreamClock(5, 10.0, false);
+    } catch (const std::out_of_range&) {
+        threw = true;
+    }
+    GRAPH_CHECK(threw);
+}
+
+void TestReportsCarryTheFrameTime() {
+    const cv::Mat frame = cv::Mat::zeros(480, 640, CV_8UC3);
+    FakeModelRegistry sync_registry = BuildCascadeRegistry();
+    StageGraph sync_graph;
+    sync_graph.Build(ParseGraphText(CascadeJson(), "t.json"), sync_registry, "/models", false);
+    sync_graph.SetStreamClock(0, 10.0, false);
+    const FrameReport expected = SyncExecutor().RunFrame(sync_graph, frame, 12);
+    FakeModelRegistry async_registry = BuildCascadeRegistry();
+    StageGraph async_graph;
+    async_graph.Build(ParseGraphText(CascadeJson(), "t.json"), async_registry, "/models", false);
+    async_graph.SetStreamClock(0, 10.0, false);
+    const FrameReport actual = AsyncExecutor(StageJobs(4)).RunFrame(async_graph, frame, 12);
+    GRAPH_CHECK(expected.time_s == 12.0 / 10.0);
+    GRAPH_CHECK(expected == actual);
+    GRAPH_CHECK(expected.events.empty() && expected.overlays.empty());
+}
+
+void TestOperatorEqualityComparesTimeEventsAndOverlays() {
+    FrameReport a;
+    a.time_s = 0.5;
+    GraphEvent event;
+    event.node = "z";
+    event.event = "enter";
+    event.track_id = 3;
+    event.time_s = 0.5;
+    event.data.numbers.push_back(std::make_pair(std::string("count"), 1.0));
+    a.events.push_back(event);
+    LogicOverlay overlay;
+    overlay.polygons.push_back(std::vector<cv::Point2f>(3, cv::Point2f(1.f, 2.f)));
+    a.overlays["z"] = overlay;
+    FrameReport b = a;
+    GRAPH_CHECK(a == b);
+    b.time_s = 0.6;
+    GRAPH_CHECK(!(a == b));
+    b = a;
+    b.events[0].track_id = 4;
+    GRAPH_CHECK(!(a == b));
+    b = a;
+    b.events[0].data.numbers[0].second = 2.0;
+    GRAPH_CHECK(!(a == b));
+    b = a;
+    b.overlays["z"].alert = true;
+    GRAPH_CHECK(!(a == b));
+    b = a;
+    b.overlays["y"] = overlay;
+    GRAPH_CHECK(!(a == b));
+}
+
+void TestReportToJsonWritesEventsOnlyWhenThereAreSome() {
+    FrameReport report;
+    report.frame_index = 7;
+    report.stream = "cam";
+    report.time_s = 1.23449;
+    GRAPH_CHECK(!consumer::ReportToJson(report, false).contains("events"));
+    GraphEvent event;
+    event.node = "z";
+    event.event = "enter";
+    event.track_id = 3;
+    event.time_s = 1.23449;
+    event.data.numbers.push_back(std::make_pair(std::string("count"), 1.0));
+    event.data.text.push_back(std::make_pair(std::string("name"), std::string("bob")));
+    report.events.push_back(event);
+    const nlohmann::json json = consumer::ReportToJson(report, false);
+    GRAPH_CHECK(json.contains("events") && json["events"].size() == 1);
+    GRAPH_CHECK(json["events"][0].dump() ==
+                "{\"data\":{\"count\":1,\"name\":\"bob\"},\"event\":\"enter\",\"node\":\"z\","
+                "\"time\":1.234,\"track_id\":3}");
+    GRAPH_CHECK(consumer::EventLineJson(event, report).dump() ==
+                "{\"frame\":7,\"time\":1.234,\"stream\":\"cam\",\"node\":\"z\",\"event\":\"enter\","
+                "\"track_id\":3,\"data\":{\"count\":1,\"name\":\"bob\"}}");
+    event.track_id = -1;
+    event.data.numbers[0].second = std::numeric_limits<double>::quiet_NaN();
+    GRAPH_CHECK(consumer::EventLineJson(event, report).dump().find(
+                    "\"track_id\":-1,\"data\":{\"count\":\"NaN\"") != std::string::npos);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13088,6 +13188,10 @@ int main() {
     TestValidateChecksLogicInputs();
     TestValidateChecksTheGalleryFile();
     TestNodeOutputShapeFollowsFilterZoneAndUser();
+    TestFrameTimeCountsFramesOrWallSeconds();
+    TestReportsCarryTheFrameTime();
+    TestOperatorEqualityComparesTimeEventsAndOverlays();
+    TestReportToJsonWritesEventsOnlyWhenThereAreSome();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

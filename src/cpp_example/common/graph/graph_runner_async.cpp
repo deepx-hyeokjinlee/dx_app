@@ -395,6 +395,7 @@ struct AsyncExecutor::Engine {
         ctx->stream_seq = next_stream_seq[stream]++;
         ctx->report.frame_index = frame_index;
         ctx->report.stream = plan.source_id;
+        ctx->report.time_s = graph->FrameTime(stream, frame_index);
         if (frame.empty()) {
             ctx->report.error = "source produced an empty frame";
             ctx->closed = true;

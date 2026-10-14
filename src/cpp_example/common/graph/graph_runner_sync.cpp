@@ -28,6 +28,7 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
     FrameReport report;
     report.frame_index = frame_index;
     report.stream = plan.source_id;
+    report.time_s = graph.FrameTime(stream, frame_index);
 
     if (frame.empty()) {
         report.error = "source produced an empty frame";

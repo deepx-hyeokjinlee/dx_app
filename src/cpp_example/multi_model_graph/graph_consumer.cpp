@@ -465,6 +465,46 @@ void PrepareGraph(const std::string& graph_path, const std::string& model_dir,
     graph->Build(*spec, registry, model_dir);
 }
 
+namespace {
+
+double RoundedSeconds(double seconds) { return std::round(seconds * 1000.0) / 1000.0; }
+
+template <typename Json>
+Json EventData(const RecordItem& data) {
+    Json out = Json::object();
+    for (std::size_t n = 0; n < data.numbers.size(); ++n) {
+        out[data.numbers[n].first] = JsonNumber<Json>(data.numbers[n].second);
+    }
+    for (std::size_t t = 0; t < data.text.size(); ++t) {
+        out[data.text[t].first] = data.text[t].second;
+    }
+    return out;
+}
+
+json EventToReportJson(const GraphEvent& event) {
+    json out = json::object();
+    out["node"] = event.node;
+    out["event"] = event.event;
+    out["track_id"] = event.track_id;
+    out["time"] = JsonNumber<json>(RoundedSeconds(event.time_s));
+    out["data"] = EventData<json>(event.data);
+    return out;
+}
+
+}  // namespace
+
+nlohmann::ordered_json EventLineJson(const GraphEvent& event, const FrameReport& report) {
+    nlohmann::ordered_json out = nlohmann::ordered_json::object();
+    out["frame"] = static_cast<unsigned long long>(report.frame_index);
+    out["time"] = JsonNumber<nlohmann::ordered_json>(RoundedSeconds(event.time_s));
+    out["stream"] = report.stream;
+    out["node"] = event.node;
+    out["event"] = event.event;
+    out["track_id"] = event.track_id;
+    out["data"] = EventData<nlohmann::ordered_json>(event.data);
+    return out;
+}
+
 bool NamesStreams(const StageGraph& graph) { return graph.streams().size() > 1; }
 
 json ReportToJson(const FrameReport& report, bool name_stream, bool with_timing) {
@@ -493,6 +533,13 @@ json ReportToJson(const FrameReport& report, bool name_stream, bool with_timing)
     }
     out["roi_nodes"] = roi_nodes;
     if (name_stream) out["stream"] = report.stream;
+    if (!report.events.empty()) {
+        json events = json::array();
+        for (std::size_t e = 0; e < report.events.size(); ++e) {
+            events.push_back(EventToReportJson(report.events[e]));
+        }
+        out["events"] = events;
+    }
     if (with_timing) {
         json timing = json::object();
         for (std::map<std::string, double>::const_iterator it = report.node_ms.begin();

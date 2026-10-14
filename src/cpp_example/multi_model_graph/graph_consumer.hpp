@@ -25,6 +25,7 @@
 #ifndef DXAPP_MULTI_MODEL_GRAPH_GRAPH_CONSUMER_HPP
 #define DXAPP_MULTI_MODEL_GRAPH_GRAPH_CONSUMER_HPP
 
+#include <cmath>
 #include <cstddef>
 #include <deque>
 #include <map>
@@ -88,12 +89,40 @@ std::string DefaultModelDir();
  * Timing: with `with_timing` it adds "node_ms": {"<node id>": ms, ...},
  * FrameReport::node_ms rounded to 0.001 ms. Off by default, so a report
  * stays free of anything executor-specific (--report-timing turns it on).
+ *
+ * Events: a frame whose logic nodes raised events gets "events": [{"node",
+ * "event", "track_id", "time", "data"}], in FrameReport::events order. A
+ * frame without events has no key, so a graph without logic nodes writes
+ * exactly the bytes it always did.
  */
 nlohmann::json ReportToJson(const FrameReport& report, bool name_stream,
                             bool with_timing = false);
 
 /// True when a graph's reports name their stream: it has more than one source.
 bool NamesStreams(const StageGraph& graph);
+
+/// A number as a person writes it: a whole number without ".0", a
+/// non-finite one as "NaN", "Infinity" or "-Infinity" (U-11). For event
+/// data and --list-ops; report payloads keep their own encoding.
+template <typename Json>
+Json JsonNumber(double value) {
+    if (std::isnan(value)) return Json("NaN");
+    if (std::isinf(value)) return Json(value > 0 ? "Infinity" : "-Infinity");
+    if (value == std::floor(value) && std::fabs(value) < 1e15) {
+        return Json(static_cast<long long>(value));
+    }
+    return Json(value);
+}
+
+/**
+ * @brief One event as the CLI prints it after "[EVENT] " and writes it to
+ *        --events: {"frame", "time", "stream", "node", "event", "track_id",
+ *        "data"}, in that order.
+ *
+ * "time" is report.time_s rounded to 0.001 s, "track_id" -1 when the event
+ * is about no one track, "data" the event's numbers then its text, flat.
+ */
+nlohmann::ordered_json EventLineJson(const GraphEvent& event, const FrameReport& report);
 
 // ---------------------------------------------------------------------
 // Inputs

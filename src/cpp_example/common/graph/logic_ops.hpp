@@ -16,8 +16,12 @@
 #ifndef DXAPP_GRAPH_LOGIC_OPS_HPP
 #define DXAPP_GRAPH_LOGIC_OPS_HPP
 
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include <opencv2/core.hpp>
 
 #include "common/graph/shape.hpp"
 
@@ -75,6 +79,35 @@ struct LogicOpInfo {
 
     LogicOpInfo()
         : min_inputs(1), max_inputs(1), same_shape_out(false), needs_tracking(false) {}
+};
+
+/// A label a logic node asks to be drawn.
+struct OverlayText {
+    cv::Point2f at;    ///< source-frame pixels; at.x < 0: a line in the top-left panel
+    std::string text;
+    bool alert;        ///< drawn on the alert colour
+    OverlayText() : at(-1.f, -1.f), alert(false) {}
+};
+
+/// What one logic node asks the visualizer to draw for one frame, in
+/// source-frame pixels (RenderReport's pass 5).
+struct LogicOverlay {
+    std::vector<std::vector<cv::Point2f> > polygons;
+    std::vector<std::pair<cv::Point2f, cv::Point2f> > lines;  ///< A -> B; "in" is to its right
+    std::vector<cv::Rect2f> highlights;                        ///< boxes outlined
+    std::vector<OverlayText> texts;
+    bool alert;  ///< polygons, lines and highlights in the alert colour
+    LogicOverlay() : alert(false) {}
+};
+
+/// One event a logic node raised in one frame.
+struct GraphEvent {
+    std::string node;    ///< the logic node's id
+    std::string event;   ///< "enter", "cross", a condition's "event", ...
+    int track_id;        ///< -1: not about one track
+    double time_s;       ///< FrameReport::time_s of its frame
+    RecordItem data;     ///< numbers and text, written flat as "data"
+    GraphEvent() : track_id(-1), time_s(0.0) {}
 };
 
 /// filter, zone, line, count, dwell, condition, gallery, user - in that order.

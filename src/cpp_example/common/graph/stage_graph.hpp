@@ -17,6 +17,7 @@
 
 #include "common/graph/graph_config.hpp"
 #include "common/graph/i_registry.hpp"
+#include "common/graph/logic_ops.hpp"
 #include "common/graph/roi_router.hpp"
 
 namespace dxapp {
@@ -80,8 +81,17 @@ struct FrameReport {
     /// with no crops. Measured, so NOT compared by operator== and written to
     /// --report only with --report-timing.
     std::map<std::string, double> node_ms;
+    /// Seconds: StageGraph::FrameTime of this frame, the clock logic nodes
+    /// count in. Set once per frame, so every logic node sees one time.
+    double time_s;
+    /// Every event the logic nodes raised in this frame, in the stream's
+    /// topological node order (each node's events in the order it raised them).
+    std::vector<GraphEvent> events;
+    /// What each logic node asks the visualizer to draw, by node id. A node
+    /// with an entry here is drawn by pass 5 only, never by the shape passes.
+    std::map<std::string, LogicOverlay> overlays;
 
-    FrameReport() : frame_index(0), skipped_out_of_bounds(0) {}
+    FrameReport() : frame_index(0), skipped_out_of_bounds(0), time_s(0.0) {}
 };
 
 /// Milliseconds from `since` to `until`, for FrameReport::node_ms; never negative.
@@ -130,6 +140,10 @@ inline bool operator!=(const FrameReport& a, const FrameReport& b) {
  */
 bool ByOrigin(const StageResult& a, const StageResult& b);
 
+/// Frames per second of a stream whose source reports none (an image,
+/// a camera that does not say) and of every stream until SetStreamClock.
+const double kDefaultStreamFps = 30.0;
+
 /// One stream of a built graph (SP2): the frames of one source node.
 struct StreamPlan {
     std::size_t source;              ///< node index of the source
@@ -137,7 +151,12 @@ struct StreamPlan {
     std::vector<char> member;        ///< per node: 1 when this stream runs it
     std::vector<int> in_edges;       ///< per node: edges into it whose producer is a member
     std::vector<std::size_t> order;  ///< topological_order(), members only
-    StreamPlan() : source(0) {}
+    double fps;                      ///< frame_index / fps is a file frame's time
+    bool wall_clock;                 ///< a live source: seconds since its first frame
+    bool clock_started;
+    std::chrono::steady_clock::time_point clock_start;
+    StreamPlan()
+        : source(0), fps(kDefaultStreamFps), wall_clock(false), clock_started(false) {}
 };
 
 class StageGraph {
@@ -168,6 +187,15 @@ class StageGraph {
     /// name its stream (an index into StageGraph::streams())", or
     /// "<caller>: the graph has no source node".
     std::size_t OnlyStream(const char* caller) const;
+    /// How stream `stream` counts time (logic nodes' seconds): frame_index /
+    /// fps, or with `wall_clock` (a camera, RTSP) the seconds since the first
+    /// frame asked for after this call. A rate that is not a positive finite
+    /// number keeps kDefaultStreamFps. Build resets every stream to
+    /// frame_index / kDefaultStreamFps. Throws std::out_of_range.
+    void SetStreamClock(std::size_t stream, double fps, bool wall_clock);
+    /// The time of frame `frame_index` of stream `stream`, in seconds. Both
+    /// executors call it once per frame, from the driver thread.
+    double FrameTime(std::size_t stream, std::size_t frame_index);
 
     /// Indices of edges whose producer is `node`.
     std::vector<std::size_t> OutgoingEdges(std::size_t node) const;

@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cmath>
 #include <exception>
 #include <memory>
 #include <sstream>
@@ -295,6 +296,30 @@ bool SamePorts(const StagePorts& x, const StagePorts& y) {
     for (; a != x.end(); ++a, ++b) {
         if (a->first != b->first) return false;
         if (!SameData(a->second, b->second)) return false;
+    }
+    return true;
+}
+
+bool SameEvents(const std::vector<GraphEvent>& a, const std::vector<GraphEvent>& b) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (a[i].node != b[i].node || a[i].event != b[i].event) return false;
+        if (a[i].track_id != b[i].track_id || a[i].time_s != b[i].time_s) return false;
+        if (a[i].data.numbers != b[i].data.numbers || a[i].data.text != b[i].data.text) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SameOverlay(const LogicOverlay& a, const LogicOverlay& b) {
+    if (a.alert != b.alert || a.polygons != b.polygons || a.lines != b.lines) return false;
+    if (a.highlights != b.highlights || a.texts.size() != b.texts.size()) return false;
+    for (std::size_t i = 0; i < a.texts.size(); ++i) {
+        if (a.texts[i].at != b.texts[i].at || a.texts[i].text != b.texts[i].text ||
+            a.texts[i].alert != b.texts[i].alert) {
+            return false;
+        }
     }
     return true;
 }
@@ -630,6 +655,24 @@ std::size_t StageGraph::OnlyStream(const char* caller) const {
     throw std::invalid_argument(text.str());
 }
 
+void StageGraph::SetStreamClock(std::size_t stream, double fps, bool wall_clock) {
+    StreamPlan& plan = streams_.at(stream);
+    plan.fps = std::isfinite(fps) && fps > 0.0 ? fps : kDefaultStreamFps;
+    plan.wall_clock = wall_clock;
+    plan.clock_started = false;
+}
+
+double StageGraph::FrameTime(std::size_t stream, std::size_t frame_index) {
+    StreamPlan& plan = streams_.at(stream);
+    if (!plan.wall_clock) return static_cast<double>(frame_index) / plan.fps;
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    if (!plan.clock_started) {
+        plan.clock_started = true;
+        plan.clock_start = now;
+    }
+    return std::chrono::duration<double>(now - plan.clock_start).count();
+}
+
 std::vector<std::size_t> StageGraph::OutgoingEdges(std::size_t node) const {
     std::vector<std::size_t> out;
     for (std::size_t i = 0; i < edges_.size(); ++i) {
@@ -699,6 +742,16 @@ bool operator==(const FrameReport& a, const FrameReport& b) {
             if (!SameData(x.data, y.data)) return false;
             if (!SamePorts(x.ports, y.ports)) return false;
         }
+    }
+    // Logic nodes: the frame's time, its events and what is drawn, exactly
+    // (both executors compute them from the same inputs in stream order).
+    if (a.time_s != b.time_s) return false;
+    if (!SameEvents(a.events, b.events)) return false;
+    if (a.overlays.size() != b.overlays.size()) return false;
+    for (std::map<std::string, LogicOverlay>::const_iterator it = a.overlays.begin();
+         it != a.overlays.end(); ++it) {
+        std::map<std::string, LogicOverlay>::const_iterator other = b.overlays.find(it->first);
+        if (other == b.overlays.end() || !SameOverlay(it->second, other->second)) return false;
     }
     return true;
 }
