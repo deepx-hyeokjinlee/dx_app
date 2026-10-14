@@ -11916,6 +11916,39 @@ void TestSyncExecutorTimesEveryNode() {
     GRAPH_CHECK(cpu.node_ms.count("face") == 1);
 }
 
+// Graph Composer P1: async node_ms runs from dispatch to the last completion.
+void TestAsyncExecutorTimesEveryNode() {
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    registry.SetLatency("yolov8n", 30);
+    registry.SetLatency("casvit_t", 10);
+    const GraphSpec spec = ParseGraphText(CascadeJson(), "t.json");
+    StageGraph graph;
+    graph.Build(spec, registry, "/models", false);
+    AsyncExecutor executor(StageJobs(4));
+    const FrameReport report =
+        executor.RunFrame(graph, cv::Mat::zeros(480, 640, CV_8UC3), 0);
+    GRAPH_CHECK(report.error.empty());
+    GRAPH_CHECK(report.node_ms.count("cam") == 0);
+    GRAPH_CHECK(report.node_ms.count("od") == 1 && report.node_ms.at("od") >= 29.0);
+    GRAPH_CHECK(report.node_ms.count("reid") == 1 && report.node_ms.at("reid") >= 9.0);
+    GRAPH_CHECK(report.node_ms.at("od") < 5000.0);
+
+    // A ROI node that got no crops took no time.
+    FakeModelRegistry empty = BuildCascadeRegistry();
+    const GraphSpec none = ParseGraphText(
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"od\",\"model\":\"yolov8n\"},{\"id\":\"reid\",\"model\":\"casvit_t\"}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"od\"},"
+        "{\"from\":\"od\",\"to\":\"reid\",\"roi\":{\"classes\":[\"car\"]}}]}",
+        "none.json");
+    StageGraph none_graph;
+    none_graph.Build(none, empty, "/models", false);
+    AsyncExecutor none_executor(StageJobs(4));
+    const FrameReport no_crops =
+        none_executor.RunFrame(none_graph, cv::Mat::zeros(480, 640, CV_8UC3), 0);
+    GRAPH_CHECK(no_crops.node_ms.count("reid") == 1 && no_crops.node_ms.at("reid") == 0.0);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12263,6 +12296,7 @@ int main() {
     TestHeadPoseMatchesSyncAndAsync();
     TestVolumeProxyMatchesSyncAndAsync();
     TestSyncExecutorTimesEveryNode();
+    TestAsyncExecutorTimesEveryNode();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

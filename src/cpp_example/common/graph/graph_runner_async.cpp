@@ -86,6 +86,7 @@ class JobCollector {
         std::lock_guard<std::mutex> lock(mutex_);
         if (job >= delivered_.size() || delivered_[job] != 0) return false;
         delivered_[job] = 1;
+        last_done_ = std::chrono::steady_clock::now();
         if (!error.empty()) {
             errors_[job] = error;
             return true;
@@ -108,11 +109,19 @@ class JobCollector {
         return last;
     }
 
+    /// When the last accepted completion was recorded, on the thread that
+    /// delivered it (the epoch when none was).
+    std::chrono::steady_clock::time_point LastDone() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return last_done_;
+    }
+
  private:
     mutable std::mutex mutex_;
     std::vector<StageResult> results_;
     std::vector<std::string> errors_;
     std::vector<char> delivered_;
+    std::chrono::steady_clock::time_point last_done_;
 };
 typedef std::shared_ptr<JobCollector> JobCollectorPtr;
 
@@ -167,6 +176,7 @@ struct NodeRun {
     bool is_roi;
     std::size_t total;      ///< jobs this run owns
     std::size_t completed;  ///< accepted completions processed so far
+    std::chrono::steady_clock::time_point started;  ///< when Dispatch ran (node_ms)
     NodeRun() : is_roi(false), total(0), completed(0) {}
 };
 
@@ -438,8 +448,11 @@ struct AsyncExecutor::Engine {
                 continue;
             }
             if (node.is_cpu) {
+                const std::chrono::steady_clock::time_point started =
+                    std::chrono::steady_clock::now();
                 const CpuReduction reduced =
                     ReduceCpu(node.op, node.params, ctx->result_in[index], ctx->frame.size());
+                ctx->report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
                 ctx->report.node_results[node.id] = reduced.result;
                 bool earlier_error = !ctx->report.error.empty();
                 const std::vector<std::size_t>& order = graph->streams()[ctx->stream].order;
@@ -462,6 +475,7 @@ struct AsyncExecutor::Engine {
 
     void Dispatch(const FrameCtxPtr& ctx, std::size_t index) {
         NodeRun run;
+        run.started = std::chrono::steady_clock::now();
         if (ctx->got_frame[index]) {
             run.total = 1;
             run.jobs.reset(new JobCollector(1));
@@ -655,6 +669,10 @@ struct AsyncExecutor::Engine {
         ctx.runs.erase(index);
         const std::string job_error = run.jobs->LastError();
         std::vector<StageResult> results = run.jobs->Results();
+        // Dispatch to the last completion (spec: graph composer node time). A
+        // ROI node that got no crops ran nothing.
+        ctx.report.node_ms[node.id] =
+            run.total == 0 ? 0.0 : ElapsedMs(run.started, run.jobs->LastDone());
         StageDataPtr produced;
         StagePorts ports;  // the producer's extra outputs (U-08)
 
