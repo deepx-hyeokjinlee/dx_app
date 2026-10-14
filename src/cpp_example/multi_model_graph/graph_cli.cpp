@@ -753,6 +753,185 @@ std::vector<GraphError> ModelFileProblems(const GraphSpec& spec,
 }
 
 // ---------------------------------------------------------------------
+// --check --json
+// ---------------------------------------------------------------------
+
+/// The graph file as plain JSON, to name the node or edge of a parse error
+/// by the index the error gives; null when it does not parse.
+nlohmann::json RawGraph(const std::string& path) {
+    std::ifstream in(path.c_str());
+    if (!in.is_open()) return nlohmann::json();
+    try {
+        return nlohmann::json::parse(in);
+    } catch (const std::exception&) {
+        return nlohmann::json();
+    }
+}
+
+/// The <i> of "<kind>[<i>]" in `where`, searched from `from`.
+bool IndexAfter(const std::string& where, const std::string& kind, std::size_t from,
+                std::size_t* index) {
+    const std::string head = kind + "[";
+    const std::size_t start = where.find(head, from);
+    if (start == std::string::npos) return false;
+    const char* digits = where.c_str() + start + head.size();
+    char* end = NULL;
+    const unsigned long value = std::strtoul(digits, &end, 10);
+    if (end == digits || *end != ']') return false;
+    *index = static_cast<std::size_t>(value);
+    return true;
+}
+
+/// raw[list][index][key] when it is a string, else null.
+nlohmann::json StringAt(const nlohmann::json& raw, const char* list, std::size_t index,
+                        const char* key) {
+    if (!raw.is_object()) return nullptr;
+    nlohmann::json::const_iterator items = raw.find(list);
+    if (items == raw.end() || !items->is_array() || index >= items->size()) return nullptr;
+    const nlohmann::json& item = (*items)[index];
+    if (!item.is_object()) return nullptr;
+    nlohmann::json::const_iterator value = item.find(key);
+    if (value == item.end() || !value->is_string()) return nullptr;
+    return *value;
+}
+
+/// error["node"] / error["edge"] for a GraphError's where (see README).
+void AddErrorTarget(const std::string& where, const GraphSpec* spec, const std::string& path,
+                    nlohmann::json* error) {
+    (*error)["node"] = nullptr;
+    (*error)["edge"] = nullptr;
+    if (spec != NULL) {
+        for (std::size_t e = 0; e < spec->edges.size(); ++e) {
+            const EdgeSpec& edge = spec->edges[e];
+            if (where.find("edge \"" + edge.from + "\"->\"" + edge.to + "\"") == std::string::npos) {
+                continue;
+            }
+            nlohmann::json target = nlohmann::json::object();
+            target["from"] = edge.from;
+            target["to"] = edge.to;
+            (*error)["edge"] = target;
+            return;
+        }
+        for (std::size_t n = 0; n < spec->nodes.size(); ++n) {
+            if (where.find("node \"" + spec->nodes[n].id + "\"") == std::string::npos) continue;
+            (*error)["node"] = spec->nodes[n].id;
+            return;
+        }
+        return;
+    }
+    // A parse error: "<path> node[3] ..." / "<path> edge[2] ...".
+    const std::size_t from = where.compare(0, path.size(), path) == 0 ? path.size() : 0;
+    std::size_t index = 0;
+    if (IndexAfter(where, "edge", from, &index)) {
+        const nlohmann::json raw = RawGraph(path);
+        nlohmann::json target = nlohmann::json::object();
+        target["from"] = StringAt(raw, "edges", index, "from");
+        target["to"] = StringAt(raw, "edges", index, "to");
+        (*error)["edge"] = target;
+    } else if (IndexAfter(where, "node", from, &index)) {
+        (*error)["node"] = StringAt(RawGraph(path), "nodes", index, "id");
+    }
+}
+
+nlohmann::json ErrorJson(const GraphError& error, const GraphSpec* spec,
+                         const std::string& path) {
+    nlohmann::json out = nlohmann::json::object();
+    out["code"] = ToString(error.code());
+    out["where"] = error.where();
+    out["what"] = error.what_happened();
+    out["how"] = error.how_to_fix();
+    AddErrorTarget(error.where(), spec, path, &out);
+    return out;
+}
+
+/// present | missing | invalid | unloadable, for the .dxnn at `path`.
+std::string FileState(const std::string& path) {
+    if (!FileExists(path)) return "missing";
+    uint32_t version = 0;
+    std::string error;
+    if (!ReadDxnnContainerVersion(path, &version, &error)) return "invalid";
+    return ContainerSupportError(version, RuntimeVersion()).empty() ? "present" : "unloadable";
+}
+
+/// One entry per model node, in declaration order (see README).
+nlohmann::json ModelsJson(const GraphSpec& spec, const IModelRegistry& registry,
+                          const std::string& model_dir) {
+    const std::map<std::string, std::string> owners = SharedEngineOwners(spec, registry);
+    nlohmann::json models = nlohmann::json::array();
+    for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
+        const NodeSpec& node = spec.nodes[i];
+        if (node.is_source || node.is_cpu) continue;
+        nlohmann::json row = nlohmann::json::object();
+        row["node"] = node.id;
+        nlohmann::json engine = nlohmann::json::object();
+        engine["buffers"] = node.engine.buffers;
+        engine["share"] = node.engine.share;
+        std::map<std::string, std::string>::const_iterator owner = owners.find(node.id);
+        engine["shared_with"] = owner != owners.end() && owner->second != node.id
+                                    ? nlohmann::json(owner->second)
+                                    : nlohmann::json(nullptr);
+        const ModelInfo* info = registry.find(node.model);
+        if (info == NULL) {
+            row["model"] = node.model;
+            row["file"] = nullptr;
+            row["state"] = "unknown";
+            row["container"] = nullptr;
+        } else {
+            const std::string path = model_dir + "/" + info->dxnn_file;
+            row["model"] = info->model_name;
+            row["file"] = info->dxnn_file;
+            row["state"] = FileState(path);
+            uint32_t version = 0;
+            std::string ignored;
+            row["container"] = FileExists(path) && ReadDxnnContainerVersion(path, &version, &ignored)
+                                   ? nlohmann::json("v" + std::to_string(version))
+                                   : nlohmann::json(nullptr);
+        }
+        row["engine"] = engine;
+        models.push_back(row);
+    }
+    return models;
+}
+
+/// --check --json: exit 0 when nothing is in "errors", else 1.
+int PrintCheckJson(const GraphCliArgs& args, const IModelRegistry& registry) {
+    nlohmann::json errors = nlohmann::json::array();
+    nlohmann::json models = nlohmann::json::array();
+    nlohmann::json notes = nlohmann::json::array();
+    std::string graph_name = args.graph_path;
+    GraphSpec spec;
+    bool parsed = false;
+    try {
+        spec = ParseGraphFile(args.graph_path);
+        parsed = true;
+        if (!spec.name.empty()) graph_name = spec.name;
+        ValidateGraph(spec, registry);
+    } catch (const GraphError& error) {
+        errors.push_back(ErrorJson(error, parsed ? &spec : NULL, args.graph_path));
+    }
+    if (parsed) {
+        const std::vector<GraphError> files = ModelFileProblems(spec, registry, args.model_dir);
+        for (std::size_t i = 0; i < files.size(); ++i) {
+            errors.push_back(ErrorJson(files[i], &spec, args.graph_path));
+        }
+        models = ModelsJson(spec, registry, args.model_dir);
+        std::istringstream lines(AliasNotes(spec, registry));
+        std::string line;
+        while (std::getline(lines, line)) {
+            if (!line.empty()) notes.push_back(line);
+        }
+    }
+    nlohmann::json out = nlohmann::json::object();
+    out["ok"] = errors.empty();
+    out["graph"] = graph_name;
+    out["errors"] = errors;
+    out["models"] = models;
+    out["notes"] = notes;
+    std::printf("%s\n", out.dump(2).c_str());
+    return errors.empty() ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------
 // Running
 // ---------------------------------------------------------------------
 
@@ -1215,6 +1394,7 @@ int Main(int argc, char** argv, ExecutorKind kind) {
     InstallInterruptHandler();
 
     try {
+        if (args.check_only && args.json) return PrintCheckJson(args, registry);
         if (args.check_only) {
             GraphSpec spec = ParseGraphFile(args.graph_path);
             ValidateGraph(spec, registry);                      // T0

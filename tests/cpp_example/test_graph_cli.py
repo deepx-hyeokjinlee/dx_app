@@ -3086,3 +3086,103 @@ def test_json_is_only_for_check_and_list_models():
     result = run(BINARIES[0], "--graph", "{}/cascade_od_reid_track.json".format(GRAPHS), "--json")
     assert result.returncode == 2, result.stdout + result.stderr
     assert "--json applies to --check and --list-models" in result.stderr
+
+
+def _check_json(path, *args):
+    result = run(BINARIES[0], "--check", str(path), "--json", *args)
+    assert result.stderr == "", result.stderr
+    return result.returncode, json.loads(result.stdout)
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("graph", SAMPLE_GRAPHS)
+def test_check_json_of_every_sample(graph):
+    code, out = _check_json(GRAPH_DIR / graph)
+    assert code == 0 and out["ok"] is True and out["errors"] == [], out
+    with open(str(GRAPH_DIR / graph), encoding="utf-8") as handle:
+        spec = json.load(handle)
+    assert out["graph"] == spec["name"]
+    assert [m["node"] for m in out["models"]] == [n["id"] for n in spec["nodes"] if "model" in n]
+    for model in out["models"]:
+        assert model["state"] in ("present", "missing"), model
+        assert model["engine"] == {"buffers": 0, "share": False, "shared_with": None}, model
+
+
+CHECK_JSON_ERRORS = [
+    ({"version": 1,
+      "nodes": [{"id": "cam", "type": "source", "uri": "a.jpg"},
+                {"id": "od", "model": "no_such_model_at_all"}],
+      "edges": [{"from": "cam", "to": "od"}]},
+     "MODEL_UNKNOWN", "od", None),
+    ({"version": 1,
+      "nodes": [{"id": "cam", "type": "source", "uri": "a.jpg"},
+                {"id": "seg", "model": "bisenetv2"}, {"id": "reid", "model": "casvit_t"}],
+      "edges": [{"from": "cam", "to": "seg"}, {"from": "seg", "to": "reid", "roi": {}}]},
+     "GRAPH_EDGE", None, {"from": "seg", "to": "reid"}),
+    ({"version": 1,
+      "nodes": [{"id": "cam", "type": "source", "uri": "a.jpg"},
+                {"id": "od", "model": "yolov8n"}, {"id": "cls", "model": "resnet50"}],
+      "edges": [{"from": "cam", "to": "od"}, {"from": "cam", "to": "cls"},
+                {"from": "od", "to": "cls", "roi": {}}]},
+     "GRAPH_EDGE", "cls", None),
+    ({"version": 1,
+      "nodes": [{"id": "cam", "type": "source", "uri": "a.jpg"}, {"id": "od", "modle": "yolov8n"}],
+      "edges": [{"from": "cam", "to": "od"}]},
+     "GRAPH_SCHEMA", "od", None),
+    ({"version": 1,
+      "nodes": [{"id": "cam", "type": "source", "uri": "a.jpg"}, {"id": "od", "model": "yolov8n"}],
+      "edges": [{"form": "cam", "to": "od"}]},
+     "GRAPH_SCHEMA", None, {"from": None, "to": "od"}),
+    ({"version": 1,
+      "nodes": [{"id": "cam", "type": "source", "uri": "a.jpg"},
+                {"id": "a", "model": "yolov8n"}, {"id": "b", "model": "yolov8n"}],
+      "edges": [{"from": "cam", "to": "a"}, {"from": "a", "to": "b"}, {"from": "b", "to": "a"}]},
+     "GRAPH_CYCLE", None, None),
+]
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("graph,code,node,edge", CHECK_JSON_ERRORS)
+def test_check_json_pins_each_error_to_its_node_or_edge(tmp_path, graph, code, node, edge):
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(graph))
+    status, out = _check_json(path)
+    assert status == 1 and out["ok"] is False, out
+    assert len(out["errors"]) == 1, out["errors"]
+    error = out["errors"][0]
+    assert set(error) == {"code", "where", "what", "how", "node", "edge"}
+    assert (error["code"], error["node"], error["edge"]) == (code, node, edge), error
+
+
+@pytest.mark.graph
+def test_check_json_of_a_file_that_is_not_json(tmp_path):
+    path = tmp_path / "broken.json"
+    path.write_text("{ not json")
+    status, out = _check_json(path)
+    assert status == 1 and out["ok"] is False
+    assert out["errors"][0]["code"] == "GRAPH_SCHEMA" and out["errors"][0]["node"] is None
+    assert out["models"] == []
+    assert out["graph"] == str(path)
+
+
+@pytest.mark.graph
+def test_check_json_reports_model_files_and_engines(tmp_path):
+    models = tmp_path / "models"
+    models.mkdir()
+    dxnn = _registry()["yolov8n"]["dxnn_file"]
+    (models / dxnn).write_bytes(b"")
+    graph = _write_graph(tmp_path, [
+        {"id": "od", "model": "yolov8n", "engine": {"share": True, "buffers": 2}},
+        {"id": "od2", "model": "yolov8-n_640x640", "engine": {"share": True, "buffers": 2}},
+        {"id": "cls", "model": "resnet50"}])
+    status, out = _check_json(graph, "--model-dir", str(models))
+    assert status == 1, out
+    assert [(e["code"], e["node"]) for e in out["errors"]] == [("MODEL_LOAD", "od"), ("MODEL_LOAD", "od2")]
+    by = {m["node"]: m for m in out["models"]}
+    assert by["od"]["state"] == "invalid" and by["od"]["container"] is None
+    assert by["od"]["model"] == "yolov8-n_640x640" and by["od"]["file"] == dxnn
+    assert by["od"]["engine"] == {"buffers": 2, "share": True, "shared_with": None}
+    assert by["od2"]["engine"] == {"buffers": 2, "share": True, "shared_with": "od"}
+    assert by["cls"]["state"] == "missing"
+    assert by["cls"]["engine"] == {"buffers": 0, "share": False, "shared_with": None}
+    assert any('"yolov8n" is the old name of "yolov8-n_640x640"' in note for note in out["notes"])
