@@ -36,6 +36,18 @@ namespace {
 // The FrameReport as JSON
 // ---------------------------------------------------------------------
 
+/// Seconds are written to 0.001 s, the way a report writes "time".
+double RoundedSeconds(double seconds) { return std::round(seconds * 1000.0) / 1000.0; }
+
+/// A records or event number as written: a time ("seconds", or a name
+/// ending in "_s") rounded like "time", so 0.30000000000000004 is 0.3;
+/// any other number unchanged.
+double WrittenNumber(const std::string& name, double value) {
+    const bool seconds = name == "seconds" ||
+                         (name.size() > 2 && name.compare(name.size() - 2, 2, "_s") == 0);
+    return seconds && std::isfinite(value) ? RoundedSeconds(value) : value;
+}
+
 /// FNV-1a over a matrix's pixels, so a dense payload (a label map, a depth
 /// map, a restored image) is comparable between the two executors without
 /// writing megabytes of JSON. Walks row by row: cv::Mat rows need not be
@@ -236,7 +248,8 @@ json PayloadToJson(const StageDataPtr& data) {
                 json entry = json::object();
                 json numbers = json::object();
                 for (std::size_t n = 0; n < item.numbers.size(); ++n) {
-                    numbers[item.numbers[n].first] = item.numbers[n].second;
+                    numbers[item.numbers[n].first] =
+                        WrittenNumber(item.numbers[n].first, item.numbers[n].second);
                 }
                 json text = json::object();
                 for (std::size_t t = 0; t < item.text.size(); ++t) {
@@ -467,13 +480,12 @@ void PrepareGraph(const std::string& graph_path, const std::string& model_dir,
 
 namespace {
 
-double RoundedSeconds(double seconds) { return std::round(seconds * 1000.0) / 1000.0; }
-
 template <typename Json>
 Json EventData(const RecordItem& data) {
     Json out = Json::object();
     for (std::size_t n = 0; n < data.numbers.size(); ++n) {
-        out[data.numbers[n].first] = JsonNumber<Json>(data.numbers[n].second);
+        out[data.numbers[n].first] =
+            JsonNumber<Json>(WrittenNumber(data.numbers[n].first, data.numbers[n].second));
     }
     for (std::size_t t = 0; t < data.text.size(); ++t) {
         out[data.text[t].first] = data.text[t].second;

@@ -55,10 +55,26 @@ struct LogicParamInfo {
     std::string text_default;           ///< kText / kChoice, when not required
     std::vector<std::string> choices;   ///< kChoice
     std::string help;
+    // Hints for an inspector (--list-ops --json), each written only when set.
+    double step;                        ///< kNumber: a sensible increment; 0: none
+    std::string items;                  ///< kTextList: "string", or "integer" (written as strings)
+    std::vector<std::string> when_omitted;  ///< kTextList: what leaving it out means
+    std::string format;                 ///< kText: "file" for a path
+    std::vector<std::string> extensions;    ///< format "file": the accepted endings
+    std::string equals;                 ///< the param whose value this one must repeat
+    /// The values this param may take, per input kind (condition's "value").
+    struct InputValues {
+        Shape shape;
+        bool per_crop;
+        std::vector<std::string> values;  ///< the values this input allows
+        bool from_numbers;                ///< or: a number the input's op lists in "numbers"
+        InputValues() : shape(Shape::kBoxes), per_crop(false), from_numbers(false) {}
+    };
+    std::vector<InputValues> values_by_input;
 
     LogicParamInfo()
         : kind(kNumber), required(false), low(0.0), high(0.0), low_open(false),
-          number_default(0.0) {}
+          number_default(0.0), step(0.0) {}
 };
 
 /// One input a logic op accepts: a shape, as a full-frame payload or as
@@ -90,7 +106,12 @@ struct OverlayText {
     cv::Point2f at;    ///< source-frame pixels; at.x < 0: a line in the top-left panel
     std::string text;
     bool alert;        ///< drawn on the alert colour
-    OverlayText() : at(-1.f, -1.f), alert(false) {}
+    /// (0, 0): the label's baseline starts at `at`. Else the label is laid
+    /// beside `at`, wholly on this side of it (a direction; each axis whose
+    /// part is small is centred on `at`), and moved further that way past
+    /// the labels of the boxes drawn under it.
+    cv::Point2f away;
+    OverlayText() : at(-1.f, -1.f), alert(false), away(0.f, 0.f) {}
 };
 
 /// What one logic node asks the visualizer to draw for one frame, in

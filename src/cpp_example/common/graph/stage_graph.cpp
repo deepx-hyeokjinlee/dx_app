@@ -317,7 +317,7 @@ bool SameOverlay(const LogicOverlay& a, const LogicOverlay& b) {
     if (a.highlights != b.highlights || a.texts.size() != b.texts.size()) return false;
     for (std::size_t i = 0; i < a.texts.size(); ++i) {
         if (a.texts[i].at != b.texts[i].at || a.texts[i].text != b.texts[i].text ||
-            a.texts[i].alert != b.texts[i].alert) {
+            a.texts[i].alert != b.texts[i].alert || a.texts[i].away != b.texts[i].away) {
             return false;
         }
     }
@@ -628,6 +628,8 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
     for (std::size_t i = 0; i < nodes_.size(); ++i) {
         if (!nodes_[i].tracked) continue;
         const TrackSpec& track = spec.nodes[i].track;
+        nodes_[i].track = track;
+        nodes_[i].state_generation.assign(streams_.size(), 0);
         nodes_[i].trackers.assign(streams_.size(), std::shared_ptr<IouTracker>());
         for (std::size_t s = 0; s < streams_.size(); ++s) {
             if (streams_[s].member[i]) {
@@ -640,6 +642,7 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
     // streams.
     for (std::size_t i = 0; i < nodes_.size(); ++i) {
         if (!nodes_[i].is_logic) continue;
+        nodes_[i].state_generation.assign(streams_.size(), 0);
         nodes_[i].logic_states.assign(streams_.size(), std::shared_ptr<LogicState>());
         for (std::size_t s = 0; s < streams_.size(); ++s) {
             if (streams_[s].member[i]) nodes_[i].logic_states[s].reset(new LogicState());
@@ -687,6 +690,23 @@ double StageGraph::FrameTime(std::size_t stream, std::size_t frame_index) {
         plan.clock_start = now;
     }
     return std::chrono::duration<double>(now - plan.clock_start).count();
+}
+
+void StageGraph::RestartStream(std::size_t stream) { ++streams_.at(stream).generation; }
+
+void StageGraph::FreshenStreamState(std::size_t index, std::size_t stream,
+                                    std::size_t generation) {
+    NodeRuntime& node = nodes_.at(index);
+    if (stream >= node.state_generation.size() || node.state_generation[stream] == generation) {
+        return;
+    }
+    node.state_generation[stream] = generation;
+    if (stream < node.trackers.size() && node.trackers[stream]) {
+        node.trackers[stream].reset(new IouTracker(node.track.iou, node.track.max_age));
+    }
+    if (stream < node.logic_states.size() && node.logic_states[stream]) {
+        node.logic_states[stream].reset(new LogicState());
+    }
 }
 
 std::vector<std::size_t> StageGraph::OutgoingEdges(std::size_t node) const {

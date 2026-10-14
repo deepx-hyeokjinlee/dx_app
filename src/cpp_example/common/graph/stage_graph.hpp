@@ -45,6 +45,11 @@ struct NodeRuntime {
     /// Per stream (streams() order), for a logic node: its own state in every
     /// stream that runs it, null in the others. Never shared across streams.
     std::vector<std::shared_ptr<LogicState> > logic_states;
+    /// Tracked: the "track" it was built with (a restarted stream's fresh tracker).
+    TrackSpec track;
+    /// Per stream (streams() order), for a tracked or logic node: the
+    /// StreamPlan::generation its tracker and state belong to.
+    std::vector<std::size_t> state_generation;
 
     NodeRuntime()
         : is_source(false), is_cpu(false), is_logic(false), output_shape(Shape::kFrame),
@@ -167,8 +172,12 @@ struct StreamPlan {
     bool wall_clock;                 ///< a live source: seconds since its first frame
     bool clock_started;
     std::chrono::steady_clock::time_point clock_start;
+    /// How often the stream started again (RestartStream): a frame admitted
+    /// in a later generation finds fresh trackers and logic state.
+    std::size_t generation;
     StreamPlan()
-        : source(0), fps(kDefaultStreamFps), wall_clock(false), clock_started(false) {}
+        : source(0), fps(kDefaultStreamFps), wall_clock(false), clock_started(false),
+          generation(0) {}
 };
 
 class StageGraph {
@@ -208,6 +217,19 @@ class StageGraph {
     /// The time of frame `frame_index` of stream `stream`, in seconds. Both
     /// executors call it once per frame, from the driver thread.
     double FrameTime(std::size_t stream, std::size_t frame_index);
+    /// Stream `stream` starts again from its first frame (--loop restarts a
+    /// video): every tracker and logic node of the stream starts afresh at
+    /// the next frame admitted - new track ids, no zone members, line
+    /// history, stays, counts or condition edge - as on a first pass. Frame
+    /// indices and stream time keep counting. Call it between frames, from
+    /// the driver thread. Throws std::out_of_range.
+    void RestartStream(std::size_t stream);
+    /// Before node `index` uses its tracker or logic state for a frame of
+    /// stream `stream` admitted in `generation` (StreamPlan::generation at
+    /// its admission): a fresh one when the stream restarted since the
+    /// node's last frame of it. The executors call it in the stream's frame
+    /// order, on the driver thread.
+    void FreshenStreamState(std::size_t index, std::size_t stream, std::size_t generation);
 
     /// Indices of edges whose producer is `node`.
     std::vector<std::size_t> OutgoingEdges(std::size_t node) const;

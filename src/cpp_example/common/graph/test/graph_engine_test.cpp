@@ -13985,6 +13985,296 @@ void TestGalleryMatchesOnlyAVectorWithADirection() {
     std::remove(path.c_str());
 }
 
+
+namespace {
+
+/// The pixels of `drawn` that differ from `plain`, as a mask.
+cv::Mat LabelDiffMask(const cv::Mat& plain, const cv::Mat& drawn) {
+    cv::Mat diff;
+    cv::absdiff(plain, drawn, diff);
+    cv::Mat mask;
+    cv::cvtColor(diff, mask, cv::COLOR_BGR2GRAY);
+    return mask > 0;
+}
+
+/// `overlay` without its labels.
+LogicOverlay WithoutTexts(LogicOverlay overlay) {
+    overlay.texts.clear();
+    return overlay;
+}
+
+}  // namespace
+
+// A zone's label sits inside the zone at its top-left corner and leaves a
+// box label alone; a line's label sits beside the line, on the side away
+// from its "in" arrow.
+void TestLogicLabelsCoverNeitherBoxLabelsNorTheInArrow() {
+    const cv::Mat grey(640, 640, CV_8UC3, cv::Scalar(90, 90, 90));
+    NodeSpec node;
+    node.id = "zone";
+    node.is_logic = true;
+    node.op = "zone";
+    const double right[] = {0.45, 0.35, 1.0, 0.35, 1.0, 1.0, 0.45, 1.0};
+    node.arrays["polygon"].assign(right, right + 8);
+    const LogicConfig zone = MakeLogicConfig(node);
+    // The person of sample_people.jpg in the zone: its label row is just
+    // above the zone's top edge, where the zone's corner is.
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(316, 233, 130, 195, 0.87f, "person"));
+    LogicInput input;
+    input.from = "od";
+    input.data = boxes;
+    LogicFrame at;
+    at.frame_size = cv::Size(640, 640);
+    LogicState state;
+    const LogicOutput out = RunLogic(zone, std::vector<LogicInput>(1, input), at, &state);
+    GRAPH_CHECK(out.overlay.texts.size() == 1);
+    if (out.overlay.texts.size() != 1) return;
+    GRAPH_CHECK(out.overlay.texts[0].at == cv::Point2f(288.f, 224.f));
+    FrameReport report;
+    StageResult detected;
+    detected.data = boxes;
+    report.node_results["od"] = detected;
+    report.overlays["zone"] = WithoutTexts(out.overlay);
+    const cv::Mat plain = RenderReport(grey, report);
+    report.overlays["zone"] = out.overlay;
+    const cv::Mat changed = LabelDiffMask(plain, RenderReport(grey, report));
+    int baseline = 0;
+    const cv::Size box_text =
+        cv::getTextSize("person: 87%", cv::FONT_HERSHEY_SIMPLEX, 0.5, 2, &baseline);
+    const cv::Rect box_label(316, 223 - box_text.height - 5, box_text.width,
+                             box_text.height + 5 + baseline + 1);
+    GRAPH_CHECK(cv::countNonZero(changed) > 0);
+    GRAPH_CHECK(cv::countNonZero(changed(box_label)) == 0);  // the box's label is intact
+    const cv::Rect label = cv::boundingRect(changed);
+    GRAPH_CHECK(label.x >= 288 && label.y >= 224);           // inside the zone, at its corner
+    GRAPH_CHECK(label.x < 320 && label.y < 280);
+
+    // A line from A (bottom) to B (top): the arrow points right, the label
+    // is left of the line, beside its midpoint.
+    std::map<std::string, double> none;
+    const LogicConfig line = ConfigOf("line", none);  // x = 0.5 of a 640x480 frame
+    LogicState crossings;
+    LogicFrame frame;
+    frame.frame_size = cv::Size(640, 480);
+    const LogicOutput lined = RunLogic(line, PersonInput(100.f, 1), frame, &crossings);
+    GRAPH_CHECK(lined.overlay.texts.size() == 1);
+    if (lined.overlay.texts.size() != 1) return;
+    const cv::Mat black = cv::Mat::zeros(480, 640, CV_8UC3);
+    FrameReport crossing;
+    crossing.overlays["l"] = WithoutTexts(lined.overlay);
+    const cv::Mat bare = RenderReport(black, crossing);
+    crossing.overlays["l"] = lined.overlay;
+    const cv::Mat line_changed = LabelDiffMask(bare, RenderReport(black, crossing));
+    GRAPH_CHECK(cv::countNonZero(line_changed) > 0);
+    const cv::Rect line_label = cv::boundingRect(line_changed);
+    GRAPH_CHECK(line_label.x + line_label.width <= 318);      // left of the line
+    GRAPH_CHECK(line_label.x + line_label.width >= 300);      // right beside it
+    GRAPH_CHECK(line_label.y < 240 && line_label.y + line_label.height > 220);  // at its middle
+
+    // The top-left panel moves down past a box label in its way.
+    FrameReport paneled;
+    std::shared_ptr<BoxesData> top_left(new BoxesData(Shape::kBoxes));
+    top_left->items.push_back(MakeItem(5, 40, 200, 200, 0.9f, "person"));
+    StageResult corner;
+    corner.data = top_left;
+    paneled.node_results["od"] = corner;
+    LogicOverlay panel;
+    OverlayText row;
+    row.text = "alarm: 1 > 0";
+    panel.texts.push_back(row);
+    paneled.overlays["alarm"] = panel;
+    FrameReport unpaneled = paneled;
+    unpaneled.overlays.clear();
+    const cv::Mat panel_changed =
+        LabelDiffMask(RenderReport(black, unpaneled), RenderReport(black, paneled));
+    const int person_label_bottom = 30 + baseline;  // drawDetection: baseline at y1 - 10
+    GRAPH_CHECK(cv::countNonZero(panel_changed) > 0);
+    GRAPH_CHECK(cv::countNonZero(panel_changed(cv::Rect(0, 0, 640, person_label_bottom + 1))) == 0);
+}
+
+// Values a condition reads from records are compared with the same 1e-6
+// slack as stream times: a dwell of 0.15 s that is 0.15 minus a rounding
+// error is ">= 0.15".
+void TestConditionComparesRecordValuesWithSlack() {
+    struct Case {
+        double value;
+        const char* comparator;
+        double threshold;
+        bool active;
+    };
+    const Case cases[] = {
+        {0.15 - 1e-12, ">=", 0.15, true},  {0.15 - 1e-12, "<", 0.15, false},
+        {0.1 * 3, "<=", 0.3, true},        {0.1 * 3, ">", 0.3, false},
+        {0.1 * 3, "==", 0.3, true},        {0.1 * 3, "!=", 0.3, false},
+        {0.15 - 1e-3, ">=", 0.15, false},  {0.15 + 1e-3, ">", 0.15, true},
+        {0.15 - 1e-3, "<", 0.15, true},    {0.15 + 1e-3, "!=", 0.15, true},
+    };
+    for (std::size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        NodeSpec node;
+        node.id = "c";
+        node.is_logic = true;
+        node.op = "condition";
+        node.params.text["value"] = "seconds";
+        node.params.text["comparator"] = cases[i].comparator;
+        node.params.numeric["threshold"] = cases[i].threshold;
+        const LogicConfig condition = MakeLogicConfig(node);
+        std::shared_ptr<RecordsData> records(new RecordsData());
+        RecordItem row;
+        row.numbers.push_back(std::make_pair(std::string("seconds"), cases[i].value));
+        records->items.push_back(row);
+        LogicInput input;
+        input.from = "d";
+        input.data = records;
+        LogicState state;
+        const LogicOutput out =
+            RunLogic(condition, std::vector<LogicInput>(1, input), FrameAt(0, 30.0), &state);
+        const RecordsData* rows = dynamic_cast<const RecordsData*>(out.result.data.get());
+        const bool active = rows != NULL && rows->items.size() == 1 &&
+                            NumberOf(rows->items[0], "active") == 1.0;
+        if (active != cases[i].active) {
+            std::printf("  case %zu: %.17g %s %.17g\n", i, cases[i].value, cases[i].comparator,
+                        cases[i].threshold);
+        }
+        GRAPH_CHECK(active == cases[i].active);
+        GRAPH_CHECK(out.events.size() == (cases[i].active ? 1u : 0u));
+    }
+}
+
+
+namespace {
+
+/// One event as text without its time: what a fresh pass must repeat.
+std::string EventKey(const GraphEvent& event) {
+    std::string text = event.node + " " + event.event + " #" + std::to_string(event.track_id);
+    for (std::size_t i = 0; i < event.data.numbers.size(); ++i) {
+        char number[32];
+        std::snprintf(number, sizeof(number), "%.6g", event.data.numbers[i].second);
+        text += " " + event.data.numbers[i].first + "=" + number;
+    }
+    return text;
+}
+
+/// `text` over the walk twice (keys 0..5, then 0..5 again), the stream
+/// restarted (--loop) before the second pass when `restart`.
+std::vector<FrameReport> RunWalkTwice(const std::string& text, bool restart, bool async) {
+    FakeModelRegistry registry = LogicRegistry();
+    const GraphSpec spec = ParseGraphText(text, "loop.json");
+    ValidateGraph(spec, registry);
+    StageGraph graph;
+    graph.Build(spec, registry, "/models", false);
+    graph.SetStreamClock(0, 10.0, false);
+    std::vector<FrameReport> reports;
+    SyncExecutor sync;
+    AsyncExecutor pipelined(Frames(4));
+    for (std::size_t i = 0; i < 12; ++i) {
+        if (i == 6 && restart) graph.RestartStream(0);
+        const cv::Mat frame = FrameWithKey(static_cast<int>(i % 6));
+        if (async) {
+            pipelined.Submit(graph, frame, i);
+        } else {
+            reports.push_back(sync.RunFrame(graph, frame, i));
+        }
+    }
+    if (async) {
+        pipelined.Finish(graph);
+        FrameReport report;
+        while (pipelined.TryNext(&report)) reports.push_back(report);
+    }
+    return reports;
+}
+
+}  // namespace
+
+// --loop: a stream that starts its video again starts its trackers and its
+// logic nodes' state again too, so the second pass raises what the first did.
+void TestARestartedStreamStartsItsTracksAndLogicAgain() {
+    const std::string text = LogicJson(
+        std::string(kZoneNode) +
+            ",{\"id\":\"d\",\"type\":\"logic\",\"op\":\"dwell\",\"params\":{\"threshold_s\":0.2}}",
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"d\",\"carry\":\"result\"}");
+    for (int async = 0; async < 2; ++async) {
+        const std::vector<FrameReport> looped = RunWalkTwice(text, true, async != 0);
+        GRAPH_CHECK(looped.size() == 12);
+        if (looped.size() != 12) continue;
+        std::vector<std::string> first;
+        std::vector<std::string> second;
+        for (std::size_t i = 0; i < 12; ++i) {
+            for (std::size_t e = 0; e < looped[i].events.size(); ++e) {
+                (i < 6 ? first : second)
+                    .push_back(std::to_string(i % 6) + " " + EventKey(looped[i].events[e]));
+            }
+        }
+        GRAPH_CHECK(!first.empty() && first == second);
+        for (std::size_t i = 0; i < 6; ++i) {
+            const BoxesData* a = dynamic_cast<const BoxesData*>(
+                looped[i].node_results.at("od").data.get());
+            const BoxesData* b = dynamic_cast<const BoxesData*>(
+                looped[i + 6].node_results.at("od").data.get());
+            GRAPH_CHECK(a != NULL && b != NULL && a->items.size() == b->items.size());
+            for (std::size_t k = 0; a != NULL && b != NULL && k < a->items.size(); ++k) {
+                GRAPH_CHECK(a->items[k].track_id == b->items[k].track_id);
+            }
+        }
+        // Without the restart the stay goes on: no second dwell event.
+        const std::vector<FrameReport> straight = RunWalkTwice(text, false, async != 0);
+        std::size_t dwells = 0;
+        for (std::size_t i = 0; i < straight.size(); ++i) {
+            for (std::size_t e = 0; e < straight[i].events.size(); ++e) {
+                dwells += straight[i].events[e].event == "dwell" ? 1 : 0;
+            }
+        }
+        GRAPH_CHECK(dwells == 1);
+    }
+}
+
+
+// Seconds in event data and records ("seconds", "*_s") are written to
+// 0.001 s like "time": 0.30000000000000004 is 0.3. Other numbers keep
+// every digit.
+void TestSecondsAreWrittenRoundedLikeTime() {
+    FrameReport report;
+    report.frame_index = 3;
+    report.stream = "cam";
+    report.time_s = 0.3;
+    GraphEvent event;
+    event.node = "d";
+    event.event = "dwell";
+    event.track_id = 1;
+    event.time_s = 0.3;
+    event.data.numbers.push_back(std::make_pair(std::string("seconds"), 0.1 * 3));
+    event.data.numbers.push_back(std::make_pair(std::string("wait_s"), 1.00049));
+    event.data.numbers.push_back(std::make_pair(std::string("score"), 0.123456789));
+    report.events.push_back(event);
+    std::shared_ptr<RecordsData> records(new RecordsData());
+    RecordItem row;
+    row.numbers.push_back(std::make_pair(std::string("track_id"), 1.0));
+    row.numbers.push_back(std::make_pair(std::string("seconds"), 0.1 * 3));
+    records->items.push_back(row);
+    StageResult dwell;
+    dwell.data = records;
+    report.node_results["d"] = dwell;
+    const std::string line = consumer::EventLineJson(event, report).dump();
+    GRAPH_CHECK(line.find("\"data\":{\"seconds\":0.3,\"wait_s\":1,\"score\":0.123456789}") !=
+                std::string::npos);
+    const nlohmann::json json = consumer::ReportToJson(report, false);
+    GRAPH_CHECK(json["events"][0]["data"]["seconds"].dump() == "0.3");
+    GRAPH_CHECK(json["nodes"]["d"]["payload"]["items"][0]["numbers"]["seconds"].dump() == "0.3");
+    // dwell measures to the nanosecond: 34/30 - 1/30 is 1.1, not 1.0999999999999999,
+    // in its records and its event (a condition reading it sees 1.1 too).
+    std::map<std::string, double> numbers;
+    numbers["threshold_s"] = 1.1;
+    numbers["grace_s"] = 2.0;  // frame 1 to 34 is one stay
+    const LogicConfig config = ConfigOf("dwell", numbers);
+    LogicState state;
+    RunLogic(config, PersonInput(400.f, 1), FrameAt(1, 30.0), &state);
+    const LogicOutput later = RunLogic(config, PersonInput(400.f, 1), FrameAt(34, 30.0), &state);
+    const RecordsData* rows = dynamic_cast<const RecordsData*>(later.result.data.get());
+    GRAPH_CHECK(rows != NULL && rows->items.size() == 1 &&
+                NumberOf(rows->items[0], "seconds") == 1.1);
+    GRAPH_CHECK(later.events.size() == 1 && NumberOf(later.events[0].data, "seconds") == 1.1);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -14383,6 +14673,10 @@ int main() {
     TestTwoStreamsKeepTheirOwnLogicState();
     TestConditionReadsRecordsNumbers();
     TestGalleryMatchesOnlyAVectorWithADirection();
+    TestLogicLabelsCoverNeitherBoxLabelsNorTheInArrow();
+    TestConditionComparesRecordValuesWithSlack();
+    TestARestartedStreamStartsItsTracksAndLogicAgain();
+    TestSecondsAreWrittenRoundedLikeTime();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

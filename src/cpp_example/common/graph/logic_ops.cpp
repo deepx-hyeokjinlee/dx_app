@@ -8,6 +8,7 @@
 
 #include <opencv2/imgproc.hpp>
 
+#include "common/graph/cpu_reduce.hpp"
 #include "common/graph/graph_error.hpp"
 #include "common/graph/roi_router.hpp"
 #include "common/processors/gallery_retrieval_postprocessor.hpp"
@@ -52,6 +53,26 @@ LogicParamInfo Choice(const char* name, const char* fallback,
     param.text_default = fallback;
     param.choices = choices;
     return param;
+}
+
+LogicParamInfo Step(LogicParamInfo param, double step) {
+    param.step = step;
+    return param;
+}
+
+LogicParamInfo List(const char* name, const char* items, const char* help) {
+    LogicParamInfo param = Param(name, LogicParamInfo::kTextList, help);
+    param.items = items;
+    return param;
+}
+
+LogicParamInfo::InputValues ValuesFor(Shape shape, bool per_crop,
+                                      const std::vector<std::string>& values) {
+    LogicParamInfo::InputValues allowed;
+    allowed.shape = shape;
+    allowed.per_crop = per_crop;
+    allowed.values = values;
+    return allowed;
 }
 
 LogicParamInfo Required(LogicParamInfo param) {
@@ -101,12 +122,12 @@ std::vector<LogicOpInfo> BuildLogicOps() {
     filter.summary = "keeps the boxes of the listed classes with at least a score and an area";
     filter.accepts = BoxPorts();
     filter.same_shape_out = true;
-    filter.params.push_back(Param("classes", LogicParamInfo::kTextList,
+    filter.params.push_back(List("classes", "string",
         "class names to keep, as the detector names them; leave it out to keep every class"));
-    filter.params.push_back(Number("min_score", 0.0, 1.0, 0.0,
-        "the smallest confidence kept (0.5, not 50)"));
-    filter.params.push_back(Number("min_area", 0.0, kLogicUnbounded, 0.0,
-        "the smallest box area kept, in source-frame pixels"));
+    filter.params.push_back(Step(Number("min_score", 0.0, 1.0, 0.0,
+        "the smallest confidence kept (0.5, not 50)"), 0.01));
+    filter.params.push_back(Step(Number("min_area", 0.0, kLogicUnbounded, 0.0,
+        "the smallest box area kept, in source-frame pixels"), 1.0));
     ops.push_back(filter);
 
     LogicOpInfo zone;
@@ -152,7 +173,7 @@ std::vector<LogicOpInfo> BuildLogicOps() {
     count.accepts = BoxPorts();
     count.max_inputs = 8;
     count.numbers.push_back("total");
-    count.params.push_back(Param("classes", LogicParamInfo::kTextList,
+    count.params.push_back(List("classes", "string",
         "count only these classes, one number each besides \"total\"; leave it out to "
         "count every box"));
     ops.push_back(count);
@@ -166,10 +187,10 @@ std::vector<LogicOpInfo> BuildLogicOps() {
     dwell.events.push_back("dwell");
     dwell.numbers.push_back("track_id");
     dwell.numbers.push_back("seconds");
-    dwell.params.push_back(Positive("threshold_s", kLogicUnbounded, 10.0,
-        "seconds a box must stay before its \"dwell\" event"));
-    dwell.params.push_back(Number("grace_s", 0.0, 60.0, 1.0,
-        "seconds a box may be missing (an occlusion) and still be the same stay"));
+    dwell.params.push_back(Step(Positive("threshold_s", kLogicUnbounded, 10.0,
+        "seconds a box must stay before its \"dwell\" event"), 0.1));
+    dwell.params.push_back(Step(Number("grace_s", 0.0, 60.0, 1.0,
+        "seconds a box may be missing (an occlusion) and still be the same stay"), 0.1));
     ops.push_back(dwell);
 
     LogicOpInfo condition;
@@ -183,9 +204,22 @@ std::vector<LogicOpInfo> BuildLogicOps() {
     condition.events.push_back("<event>");
     condition.numbers.push_back("value");
     condition.numbers.push_back("active");
-    condition.params.push_back(Text("value", "count",
+    LogicParamInfo value = Text("value", "count",
         "\"count\" (boxes or crops), a number the input writes (records), or "
-        "\"with:<label>\" / \"without:<label>\" (crops with scores)"));
+        "\"with:<label>\" / \"without:<label>\" (crops with scores)");
+    const std::vector<std::string> just_count(1, "count");
+    const char* const crop_values[] = {"count", "with:<label>", "without:<label>"};
+    for (std::size_t i = 0; i < condition.accepts.size(); ++i) {
+        const LogicPort& port = condition.accepts[i];
+        LogicParamInfo::InputValues allowed = ValuesFor(port.shape, port.per_crop, just_count);
+        if (port.shape == Shape::kRecords) {
+            allowed.values.clear();
+            allowed.from_numbers = true;
+        }
+        if (port.shape == Shape::kScores) allowed.values = Names(crop_values, 3);
+        value.values_by_input.push_back(allowed);
+    }
+    condition.params.push_back(value);
     const char* const comparators[] = {">", ">=", "<", "<=", "==", "!="};
     condition.params.push_back(Choice("comparator", ">", Names(comparators, 6),
         "how the value is compared with \"threshold\""));
@@ -194,9 +228,9 @@ std::vector<LogicOpInfo> BuildLogicOps() {
     const char* const reductions[] = {"max", "min", "sum"};
     condition.params.push_back(Choice("reduce", "max", Names(reductions, 3),
         "how several records' values become one: their largest, smallest or sum"));
-    condition.params.push_back(Number("cooldown_s", 0.0, 86400.0, 0.0,
+    condition.params.push_back(Step(Number("cooldown_s", 0.0, 86400.0, 0.0,
         "0: one event when the condition becomes true; more: an event at most this "
-        "often while it holds"));
+        "often while it holds"), 0.1));
     condition.params.push_back(Text("event", "",
         "the event name (letters, digits, _ . : -); leave it out for the node id"));
     ops.push_back(condition);
@@ -212,11 +246,14 @@ std::vector<LogicOpInfo> BuildLogicOps() {
     gallery.numbers.push_back("track_id");
     gallery.numbers.push_back("score");
     gallery.numbers.push_back("parent_index");
-    gallery.params.push_back(Required(Param("gallery", LogicParamInfo::kText,
+    LogicParamInfo file = Required(Param("gallery", LogicParamInfo::kText,
         "a DXGAL1 .bin built from an image folder: python3 scripts/build_gallery_database.py "
-        "--variant <model> --images <folder> --out <file>.bin")));
-    gallery.params.push_back(Number("threshold", 0.0, 1.0, 0.5,
-        "the smallest cosine similarity that names a match"));
+        "--variant <model> --images <folder> --out <file>.bin"));
+    file.format = "file";
+    file.extensions.push_back(".bin");
+    gallery.params.push_back(file);
+    gallery.params.push_back(Step(Number("threshold", 0.0, 1.0, 0.5,
+        "the smallest cosine similarity that names a match"), 0.01));
     const char* const modes_of_events[] = {"known", "all", "none"};
     gallery.params.push_back(Choice("events", "known", Names(modes_of_events, 3),
         "\"match\" events only, \"unknown\" events too, or none"));
@@ -237,8 +274,10 @@ std::vector<LogicOpInfo> BuildLogicOps() {
         "starting with a digit")));
     user.params.push_back(Required(Choice("input", "", shapes,
         "the kind of data the function receives")));
-    user.params.push_back(Required(Choice("output", "", shapes,
-        "the kind it returns; in a run the input passes through, so it equals \"input\"")));
+    LogicParamInfo returned = Required(Choice("output", "", shapes,
+        "the kind it returns; in a run the input passes through, so it equals \"input\""));
+    returned.equals = "input";
+    user.params.push_back(returned);
     ops.push_back(user);
     return ops;
 }
@@ -267,12 +306,18 @@ std::vector<LogicOpInfo> BuildCpuOps() {
     const char* const measures[] = {"box_x", "box_y", "box_w", "box_h", "class_id",
                                     "mask_area_px", "median_depth", "volume_proxy"};
     volume.numbers = Names(measures, 8);
-    volume.params.push_back(Number("scale_factor", 0.0, kLogicUnbounded, 1.0,
-        "multiplies the proxy; 1.0 leaves it in mask-pixels times depth"));
-    volume.params.push_back(Param("classes", LogicParamInfo::kTextList,
-        "package class names; leave it out for the defaults, [] to match none"));
-    volume.params.push_back(Param("class_ids", LogicParamInfo::kTextList,
-        "package class ids as strings; leave it out for the defaults, [] to match none"));
+    volume.params.push_back(Step(Number("scale_factor", 0.0, kLogicUnbounded, 1.0,
+        "multiplies the proxy; 1.0 leaves it in mask-pixels times depth"), 0.1));
+    LogicParamInfo classes = List("classes", "string",
+        "package class names; leave it out for the built-in ones (when_omitted), [] to "
+        "match none");
+    classes.when_omitted = CpuPackageClassNames();
+    volume.params.push_back(classes);
+    LogicParamInfo class_ids = List("class_ids", "integer",
+        "package class ids, each an integer written as a string (\"24\"); leave it out "
+        "for the built-in ones (when_omitted), [] to match none");
+    class_ids.when_omitted = CpuPackageClassIds();
+    volume.params.push_back(class_ids);
     ops.push_back(volume);
     return ops;
 }
@@ -506,8 +551,14 @@ LogicOutput RunZone(const LogicConfig& c, const std::vector<LogicInput>& inputs,
         out.events.push_back(event);
     }
     out.overlay.alert = !kept->items.empty();
-    OverlayText label;
-    if (!polygon.empty()) label.at = polygon[0];
+    OverlayText label;  // inside the zone, at its top-left corner
+    if (!polygon.empty()) {
+        label.at = polygon[0];
+        for (std::size_t i = 1; i < polygon.size(); ++i) {
+            if (polygon[i].x + polygon[i].y < label.at.x + label.at.y) label.at = polygon[i];
+        }
+        label.away = cv::Point2f(1.f, 1.f);
+    }
     label.text = c.id + ": " + std::to_string(kept->items.size());
     label.alert = out.overlay.alert;
     out.overlay.texts.push_back(label);
@@ -587,8 +638,11 @@ LogicOutput RunLine(const LogicConfig& c, const std::vector<LogicInput>& inputs,
     records->items.push_back(totals);
     out.result.data = records;
     if (line.size() == 2) {
-        OverlayText label;
+        OverlayText label;  // beside the middle, left of A->B: the "in" arrow points right
         label.at = (line[0] + line[1]) * 0.5f;
+        const cv::Point2f along = line[1] - line[0];
+        const float length = std::sqrt(along.x * along.x + along.y * along.y);
+        if (length > 0.f) label.away = cv::Point2f(along.y / length, -along.x / length);
         label.text = c.id + " in " + std::to_string(s->count_in) + " out " +
                      std::to_string(s->count_out);
         label.alert = !out.events.empty();
@@ -659,7 +713,8 @@ LogicOutput RunDwell(const LogicConfig& c, const std::vector<LogicInput>& inputs
             TrackMemo& memo = found->second;
             memo.last_s = at.time_s;
             memo.point = Anchor(item.box, "bottom");
-            const double seconds = at.time_s - memo.first_s;
+            // To the nanosecond: 34/30 - 1/30 s is 1.1, not 1.0999999999999999.
+            const double seconds = std::round((at.time_s - memo.first_s) * 1e9) / 1e9;
             RecordItem row;
             AddNumber(&row, "track_id", static_cast<double>(item.track_id));
             AddNumber(&row, "seconds", seconds);
@@ -687,13 +742,17 @@ LogicOutput RunDwell(const LogicConfig& c, const std::vector<LogicInput>& inputs
     return out;
 }
 
+/// Values within kTimeSlackS of the threshold count as equal to it: a
+/// records number is often a stream time (dwell's seconds) or a sum of
+/// fractions, and misses its threshold by a rounding error like times do.
 bool Compare(double value, const std::string& comparator, double threshold) {
-    if (comparator == ">") return value > threshold;
-    if (comparator == ">=") return value >= threshold;
-    if (comparator == "<") return value < threshold;
-    if (comparator == "<=") return value <= threshold;
-    if (comparator == "==") return value == threshold;
-    if (comparator == "!=") return value != threshold;
+    const bool equal = std::fabs(value - threshold) <= kTimeSlackS;
+    if (comparator == ">") return !equal && value > threshold;
+    if (comparator == ">=") return equal || value > threshold;
+    if (comparator == "<") return !equal && value < threshold;
+    if (comparator == "<=") return equal || value < threshold;
+    if (comparator == "==") return equal;
+    if (comparator == "!=") return !equal;
     return false;
 }
 

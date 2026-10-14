@@ -603,17 +603,106 @@ void DrawLabel(cv::Mat* canvas, const std::string& text, cv::Point at, bool aler
     cv::putText(*canvas, text, at, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
 }
 
-void DrawLogicOverlay(cv::Mat* canvas, const LogicOverlay& overlay, int* panel_line) {
+/// The box DrawLabel fills for `text` with its baseline at `at` (before clamping).
+cv::Rect LabelBox(const std::string& text, cv::Point at) {
+    int baseline = 0;
+    const cv::Size size = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
+    return cv::Rect(at.x, at.y - size.height - 2, size.width + 1, size.height + 2 + baseline + 1);
+}
+
+/// `box` kept inside the canvas the way DrawLabel keeps a label inside it.
+cv::Rect InsideCanvas(cv::Rect box, const cv::Size& canvas) {
+    box.x = std::max(0, std::min(box.x, canvas.width - box.width));
+    box.y = std::max(0, std::min(box.y, canvas.height - box.height));
+    return box;
+}
+
+/// `box` moved up (`up`) or down until it overlaps nothing in `taken`.
+cv::Rect PastTaken(cv::Rect box, bool up, const cv::Size& canvas,
+                   const std::vector<cv::Rect>& taken) {
+    for (std::size_t tries = 0; tries <= taken.size(); ++tries) {
+        const cv::Rect placed = InsideCanvas(box, canvas);
+        bool moved = false;
+        for (std::size_t i = 0; i < taken.size() && !moved; ++i) {
+            if ((placed & taken[i]).area() == 0) continue;
+            box.y = up ? taken[i].y - box.height - 1 : taken[i].y + taken[i].height + 1;
+            moved = true;
+        }
+        if (!moved) break;
+    }
+    return InsideCanvas(box, canvas);
+}
+
+/// The box of a label laid beside `text.at` towards `text.away`
+/// (OverlayText): `kGap` pixels off `at` on each axis that leans that way,
+/// centred on it on an axis that does not, then moved on along `away`'s
+/// vertical lean (down when it has none) past every box in `taken`.
+cv::Rect BesideAnchor(const OverlayText& text, const cv::Size& canvas,
+                      const std::vector<cv::Rect>& taken) {
+    const int kGap = 4;
+    const float kLean = 0.2f;
+    cv::Rect box = LabelBox(text.text, cv::Point(0, 0));
+    const cv::Point at = Pixel(text.at);
+    box.x = at.x - box.width / 2;
+    if (text.away.x > kLean) box.x = at.x + kGap;
+    if (text.away.x < -kLean) box.x = at.x - kGap - box.width;
+    box.y = at.y - box.height / 2;
+    if (text.away.y > kLean) box.y = at.y + kGap;
+    if (text.away.y < -kLean) box.y = at.y - kGap - box.height;
+    return PastTaken(box, text.away.y < -kLean, canvas, taken);
+}
+
+/// Draw a label whose filled box is `box` (LabelBox's geometry).
+void DrawLabelIn(cv::Mat* canvas, const std::string& text, const cv::Rect& box, bool alert) {
+    const cv::Rect origin = LabelBox(text, cv::Point(0, 0));
+    DrawLabel(canvas, text, cv::Point(box.x, box.y - origin.y), alert);
+}
+
+/// The label rows DrawBoxes fills above each box (drawDetection's own
+/// geometry, visualization.hpp), so a logic label can keep off them.
+void AddBoxLabelRows(const StageResult& result, const cv::Size& canvas,
+                     std::vector<cv::Rect>* taken) {
+    const BoxesData* boxes = dynamic_cast<const BoxesData*>(result.data.get());
+    if (boxes == NULL) return;
+    for (std::size_t i = 0; i < boxes->items.size(); ++i) {
+        const BoxItem& item = boxes->items[i];
+        const cv::Rect2f restored = RestoreBox(item.box, result.origin);
+        const float x1 = std::max(0.f, std::min(restored.x, static_cast<float>(canvas.width)));
+        const float y1 = std::max(0.f, std::min(restored.y, static_cast<float>(canvas.height)));
+        const std::string label =
+            item.class_name + ": " + std::to_string(static_cast<int>(item.score * 100)) + "%";
+        int baseline = 0;
+        const cv::Size text = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 2, &baseline);
+        const int y = y1 - 10 > 10 ? static_cast<int>(y1 - 10)
+                                   : static_cast<int>(y1 + text.height + 10);
+        taken->push_back(cv::Rect(static_cast<int>(x1), y - text.height - 5, text.width + 1,
+                                  text.height + 5 + baseline + 1));
+    }
+}
+
+/// Zones, lines with their "in" arrow and highlighted boxes; labels are
+/// drawn after every overlay's shapes (DrawLogicLabels).
+void DrawLogicShapes(cv::Mat* canvas, const LogicOverlay& overlay, cv::Mat* tint) {
     const cv::Scalar color = overlay.alert ? kAlertColor : kLogicColor;
+    const cv::Rect frame(0, 0, canvas->cols, canvas->rows);
     for (std::size_t i = 0; i < overlay.polygons.size(); ++i) {
         if (overlay.polygons[i].size() < 3) continue;
         std::vector<std::vector<cv::Point> > contour(1);
         for (std::size_t k = 0; k < overlay.polygons[i].size(); ++k) {
             contour[0].push_back(Pixel(overlay.polygons[i][k]));
         }
-        cv::Mat tint = canvas->clone();
-        cv::fillPoly(tint, contour, color);
-        cv::addWeighted(tint, 0.2, *canvas, 0.8, 0.0, *canvas);
+        // Tint only the polygon's bounding box, in one reused buffer.
+        const cv::Rect bounds = cv::boundingRect(contour[0]) & frame;
+        if (bounds.area() > 0) {
+            cv::Mat region = (*canvas)(bounds);
+            region.copyTo(*tint);
+            std::vector<std::vector<cv::Point> > local(1);
+            for (std::size_t k = 0; k < contour[0].size(); ++k) {
+                local[0].push_back(contour[0][k] - bounds.tl());
+            }
+            cv::fillPoly(*tint, local, color);
+            cv::addWeighted(*tint, 0.2, region, 0.8, 0.0, region);
+        }
         cv::polylines(*canvas, contour, true, color, 2);
     }
     for (std::size_t i = 0; i < overlay.lines.size(); ++i) {
@@ -636,15 +725,40 @@ void DrawLogicOverlay(cv::Mat* canvas, const LogicOverlay& overlay, int* panel_l
                                cvRound(box.height)),
                       color, 3);
     }
-    for (std::size_t i = 0; i < overlay.texts.size(); ++i) {
-        const OverlayText& text = overlay.texts[i];
-        if (text.at.x < 0.f) {
-            DrawLabel(canvas, text.text, cv::Point(10, 24 + kPanelLineHeight * (*panel_line)),
-                      text.alert);
-            ++*panel_line;
-        } else {
-            DrawLabel(canvas, text.text, Pixel(text.at), text.alert);
+}
+
+/// Every overlay's labels: first the top-left panel (one line under the
+/// other, each moved down past the box labels in `taken`), then the
+/// labels anchored in the picture, each kept off everything drawn before.
+void DrawLogicLabels(cv::Mat* canvas, const std::map<std::string, LogicOverlay>& overlays,
+                     std::vector<cv::Rect>* taken) {
+    const cv::Size size = canvas->size();
+    std::vector<cv::Rect> panel;
+    int next_baseline = 24;
+    for (int pass = 0; pass < 2; ++pass) {
+        for (std::map<std::string, LogicOverlay>::const_iterator it = overlays.begin();
+             it != overlays.end(); ++it) {
+            for (std::size_t i = 0; i < it->second.texts.size(); ++i) {
+                const OverlayText& text = it->second.texts[i];
+                const bool in_panel = text.at.x < 0.f;
+                if (in_panel != (pass == 0)) continue;
+                cv::Rect box;
+                if (in_panel) {
+                    box = PastTaken(LabelBox(text.text, cv::Point(10, next_baseline)), false,
+                                    size, *taken);
+                    next_baseline =
+                        box.y - LabelBox(text.text, cv::Point(0, 0)).y + kPanelLineHeight;
+                    panel.push_back(box);
+                } else if (text.away == cv::Point2f(0.f, 0.f)) {
+                    box = InsideCanvas(LabelBox(text.text, Pixel(text.at)), size);
+                } else {
+                    box = BesideAnchor(text, size, *taken);
+                }
+                DrawLabelIn(canvas, text.text, box, text.alert);
+                if (!in_panel) taken->push_back(box);
+            }
         }
+        if (pass == 0) taken->insert(taken->end(), panel.begin(), panel.end());
     }
 }
 
@@ -694,6 +808,34 @@ void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, Draw
     }
 }
 
+/// Every result ForEachResult draws, ports as results of their own, in its order.
+template <typename Visit>
+void VisitResults(const FrameReport& report, Visit visit) {
+    std::vector<const StageResult*> results;
+    for (std::map<std::string, StageResult>::const_iterator it = report.node_results.begin();
+         it != report.node_results.end(); ++it) {
+        if (report.logic_nodes.count(it->first) != 0 || report.overlays.count(it->first) != 0) {
+            continue;
+        }
+        results.push_back(&it->second);
+    }
+    for (std::map<std::string, std::vector<StageResult> >::const_iterator it =
+             report.roi_results.begin();
+         it != report.roi_results.end(); ++it) {
+        for (std::size_t i = 0; i < it->second.size(); ++i) results.push_back(&it->second[i]);
+    }
+    for (std::size_t i = 0; i < results.size(); ++i) {
+        visit(*results[i]);
+        for (StagePorts::const_iterator port = results[i]->ports.begin();
+             port != results[i]->ports.end(); ++port) {
+            StageResult as_result;
+            as_result.data = port->second;
+            as_result.origin = results[i]->origin;
+            visit(as_result);
+        }
+    }
+}
+
 }  // namespace
 
 cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report) {
@@ -723,12 +865,23 @@ cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report) {
     ForEachResult(report, &canvas, Shape::kScores, &DrawScores);
     ForEachResult(report, &canvas, Shape::kVector, &DrawVector);
 
-    // Pass 5: logic nodes, over everything else, in node-id order.
-    int panel_line = 0;
+    // Pass 5: logic nodes, over everything else, in node-id order. A label
+    // laid beside its anchor keeps off the box labels of pass 3 and off
+    // the labels drawn before it.
+    std::vector<cv::Rect> taken;
+    VisitResults(report, [&canvas, &taken](const StageResult& result) {
+        if (!result.data) return;
+        const Shape shape = result.data->shape();
+        if (shape == Shape::kBoxes || shape == Shape::kInstances) {
+            AddBoxLabelRows(result, canvas.size(), &taken);
+        }
+    });
+    cv::Mat tint;
     for (std::map<std::string, LogicOverlay>::const_iterator it = report.overlays.begin();
          it != report.overlays.end(); ++it) {
-        DrawLogicOverlay(&canvas, it->second, &panel_line);
+        DrawLogicShapes(&canvas, it->second, &tint);
     }
+    DrawLogicLabels(&canvas, report.overlays, &taken);
     return canvas;
 }
 

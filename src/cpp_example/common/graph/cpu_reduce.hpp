@@ -46,6 +46,11 @@ CpuReduction ReduceCpu(const std::string& op, const StageParams& params,
                        const std::vector<StageDataPtr>& inputs,
                        const cv::Size& frame_size);
 
+/// volume's package classes when its "classes" / "class_ids" are left out
+/// (ids as text, as a graph writes them), for --list-ops.
+std::vector<std::string> CpuPackageClassNames();
+std::vector<std::string> CpuPackageClassIds();
+
 }  // namespace graph
 }  // namespace dxapp
 

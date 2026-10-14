@@ -3413,9 +3413,25 @@ def test_sync_and_async_write_the_same_events(tmp_path):
 @pytest.mark.graph
 def test_loop_with_per_frame_images_needs_frames(tmp_path):
     result = run(BINARIES[0], "--graph", "{}/cascade_od_reid_track.json".format(GRAPHS),
-                 "--loop", "--output", str(tmp_path / "out.png"))
+                 "--input", str(tmp_path / "walk.mp4"), "--loop",
+                 "--output", str(tmp_path / "out.png"))
     assert result.returncode == 2, result.stdout + result.stderr
     assert "--loop never ends a video" in result.stderr, result.stderr
+
+
+@pytest.mark.graph_e2e
+def test_loop_on_an_image_writes_its_one_image(tmp_path):
+    """--loop restarts only videos: an image source ends after its frame, so
+    per-frame image --output without --frames is fine."""
+    graph = "cascade_od_reid_track.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    out = tmp_path / "out.png"
+    result = run(BINARIES[0], "--graph", "{}/{}".format(GRAPHS, graph), "--loop",
+                 "--output", str(out))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert out.is_file() and "1 frame, 0 failed" in result.stdout.splitlines(), result.stdout
 
 
 @pytest.mark.graph
@@ -3441,6 +3457,10 @@ def test_loop_restarts_a_video_until_frames(tmp_path, binary):
     assert [frame["index"] for frame in frames] == list(range(10))
     boxes = [[item["box"] for item in frame["nodes"]["od"]["payload"]["items"]] for frame in frames]
     assert boxes[4] == boxes[0] and boxes[8] == boxes[0], "frame 4 and 8 are frame 0 again"
+    # Each restart starts the tracker again: the same ids as on the first pass.
+    tracks = [[item["track_id"] for item in frame["nodes"]["od"]["payload"]["items"]]
+              for frame in frames]
+    assert tracks[4] == tracks[0] and tracks[8] == tracks[0], tracks
     assert "10 frames, 0 failed" in result.stdout.splitlines(), result.stdout[-300:]
     assert _field(_progress_lines(result.stdout)[-1], "frames") == "10"
 
@@ -3480,6 +3500,42 @@ def test_list_ops_json_describes_every_op():
     assert condition["value"]["default"] == "count"
     assert by["condition"]["events"] == ["<event>"]
     assert by["line"]["numbers"] == ["in", "out", "total"]
+
+
+@pytest.mark.graph
+def test_list_ops_json_gives_an_inspector_its_hints():
+    """Fields a GUI inspector needs beyond type and bounds; each appears only
+    where it applies, so every other param keeps its keys."""
+    ops = {op["op"]: op for op in json.loads(run(BINARIES[0], "--list-ops", "--json").stdout)}
+
+    def params(op):
+        return {p["name"]: p for p in ops[op]["params"]}
+
+    # A list left out is not [] (volume: the built-in package classes; [] matches none).
+    volume = params("volume")
+    for name in ("classes", "class_ids"):
+        assert "default" not in volume[name], volume[name]
+    assert volume["classes"]["items"] == "string" and volume["class_ids"]["items"] == "integer"
+    assert volume["classes"]["when_omitted"] == ["backpack", "handbag", "suitcase", "box",
+                                                 "package", "luggage"]
+    assert volume["class_ids"]["when_omitted"] == ["24", "26", "28"]
+    assert "default" not in params("filter")["classes"]
+    assert "when_omitted" not in params("filter")["classes"]
+    gallery = params("gallery")["gallery"]
+    assert gallery["type"] == "text" and gallery["format"] == "file"
+    assert gallery["extensions"] == [".bin"]
+    assert params("filter")["min_score"]["step"] == 0.01
+    assert params("dwell")["threshold_s"]["step"] == 0.1
+    assert params("user")["output"]["equals"] == "input"
+    assert "equals" not in params("user")["input"]
+    by_input = params("condition")["value"]["values_by_input"]
+    assert {"shape": "boxes", "per_crop": False, "values": ["count"]} in by_input
+    assert {"shape": "records", "per_crop": False, "values_from": "numbers"} in by_input
+    assert {"shape": "scores", "per_crop": True,
+            "values": ["count", "with:<label>", "without:<label>"]} in by_input
+    assert {"shape": "vector", "per_crop": True, "values": ["count"]} in by_input
+    help_last = [p for op in ops.values() for p in op["params"] if list(p)[-1] != "help"]
+    assert help_last == []
 
 
 @pytest.mark.graph

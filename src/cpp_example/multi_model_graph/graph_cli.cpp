@@ -29,6 +29,7 @@
 #include "common/graph/logic_ops.hpp"
 #include "common/graph/shape.hpp"
 #include "common/graph/stage_graph.hpp"
+#include "common/inputs/input_factory.hpp"
 #include "common/registry/static_model_registry.hpp"
 #include "common/third_party/nlohmann_json.hpp"
 #include "common/utility/dxnn_container.hpp"
@@ -612,7 +613,10 @@ OrderedJson ParamJson(const LogicParamInfo& param) {
             out["choices"] = param.choices;
             break;
         case LogicParamInfo::kTextList:
-            out["default"] = OrderedJson::array();
+            // No "default": leaving a list out is not [] (volume: the
+            // built-in classes, "when_omitted"; filter, count: every class).
+            out["items"] = param.items.empty() ? std::string("string") : param.items;
+            if (!param.when_omitted.empty()) out["when_omitted"] = param.when_omitted;
             break;
         case LogicParamInfo::kPolygon:
             out["min_points"] = 3;
@@ -620,6 +624,26 @@ OrderedJson ParamJson(const LogicParamInfo& param) {
         case LogicParamInfo::kLine:
             out["points"] = 2;
             break;
+    }
+    if (param.step > 0.0) out["step"] = JsonNumber<OrderedJson>(param.step);
+    if (!param.format.empty()) out["format"] = param.format;
+    if (!param.extensions.empty()) out["extensions"] = param.extensions;
+    if (!param.equals.empty()) out["equals"] = param.equals;
+    if (!param.values_by_input.empty()) {
+        OrderedJson by_input = OrderedJson::array();
+        for (std::size_t i = 0; i < param.values_by_input.size(); ++i) {
+            const LogicParamInfo::InputValues& allowed = param.values_by_input[i];
+            OrderedJson row = OrderedJson::object();
+            row["shape"] = ToString(allowed.shape);
+            row["per_crop"] = allowed.per_crop;
+            if (allowed.from_numbers) {
+                row["values_from"] = "numbers";
+            } else {
+                row["values"] = allowed.values;
+            }
+            by_input.push_back(row);
+        }
+        out["values_by_input"] = by_input;
     }
     out["help"] = param.help;
     return out;
@@ -1516,7 +1540,14 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
     // avg_fps counts from here (model load is out, pipeline fill is in): an input
     // shorter than --max-inflight returns every report in one burst at Finish().
     progress().start();
+    std::vector<std::size_t> restarts(reader.size(), 0);
     while (!Interrupted() && reader.Next(&stream, &frame, &index)) {
+        // --loop: a video that started again starts its tracks and its logic
+        // nodes' state again too (from this frame on, in frame order).
+        if (reader.restarts(stream) != restarts[stream]) {
+            restarts[stream] = reader.restarts(stream);
+            graph.RestartStream(stream);
+        }
         executor.Submit(graph, stream, frame, index);
         while (executor.TryNext(&report, &shown)) {
             if (!handle(report, shown)) {
@@ -1683,7 +1714,13 @@ int Main(int argc, char** argv, ExecutorKind kind) {
                     return 2;
                 }
             }
-            if (args.loop && args.frames == 0 &&
+            // Only a video file loops: images, cameras and RTSP end (or not) as without --loop.
+            bool loops = false;
+            for (std::size_t s = 0; s < streams.size(); ++s) {
+                loops = loops || (!IsLiveUri(streams[s].uri) &&
+                                  InputFactory::detectFileType(streams[s].uri) == InputType::VIDEO);
+            }
+            if (args.loop && loops && args.frames == 0 &&
                 ClassifyOutput(args.output) == OutputKind::kImagePerFrame) {
                 std::fprintf(stderr,
                              "--loop never ends a video, and --output %s writes one image per "

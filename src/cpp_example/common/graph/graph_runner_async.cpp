@@ -186,6 +186,7 @@ struct FrameCtx {
     std::size_t seq;
     std::size_t stream;  ///< StageGraph::streams() index
     std::size_t stream_seq;  ///< admission order within its stream: the key of its tracker gates
+    std::size_t generation;  ///< StreamPlan::generation at admission (RestartStream)
     FrameReport report;
     cv::Mat frame;  ///< an owned copy: sources reuse their buffer
     std::vector<int> pending_inputs;
@@ -203,7 +204,7 @@ struct FrameCtx {
     std::map<std::size_t, NodeRun> runs;  ///< dispatched, not yet harvested
     std::vector<std::size_t> ready;       ///< released, not yet dispatched
     bool closed;
-    FrameCtx() : seq(0), stream(0), stream_seq(0), closed(false) {}
+    FrameCtx() : seq(0), stream(0), stream_seq(0), generation(0), closed(false) {}
 };
 typedef std::shared_ptr<FrameCtx> FrameCtxPtr;
 
@@ -423,6 +424,7 @@ struct AsyncExecutor::Engine {
         ctx->report.frame_index = frame_index;
         ctx->report.stream = plan.source_id;
         ctx->report.time_s = graph->FrameTime(stream, frame_index);
+        ctx->generation = plan.generation;
         if (frame.empty()) {
             ctx->report.error = "source produced an empty frame";
             ctx->closed = true;
@@ -765,6 +767,7 @@ struct AsyncExecutor::Engine {
                 dynamic_cast<const BoxesData*>(produced.get());
             if (source_boxes != NULL) {
                 tracked.reset(new BoxesData(*source_boxes));
+                graph->FreshenStreamState(index, ctx.stream, ctx.generation);
                 ApplyTrackIds(tracked.get(), node.trackers[ctx.stream].get());
                 boxes = tracked.get();
                 // Keep the origin the stage reported (its inv_align maps a
@@ -791,6 +794,7 @@ struct AsyncExecutor::Engine {
         LogicFrame at;
         at.frame_size = ctx.frame.size();
         at.time_s = ctx.report.time_s;
+        graph->FreshenStreamState(index, ctx.stream, ctx.generation);
         const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
         const LogicOutput out = RunLogic(*node.logic, ctx.logic_in[index], at,
                                          node.logic_states[ctx.stream].get());

@@ -319,5 +319,19 @@ CpuReduction ReduceCpu(const std::string& op, const StageParams& params,
     return out;
 }
 
+std::vector<std::string> CpuPackageClassNames() {
+    return std::vector<std::string>(
+        kDefaultClassNames,
+        kDefaultClassNames + sizeof(kDefaultClassNames) / sizeof(kDefaultClassNames[0]));
+}
+
+std::vector<std::string> CpuPackageClassIds() {
+    std::vector<std::string> ids;
+    for (std::size_t i = 0; i < sizeof(kDefaultClassIds) / sizeof(kDefaultClassIds[0]); ++i) {
+        ids.push_back(std::to_string(kDefaultClassIds[i]));
+    }
+    return ids;
+}
+
 }  // namespace graph
 }  // namespace dxapp

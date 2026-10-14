@@ -29,6 +29,7 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
     report.frame_index = frame_index;
     report.stream = plan.source_id;
     report.time_s = graph.FrameTime(stream, frame_index);
+    const std::size_t generation = plan.generation;
 
     if (frame.empty()) {
         report.error = "source produced an empty frame";
@@ -90,6 +91,7 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             LogicFrame at;
             at.frame_size = frame.size();
             at.time_s = report.time_s;
+            graph.FreshenStreamState(index, stream, generation);
             const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
             const LogicOutput out =
                 RunLogic(*node.logic, found == logic_inbox.end() ? no_inputs : found->second, at,
@@ -177,6 +179,7 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
                 dynamic_cast<const BoxesData*>(produced.get());
             if (source_boxes != NULL) {
                 tracked.reset(new BoxesData(*source_boxes));
+                graph.FreshenStreamState(index, stream, generation);
                 ApplyTrackIds(tracked.get(), node.trackers[stream].get());
                 boxes = tracked.get();
                 // Keep the origin the stage reported (its inv_align maps a
