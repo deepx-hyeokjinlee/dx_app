@@ -312,9 +312,9 @@ Coverage Filtering Rules
 
 ## Maintenance & CI/CD
 
-### Repository checks (GitHub Actions)
+### Repository checks
 
-`scripts/ci_checks.sh` is the single entry point for the repository checks that need no NPU; those needing the DX-RT headers SKIP where they are missing. `.github/workflows/dxapp-checks.yml` runs it on every push and pull request (and on `workflow_dispatch`); developers run the same command.
+`scripts/ci_checks.sh` is the single entry point for the repository checks that need no NPU; those needing the DX-RT headers SKIP where they are missing. Developers and CI jobs run the same command.
 
 ```bash
 bash scripts/ci_checks.sh                  # every check, then a PASS / SKIP / FAIL summary
@@ -342,31 +342,13 @@ bash scripts/ci_checks.sh --require-dxrt   # a check skipped for want of the dxr
 
 **SKIP versus FAIL.** A check whose prerequisite is missing on this machine prints `SKIP` with the reason, and the run still exits 0; only a `FAIL` makes it exit 1. `--require-dxrt` turns the missing dxrt headers of `header-odr`, `cxx14-headers` and `cross-compile` into a `FAIL`. A missing cross compiler is still a `SKIP`. `--only` runs the named checks (an unknown name exits 2).
 
-**The runner's view, locally.** The GitHub-hosted runner has no dxrt headers, so those three checks are skipped there. To see the same on your machine:
+**A machine without the dxrt headers.** Those three checks are skipped where the headers are missing. To see that run on a machine that has them:
 
 ```bash
 DXRT_INCLUDE_DIR=/nonexistent bash scripts/ci_checks.sh
 ```
 
-Other variables: `PYTHON` (the interpreter for the checks, default the active virtual environment's, else `python3`) and `DXAPP_CROSS_CXX`. `DXAPP_CHECKS_RUNNER` is a repository variable that replaces the `ubuntu-24.04` runner of the `checks` job. Pull requests from a fork always run on `ubuntu-24.04`, whatever the variable says, so a fork's code never reaches that runner; pushes, `workflow_dispatch` and pull requests from branches of this repository use it.
-
-**The NPU job** (`npu` in the workflow) is off by default. It needs a self-hosted runner and runs tests on the real device.
-
-- Enable it with the repository variable `DXAPP_NPU_CI=true` (Settings, Secrets and variables, Actions, Variables), together with three more variables:
-  - `DXAPP_NPU_PYTHON`: a virtual environment's Python with pybind11, pytest and numpy;
-  - `DXAPP_NPU_RUNTIME_DIR`: the dx-runtime checkout, for `scripts/sanity_check.sh`;
-  - `DXAPP_NPU_ASSETS_DIR`: the models and videos, laid out as `setup.sh` fills `assets/`.
-- Register a runner with the labels `self-hosted, linux, x64, dxapp-npu`, with DX-RT, the NPU driver, cmake, ninja, g++ and OpenCV installed.
-- It runs on `workflow_dispatch` and on pushes to `main` or `staging`, after the `checks` job passes, and never on `pull_request`.
-- What it runs, in order, every NPU step under an external `timeout` (a hung hardware case fails its step instead of holding the runner):
-  1. the NPU sanity check, judged by the text `Sanity check PASSED!`;
-  2. `scripts/ci_checks.sh --require-dxrt --only header-odr,cxx14-headers`;
-  3. a link from `assets` to `DXAPP_NPU_ASSETS_DIR`;
-  4. the build and install into `bin/`, with `graph_engine_test` and `common_unit_test` copied there;
-  5. `graph_engine_test` (0 failures, 0 skipped) and `common_unit_test` (0 failures);
-  6. the graph trio: `tests/cpp_example/test_graph_engine.py`, `test_graph_cli.py` and `test_graph_python.py`.
-
-The `checks` job also marks the checkout as a git `safe.directory`, so the hermetic guard of `tests/scripts` can list the tracked files in a container runner.
+Other variables: `PYTHON` (the interpreter for the checks, default the active virtual environment's, else `python3`) and `DXAPP_CROSS_CXX`.
 
 ### Continuous Integration (CI) Integration
 

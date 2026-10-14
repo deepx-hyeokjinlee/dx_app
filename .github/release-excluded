@@ -47,17 +47,12 @@ docs/superpowers/
 scripts/add_modelzoo_2_5_0_models.py
 scripts/data/
 scripts/harvest_modelzoo_tree.py
-scripts/migrate_registry_modelzoo.py
 scripts/generate_manifest.py
-scripts/extract_processor_specs.py
 scripts/verify_processor_spec_equivalence.py
 tests/python_example/unit/test_modelzoo_2_5_0_additions.py
 
 # One-off layout migrations — they need the PRE-restructure example tree (--orig),
 # which is not in the package, so they cannot run against a release at all.
-scripts/generate_family_layout.py
-scripts/relocate_python_variant_factories.py
-scripts/restructure_examples.py
 scripts/verify_generated_layout.py
 
 # Internal QA / audit harnesses — developer sweeps over the whole registry, hardcoded

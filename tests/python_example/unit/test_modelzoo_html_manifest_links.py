@@ -1,22 +1,9 @@
 # Copyright (C) 2018- DEEPX Ltd. All rights reserved.
-"""Three-way check: DX Model Zoo.html <-> modelzoo_manifest.json <-> the examples.
+"""modelzoo_manifest.json <-> the examples <-> config/model_registry.json.
 
-An example is only usable if the model behind it can be downloaded, and that chain has
-three independent links: the zoo page offers a file, the manifest points a name at that
-file's URL, and an example variant config exists for the stem. Each pair has drifted at
-least once.
-
-The check is TIER-AWARE, which the first attempt was not. The page offers the same
-model under three quantisation tiers -- measured 350 q-lite, 341 q-pro, 15 q-master --
-and comparing every manifest row against the q-lite list alone reported 7 mismatches of
-which 4 were fine: beit-l-p16_384x384, levit-128s_224x224, vit-b-p16_384x384 and
-vit-t-p16_224x224 are q-master entries, listed on the page and downloadable (HTTP 200).
-
-Rows whose URL is a `/2_5_0/` path are excluded: those are models the zoo has announced
-but not published, so no 2_4_0 link exists for them by construction.
-
-The page itself is not committed, so the tests skip when it is absent rather than
-failing a checkout that never had it.
+An example is only usable if the model behind it can be downloaded: the manifest points
+a name at the file's URL, an example variant config exists for the stem, and the
+registry names the same file. Each pair has drifted at least once.
 """
 from __future__ import annotations
 
@@ -28,32 +15,10 @@ import pytest
 from test_helpers.constants import EXCLUDED_EXAMPLE_VARIANTS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-HTML = PROJECT_ROOT / "DX Model Zoo.html"
 MANIFEST = PROJECT_ROOT / "scripts" / "modelzoo_manifest.json"
 REGISTRY = PROJECT_ROOT / "config" / "model_registry.json"
 
-PENDING = "/2_5_0/"
 URL = re.compile(r"https://sdk\.deepx\.ai/modelzoo/([a-z0-9-]+)/([0-9_]+)/([^\"' ]+\.dxnn)")
-
-# SCRFD500M_PPU and YOLOV5Pose_PPU used to live on the legacy dxnn/2_4_0 tier.
-# Those manifest rows are gone; nothing else is exempt from the page check.
-LEGACY_TIER_ROWS: set[str] = set()
-
-
-def _requires_html():
-    if not HTML.is_file():
-        pytest.skip(f"{HTML.name} is not in this checkout")
-
-
-@pytest.fixture(scope="module")
-def html_links() -> dict:
-    """``{(tier, version): {filename}}`` for every .dxnn the page offers."""
-    _requires_html()
-    text = HTML.read_text(encoding="utf-8", errors="replace")
-    links: dict = {}
-    for tier, version, filename in URL.findall(text):
-        links.setdefault((tier, version), set()).add(filename)
-    return links
 
 
 @pytest.fixture(scope="module")
@@ -98,34 +63,6 @@ def test_no_manifest_row_is_duplicated(manifest):
     stems = [parts[2] for _row, parts in _parsed(manifest) if parts]
     duplicated = sorted({s for s in stems if stems.count(s) > 1})
     assert not duplicated, f"duplicate manifest rows: {duplicated}"
-
-
-# ------------------------------------------------------------------ manifest <-> page
-def test_every_published_manifest_row_is_offered_by_the_page(manifest, html_links):
-    missing = []
-    for row, parts in _parsed(manifest):
-        if not parts:
-            continue
-        tier, version, filename = parts
-        if version == "2_5_0" or row["name"] in LEGACY_TIER_ROWS:
-            continue
-        if filename not in html_links.get((tier, version), set()):
-            missing.append(f"{row['name']} -> {tier}/{version}/{filename}")
-    assert not missing, (
-        "manifest rows the zoo page does not offer at that tier:\n  "
-        + "\n  ".join(missing))
-
-
-def test_every_offered_q_lite_model_has_an_example(html_links, variant_configs):
-    """The other direction: a model on the page that no example can run."""
-    # Version-agnostic on purpose: the zoo moved the whole q-lite tier from 2_4_0 to
-    # 2_5_0 on 2026-09-30, and pinning the directory here broke the check rather than
-    # catching anything.
-    offered = {fn for (tier, _ver), files in html_links.items()
-               if tier == "q-lite-dxnn" for fn in files}
-    assert offered, "no q-lite links parsed from the page"
-    unused = sorted(f for f in offered if Path(f).stem not in variant_configs)
-    assert not unused, f"models offered by the page with no example variant: {unused}"
 
 
 # -------------------------------------------------------------- registry consistency

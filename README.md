@@ -156,7 +156,7 @@ Versions this release needs:
 - **DX-RT ≥ 3.5.0.** `./setup.sh` downloads DX Model Zoo 2_5_0, whose `.dxnn` files are container **v9**; DX-RT 3.5.0 is the first runtime that loads them.
 - **NPU driver ≥ 2.7.0** (RT and PCIe driver, as installed and tested here). The runtime's own minimum driver, firmware and `.dxnn` versions are printed by `dxrt-cli --version`.
 - **`dx_engine` 3.5.x**, the Python package of the same DX-RT: `import dx_engine` (3.5.0) raises `dx_engine and DX-RT versions do not match` when its major.minor differs from the runtime's.
-- The C++ examples check the floor when they start: a runtime older than 3.5.0 stops with `DXRT library version is too low. (required: >= 3.5.0, current: <version>)`. The check runs after the engine is created, so an older runtime may report its own error on the `.dxnn` first (see *Known issues* in `RELEASE_NOTES_MATERIAL.md`).
+- The C++ examples check the floor when they start: a runtime older than 3.5.0 stops with `DXRT library version is too low. (required: >= 3.5.0, current: <version>)`. The check runs after the engine is created, so an older runtime may report its own error on the `.dxnn` first.
 
 Tested with DX-RT 3.5.0 (build 1.6fdc543), NPU driver 2.7.0 (RT and PCIe) and firmware 2.7.4 on a DX-M1 M.2 card (x86_64).
 

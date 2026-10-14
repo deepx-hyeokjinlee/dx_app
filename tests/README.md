@@ -178,9 +178,8 @@ So running `tests/scripts` never needs a reinstall of `bin/` afterwards.
 
 `scripts/ci_checks.sh` is the one entry point for the repository checks
 that need no NPU (those needing the dxrt headers SKIP where they are
-missing), and it includes `pytest tests/scripts`. GitHub Actions runs it
-(`.github/workflows/dxapp-checks.yml`). See *Repository checks (GitHub
-Actions)* in `docs/source/docs/04_DX-APP_CPP_Example_Test.md`.
+missing), and it includes `pytest tests/scripts`. See *Repository checks*
+in `docs/source/docs/04_DX-APP_CPP_Example_Test.md`.
 
 There, `tests/scripts` runs with
 `--known-failures tests/scripts/known_target_failures.txt`: each test listed

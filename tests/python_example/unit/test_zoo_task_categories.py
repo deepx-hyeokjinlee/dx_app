@@ -1,5 +1,5 @@
 # Copyright (C) 2018- DEEPX Ltd. All rights reserved.
-"""The zoo page's task column is the authority for which task an example lives under.
+"""The DX Model Zoo's task column is the authority for which task an example lives under.
 
 DX Model Zoo 2_5_0 introduced four categories that had no directory here, and every
 model in them was filed under whatever the legacy task tables could accommodate. The
@@ -13,8 +13,8 @@ place-recognition model aimed at a pair of face photographs.
                               pp-shituv2-feature-extraction_224x224
     Person ReID               repvgg-a0-reid_256x128
 
-These tests read the page and pin the assignment, so the next re-classification cannot
-quietly regress it. The page is not committed, so they skip when it is absent.
+These tests pin that assignment in the registry and in both example trees, so the next
+re-classification cannot quietly regress it.
 
 ONE DELIBERATE DEPARTURE, asserted rather than tolerated:
 ``clip-img_resnet50_224x224_openai``. The page lists it under Zero Shot Image
@@ -26,15 +26,12 @@ prompt bank beside it is 512-d ViT-B/32 against this model's 1024-d output.
 """
 from __future__ import annotations
 
-import html as _html
 import json
-import re
 from pathlib import Path
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-HTML = PROJECT_ROOT / "DX Model Zoo.html"
 REGISTRY = PROJECT_ROOT / "config" / "model_registry.json"
 PY_TREE = PROJECT_ROOT / "src" / "python_example"
 CPP_TREE = PROJECT_ROOT / "src" / "cpp_example"
@@ -51,33 +48,16 @@ CATEGORY_TASK = {
 # module docstring.
 EXCEPTIONS = {"clip-img_resnet50_224x224_openai": "image_retrieval"}
 
-_ROW = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.S)
-_CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", re.S)
-_DXNN = re.compile(r'href="[^"]*/([^"/]+)\.dxnn"')
-
-
-def _requires_html():
-    if not HTML.is_file():
-        pytest.skip(f"{HTML.name} is not in this checkout")
-
-
-@pytest.fixture(scope="module")
-def zoo_tasks() -> dict:
-    """``{dxnn stem: zoo category}`` for every row that offers a .dxnn."""
-    _requires_html()
-    text = HTML.read_text(encoding="utf-8", errors="replace")
-    out: dict[str, str] = {}
-    for row in _ROW.findall(text):
-        cells = _CELL.findall(row)
-        if len(cells) < 3:
-            continue
-        category = _html.unescape(re.sub(r"\s+", " ",
-                                         re.sub(r"<[^>]+>", " ", cells[0]))).strip()
-        for stem in _DXNN.findall(row):
-            # A stem can appear under several quantisation tiers in one row; the
-            # category is a property of the row, so last-wins is the same value.
-            out[stem] = category
-    return out
+# What the zoo lists under each new category (the table in the module docstring).
+CATEGORY_MEMBERS = {
+    "Image Retrieval": ["clip-text_resnet50_77x512_openai"],
+    "Image Matting": ["ppmatting-hrnet-w48-composition_512x512",
+                      "ppmatting-hrnet-w48-distinctions_512x512"],
+    "Visual Place Recognition": ["eigenplaces-resnet18_512x512",
+                                 "eigenplaces-resnet50_512x512",
+                                 "pp-shituv2-feature-extraction_224x224"],
+    "Person ReID": ["repvgg-a0-reid_256x128"],
+}
 
 
 @pytest.fixture(scope="module")
@@ -86,20 +66,10 @@ def registry_task() -> dict:
     return {r["variant"]: r["task"] for r in rows}
 
 
-def test_the_page_still_declares_all_four_new_categories(zoo_tasks):
-    """If a category vanished from the page, the mapping below is stale, not wrong."""
-    present = set(zoo_tasks.values())
-    missing = sorted(set(CATEGORY_TASK) - present)
-    assert not missing, (
-        f"the page no longer lists {missing}; CATEGORY_TASK needs revisiting")
-
-
 @pytest.mark.parametrize("category", sorted(CATEGORY_TASK))
-def test_registry_task_matches_the_zoo_category(category, zoo_tasks, registry_task):
+def test_registry_task_matches_the_zoo_category(category, registry_task):
     expected = CATEGORY_TASK[category]
-    members = sorted(s for s, c in zoo_tasks.items() if c == category)
-    assert members, f"no model listed under {category!r}"
-    wrong = {s: registry_task.get(s) for s in members
+    wrong = {s: registry_task.get(s) for s in CATEGORY_MEMBERS[category]
              if registry_task.get(s) != expected}
     assert not wrong, (
         f"{category!r} should map to task {expected!r}; these disagree: {wrong}")

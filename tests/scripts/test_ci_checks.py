@@ -118,3 +118,12 @@ def test_tests_scripts_is_never_started_from_inside_itself():
     r = _run("--only", "tests-scripts", env={"DXAPP_CI_CHECKS_ACTIVE": "1"})
     assert r.returncode == 1
     assert "already running inside ci_checks.sh" in r.stderr
+
+
+def test_the_strict_claim_names_ci_checks():
+    cmake = (ROOT / "src" / "cpp_example" / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "catches in CI." not in cmake
+    assert "codegen-strict check of scripts/ci_checks.sh" in cmake
+    gen = " ".join((ROOT / "scripts" / "gen_model_registry.py").read_text(encoding="utf-8").split())
+    assert "--strict (CI)" not in gen and 'drift (CI)"' not in gen
+    assert gen.count("scripts/ci_checks.sh: codegen-strict") == 2  # docstring (re-wrapped) and --help
