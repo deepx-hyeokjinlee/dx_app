@@ -334,7 +334,7 @@ def test_help_lists_every_option(binary):
     for option in ("--graph", "--input", "--output", "--model-dir",
                    "--max-inflight", "--report", "--check", "--list-models",
                    "--max-jobs-per-stage", "--stall-timeout-ms", "--display",
-                   "--report-timing", "--json", "--events"):
+                   "--report-timing", "--json", "--events", "--loop"):
         assert option in result.stdout
 
 
@@ -3407,3 +3407,38 @@ def test_sync_and_async_write_the_same_events(tmp_path):
         assert result.returncode == 0, result.stdout + result.stderr
     assert files[BINARIES[0]].read_bytes() == files[BINARIES[1]].read_bytes()
     assert files[BINARIES[0]].read_text().count("\n") >= 2
+
+
+@pytest.mark.graph
+def test_loop_with_per_frame_images_needs_frames(tmp_path):
+    result = run(BINARIES[0], "--graph", "{}/cascade_od_reid_track.json".format(GRAPHS),
+                 "--loop", "--output", str(tmp_path / "out.png"))
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--loop never ends a video" in result.stderr, result.stderr
+
+
+@pytest.mark.graph
+def test_loop_applies_to_a_run():
+    result = run(BINARIES[0], "--check", "{}/cascade_od_reid_track.json".format(GRAPHS), "--loop")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--loop applies to a run (--graph), not to a listing or --check" in result.stderr
+
+
+@pytest.mark.graph_e2e
+@pytest.mark.parametrize("binary", BINARIES)
+def test_loop_restarts_a_video_until_frames(tmp_path, binary):
+    graph = "cascade_od_reid_track.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    video = write_moving_video(tmp_path / "moving.avi", count=4)
+    report = tmp_path / "report.json"
+    result = run_env(binary, {"DXAPP_PROGRESS": "1"}, "--graph", "{}/{}".format(GRAPHS, graph),
+                     "--input", str(video), "--loop", "--frames", "10", "--report", str(report))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frames = json.loads(report.read_text())["frames"]
+    assert [frame["index"] for frame in frames] == list(range(10))
+    boxes = [[item["box"] for item in frame["nodes"]["od"]["payload"]["items"]] for frame in frames]
+    assert boxes[4] == boxes[0] and boxes[8] == boxes[0], "frame 4 and 8 are frame 0 again"
+    assert "10 frames, 0 failed" in result.stdout.splitlines(), result.stdout[-300:]
+    assert _field(_progress_lines(result.stdout)[-1], "frames") == "10"

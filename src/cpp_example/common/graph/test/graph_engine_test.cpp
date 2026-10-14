@@ -13516,6 +13516,52 @@ void TestEventFileWriterWritesOneLinePerEvent() {
     GRAPH_CHECK(problem == "could not write /nonexistent_dir_for_graph_test/e.jsonl");
 }
 
+namespace {
+
+std::vector<std::size_t> ReadIndices(consumer::StreamReader* reader) {
+    std::vector<std::size_t> indices;
+    std::size_t stream = 0;
+    std::size_t index = 0;
+    cv::Mat frame;
+    while (reader->Next(&stream, &frame, &index)) indices.push_back(index);
+    return indices;
+}
+
+std::vector<consumer::StreamInput> OneInput(const std::string& path) {
+    std::vector<consumer::StreamInput> inputs(1);
+    inputs[0].source = "cam";
+    inputs[0].uri = path;
+    inputs[0].input = consumer::OpenInput(path);
+    return inputs;
+}
+
+}  // namespace
+
+void TestStreamReaderLoopsAVideo() {
+    const std::string video = ScratchPath("loop.avi");
+    {
+        cv::VideoWriter writer(video, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10,
+                               cv::Size(64, 48));
+        for (int i = 0; i < 4; ++i) writer.write(cv::Mat(48, 64, CV_8UC3, cv::Scalar(i * 40, 0, 0)));
+    }
+    consumer::StreamReader looped(OneInput(video), 10);
+    looped.SetLoop(true);
+    const std::vector<std::size_t> indices = ReadIndices(&looped);
+    GRAPH_CHECK(indices.size() == 10);
+    for (std::size_t i = 0; i < indices.size(); ++i) GRAPH_CHECK(indices[i] == i);
+    GRAPH_CHECK(looped.restarts(0) == 2);  // 4 + 4 + 2 frames
+    consumer::StreamReader once(OneInput(video), 10);
+    GRAPH_CHECK(ReadIndices(&once).size() == 4 && once.restarts(0) == 0);
+    // An image does not loop: one frame, then the stream ends.
+    const std::string image = ScratchPath("loop.png");
+    GRAPH_CHECK(cv::imwrite(image, cv::Mat(48, 64, CV_8UC3, cv::Scalar(9, 9, 9))));
+    consumer::StreamReader still(OneInput(image), 0);
+    still.SetLoop(true);
+    GRAPH_CHECK(ReadIndices(&still).size() == 1 && still.restarts(0) == 0);
+    std::remove(video.c_str());
+    std::remove(image.c_str());
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13904,6 +13950,7 @@ int main() {
     TestUserNodePassesItsInputThrough();
     TestRenderReportDrawsLogicOverlaysButNotTheirBoxes();
     TestEventFileWriterWritesOneLinePerEvent();
+    TestStreamReaderLoopsAVideo();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

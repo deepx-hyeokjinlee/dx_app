@@ -218,13 +218,28 @@ class StreamReader {
     const StreamInput& input(std::size_t stream) const;
     std::size_t frames_read(std::size_t stream) const;
     bool ended(std::size_t stream) const;
+    /// --loop: a video file that ends is opened again (OpenInput on its uri)
+    /// and read from its first frame, so the stream runs until --frames or a
+    /// stop request. Frame indices keep counting across restarts. Images,
+    /// cameras and RTSP are unaffected; a video that gives no frame right
+    /// after a restart ends there. Off by default (dx_graph never sets it).
+    void SetLoop(bool loop);
+    /// How many times stream `stream` started again.
+    std::size_t restarts(std::size_t stream) const;
 
  private:
+    /// Opens a video stream again from its start. False for anything that
+    /// is not a video file, or when it will not open.
+    bool Restart(std::size_t stream);
+
     std::vector<StreamInput> inputs_;
     std::vector<std::size_t> read_;
     std::vector<char> ended_;
     std::size_t limit_;
     std::size_t turn_;  ///< the stream whose turn it is
+    bool loop_;
+    std::vector<std::size_t> restarts_;
+    std::vector<std::size_t> read_since_start_;  ///< frames since it (re)opened
 };
 
 // ---------------------------------------------------------------------

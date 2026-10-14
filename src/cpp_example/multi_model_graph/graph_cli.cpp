@@ -106,6 +106,7 @@ struct GraphCliArgs {
     bool help;
     bool report_timing;   ///< --report-timing: node_ms in --report
     bool json;            ///< --check / --list-models: JSON on stdout
+    bool loop;            ///< --loop: a video starts again at its end
 
     GraphCliArgs()
         : model_dir(DefaultModelDir()),
@@ -118,7 +119,8 @@ struct GraphCliArgs {
           display(false),
           help(false),
           report_timing(false),
-          json(false) {}
+          json(false),
+          loop(false) {}
 };
 
 /// The usage text, on `out`: stdout for --help and for a usage error,
@@ -186,6 +188,8 @@ void PrintUsage(std::FILE* out, const char* program) {
         "  --frames <N>          stop after N frames (default: all); with"
         " several\n"
         "                        sources, N frames of each stream\n"
+        "  --loop                a video source starts again at its end, so the run\n"
+        "                        goes on until Ctrl-C, q/ESC or --frames N (Live)\n"
         "  --check [<file>]      validate the graph and list the model files"
         " it\n"
         "                        needs, without opening the NPU, then exit.\n"
@@ -249,6 +253,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         }
         if (option == "--report-timing") {
             args->report_timing = true;
+            continue;
+        }
+        if (option == "--loop") {
+            args->loop = true;
             continue;
         }
         if (option == "--json") {
@@ -366,6 +374,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
     }
     if (!args->events.empty() && (args->check_only || args->list_models)) {
         *error = "--events applies to a run (--graph), not to a listing or --check";
+        return false;
+    }
+    if (args->loop && (args->check_only || args->list_models)) {
+        *error = "--loop applies to a run (--graph), not to a listing or --check";
         return false;
     }
     return true;
@@ -1252,6 +1264,7 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
         inputs.push_back(std::move(input));
     }
     StreamReader reader(std::move(inputs), args.frames);
+    reader.SetLoop(args.loop);
     // Logic nodes count seconds per stream: a file's frame index over its
     // frame rate, a camera's or an RTSP stream's wall clock.
     for (std::size_t s = 0; s < reader.size(); ++s) {
@@ -1539,6 +1552,16 @@ int Main(int argc, char** argv, ExecutorKind kind) {
                     PrintUsage(stdout, argv[0]);
                     return 2;
                 }
+            }
+            if (args.loop && args.frames == 0 &&
+                ClassifyOutput(args.output) == OutputKind::kImagePerFrame) {
+                std::fprintf(stderr,
+                             "--loop never ends a video, and --output %s writes one image per "
+                             "frame: write a video instead (--output <stem>.mkv, .avi or .mp4) "
+                             "or stop after N frames (--frames N)\n\n",
+                             args.output.c_str());
+                PrintUsage(stdout, argv[0]);
+                return 2;
             }
             // Not a usage error: exit 1, as an unwritable --report. Checked
             // on the first file each stream writes; with one source that is

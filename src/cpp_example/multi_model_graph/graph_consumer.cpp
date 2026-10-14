@@ -705,7 +705,26 @@ InputSourcePtr OpenStream(const GraphSpec& spec, const StreamUri& stream) {
 
 StreamReader::StreamReader(std::vector<StreamInput> inputs, std::size_t frames_per_stream)
     : inputs_(std::move(inputs)), read_(inputs_.size(), 0), ended_(inputs_.size(), 0),
-      limit_(frames_per_stream), turn_(0) {}
+      limit_(frames_per_stream), turn_(0), loop_(false), restarts_(inputs_.size(), 0),
+      read_since_start_(inputs_.size(), 0) {}
+
+void StreamReader::SetLoop(bool loop) { loop_ = loop; }
+
+std::size_t StreamReader::restarts(std::size_t stream) const { return restarts_.at(stream); }
+
+bool StreamReader::Restart(std::size_t s) {
+    if (inputs_[s].input->getType() != InputType::VIDEO) return false;
+    try {
+        InputSourcePtr reopened = OpenInput(inputs_[s].uri);
+        if (!reopened || !reopened->isOpened()) return false;
+        inputs_[s].input = std::move(reopened);
+    } catch (const std::exception&) {
+        return false;
+    }
+    ++restarts_[s];
+    read_since_start_[s] = 0;
+    return true;
+}
 
 bool StreamReader::Next(std::size_t* stream, cv::Mat* frame, std::size_t* index) {
     // At most one pass over the streams: each gets its turn once, starting
@@ -716,11 +735,17 @@ bool StreamReader::Next(std::size_t* stream, cv::Mat* frame, std::size_t* index)
         turn_ = (turn_ + 1) % inputs_.size();
         if (ended_[s]) continue;
         if (!inputs_[s].input->getFrame(*frame)) {
-            ended_[s] = 1;  // its end: never read again
-            continue;
+            // --loop: a video that gave frames starts again, once per end.
+            const bool again = loop_ && read_since_start_[s] != 0 && Restart(s) &&
+                               inputs_[s].input->getFrame(*frame);
+            if (!again) {
+                ended_[s] = 1;  // its end: never read again
+                continue;
+            }
         }
         *stream = s;
         *index = read_[s]++;
+        ++read_since_start_[s];
         if (limit_ != 0 && read_[s] >= limit_) ended_[s] = 1;  // no read past --frames
         return true;
     }
