@@ -13102,6 +13102,98 @@ void TestEventDataKeepsEachKeyOnce() {
     GRAPH_CHECK(DropRepeatedKeys(&data).empty());
 }
 
+namespace {
+
+/// A vertical line through the frame's middle, from A (bottom) to B (top):
+/// its right is the image's right, so walking right is "in".
+const char kLineNode[] =
+    ",{\"id\":\"l\",\"type\":\"logic\",\"op\":\"line\",\"params\":{\"line\":[0.5,1,0.5,0]}}";
+const char kOdToL[] = ",{\"from\":\"od\",\"to\":\"l\",\"carry\":\"result\"}";
+
+double NumberOf(const RecordItem& item, const std::string& name) {
+    double value = -1.0;
+    NamedNumber(item, name, &value);
+    return value;
+}
+
+FakeModelRegistry ReversedLogicRegistry() {
+    FakeModelRegistry registry = LogicRegistry();
+    registry.SetDeliveryOrder("det", FakeModelRegistry::kReverse);
+    return registry;
+}
+
+}  // namespace
+
+void TestLineCountsCrossingsBothWays() {
+    const std::string text = LogicJson(kLineNode, kOdToL);
+    const std::vector<FrameReport> reports = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    const double in[] = {0, 0, 1, 1, 1, 1};
+    const double out[] = {0, 0, 0, 0, 0, 1};
+    for (std::size_t i = 0; i < 6; ++i) {
+        const RecordsData* records = RecordsOf(reports[i], "l");
+        GRAPH_CHECK(records != NULL && records->items.size() == 1);
+        if (records == NULL || records->items.size() != 1) continue;
+        GRAPH_CHECK(NumberOf(records->items[0], "in") == in[i]);
+        GRAPH_CHECK(NumberOf(records->items[0], "out") == out[i]);
+        GRAPH_CHECK(NumberOf(records->items[0], "total") == in[i] + out[i]);
+        GRAPH_CHECK(reports[i].overlays.at("l").lines.size() == 1);
+        if (i != 2 && i != 5) GRAPH_CHECK(reports[i].events.empty());
+    }
+    GRAPH_CHECK(reports[2].events.size() == 1 && reports[5].events.size() == 1);
+    if (reports[2].events.size() == 1 && reports[5].events.size() == 1) {
+        GRAPH_CHECK(reports[2].events[0].event == "cross" && reports[2].events[0].track_id == 0);
+        GRAPH_CHECK(reports[2].events[0].data.text[0].second == "in");
+        GRAPH_CHECK(reports[5].events[0].data.text[0].second == "out");
+        GRAPH_CHECK(NumberOf(reports[5].events[0].data, "out") == 1.0);
+    }
+    GRAPH_CHECK(reports[0].overlays.at("l").lines[0].first == cv::Point2f(320.f, 480.f));
+    // "direction": "in" raises only the inward event; the counts keep both.
+    const std::vector<FrameReport> in_only = RunLogicFrames(
+        LogicJson(",{\"id\":\"l\",\"type\":\"logic\",\"op\":\"line\",\"params\":"
+                  "{\"line\":[0.5,1,0.5,0],\"direction\":\"in\"}}", kOdToL),
+        LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(in_only.size() == 6 && in_only[2].events.size() == 1 && in_only[5].events.empty());
+    const std::vector<FrameReport> async = RunLogicFrames(text, ReversedLogicRegistry(), Keys(6), true);
+    GRAPH_CHECK(async.size() == 6);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
+}
+
+void TestCountCountsEachInputAndClass() {
+    const std::string text = LogicJson(
+        ",{\"id\":\"left\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":"
+        "[0,0,0.5,0,0.5,1,0,1]}}"
+        ",{\"id\":\"right\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":"
+        "[0.5,0,1,0,1,1,0.5,1]}}"
+        ",{\"id\":\"n\",\"type\":\"logic\",\"op\":\"count\",\"params\":{\"classes\":[\"person\",\"car\"]}}",
+        ",{\"from\":\"od\",\"to\":\"left\",\"carry\":\"result\"},"
+        "{\"from\":\"od\",\"to\":\"right\",\"carry\":\"result\"},"
+        "{\"from\":\"right\",\"to\":\"n\",\"carry\":\"result\"},"
+        "{\"from\":\"left\",\"to\":\"n\",\"carry\":\"result\"}");
+    const std::vector<FrameReport> reports = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    const double right[] = {0, 0, 1, 1, 1, 0};
+    for (std::size_t i = 0; i < 6; ++i) {
+        const RecordsData* records = RecordsOf(reports[i], "n");
+        GRAPH_CHECK(records != NULL && records->items.size() == 2);
+        if (records == NULL || records->items.size() != 2) continue;
+        // Inputs in edge order: right -> n is declared before left -> n.
+        GRAPH_CHECK(records->items[0].text.size() == 1 &&
+                    records->items[0].text[0].second == "right");
+        GRAPH_CHECK(records->items[1].text[0].second == "left");
+        GRAPH_CHECK(NumberOf(records->items[0], "total") == right[i]);
+        GRAPH_CHECK(NumberOf(records->items[0], "person") == right[i]);
+        GRAPH_CHECK(NumberOf(records->items[0], "car") == 0.0);
+        GRAPH_CHECK(NumberOf(records->items[1], "total") == 1.0 - right[i]);
+        GRAPH_CHECK(reports[i].overlays.at("n").texts.size() == 2);
+    }
+    const std::vector<FrameReport> async = RunLogicFrames(text, ReversedLogicRegistry(), Keys(6), true);
+    GRAPH_CHECK(async.size() == 6);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13480,6 +13572,8 @@ int main() {
     TestAsyncListsEventsInNodeOrder();
     TestCpuNodeBehindAFilterGetsOnlyTheFilteredBoxes();
     TestEventDataKeepsEachKeyOnce();
+    TestLineCountsCrossingsBothWays();
+    TestCountCountsEachInputAndClass();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

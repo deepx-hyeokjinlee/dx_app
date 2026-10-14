@@ -509,11 +509,131 @@ LogicOutput RunZone(const LogicConfig& c, const std::vector<LogicInput>& inputs,
     return out;
 }
 
+/// +1 when p is right of A->B on the image (y down), -1 left, 0 on the line.
+int Side(const cv::Point2f& a, const cv::Point2f& b, const cv::Point2f& p) {
+    const double cross = static_cast<double>(b.x - a.x) * (p.y - a.y) -
+                         static_cast<double>(b.y - a.y) * (p.x - a.x);
+    return cross > 0.0 ? 1 : (cross < 0.0 ? -1 : 0);
+}
+
+/// The line through a movement p1 -> p2 meets segment A-B (endpoints included).
+bool MovementMeetsSegment(const cv::Point2f& p1, const cv::Point2f& p2,
+                          const cv::Point2f& a, const cv::Point2f& b) {
+    return Side(p1, p2, a) * Side(p1, p2, b) <= 0;
+}
+
+LogicOutput RunLine(const LogicConfig& c, const std::vector<LogicInput>& inputs,
+                    const LogicFrame& at, LogicState* s) {
+    LogicOutput out;
+    const std::vector<cv::Point2f> line = Points(c, "line", at.frame_size);
+    if (line.size() == 2) out.overlay.lines.push_back(std::make_pair(line[0], line[1]));
+    const LogicInput* input = FirstFullFrame(inputs);
+    const std::shared_ptr<BoxesData> boxes =
+        input == NULL ? std::shared_ptr<BoxesData>() : SourceBoxes(*input);
+    if (!boxes) out.error = "missing boxes input";
+    const std::string anchor = Text(c, "anchor");
+    const std::string direction = Text(c, "direction");
+    std::set<int> seen;
+    if (boxes && line.size() == 2) {
+        for (std::size_t i = 0; i < boxes->items.size(); ++i) {
+            const BoxItem& item = boxes->items[i];
+            if (item.track_id < 0) continue;
+            seen.insert(item.track_id);
+            const cv::Point2f p = Anchor(item.box, anchor);
+            const int side = Side(line[0], line[1], p);
+            std::map<int, TrackMemo>::iterator found = s->tracks.find(item.track_id);
+            if (found == s->tracks.end()) {
+                TrackMemo memo;
+                memo.point = p;
+                memo.side = side;
+                memo.last_s = at.time_s;
+                s->tracks[item.track_id] = memo;
+                continue;
+            }
+            TrackMemo& memo = found->second;
+            if (side != 0 && memo.side != 0 && side != memo.side &&
+                MovementMeetsSegment(memo.point, p, line[0], line[1])) {
+                const bool inward = memo.side < 0;  // from the left of A->B to its right
+                if (inward) {
+                    ++s->count_in;
+                } else {
+                    ++s->count_out;
+                }
+                if (direction == "both" || direction == (inward ? "in" : "out")) {
+                    GraphEvent event = MakeEvent(c, "cross", item.track_id, at);
+                    AddText(&event.data, "direction", inward ? "in" : "out");
+                    AddNumber(&event.data, "in", static_cast<double>(s->count_in));
+                    AddNumber(&event.data, "out", static_cast<double>(s->count_out));
+                    out.events.push_back(event);
+                }
+            }
+            if (side != 0) memo.side = side;  // on the line: keep the side it came from
+            memo.point = p;
+            memo.last_s = at.time_s;
+        }
+    }
+    Forget(s, seen, at.time_s, kForgetAfterS, [](int, const TrackMemo&) {});
+    std::shared_ptr<RecordsData> records(new RecordsData());
+    RecordItem totals;
+    AddNumber(&totals, "in", static_cast<double>(s->count_in));
+    AddNumber(&totals, "out", static_cast<double>(s->count_out));
+    AddNumber(&totals, "total", static_cast<double>(s->count_in + s->count_out));
+    records->items.push_back(totals);
+    out.result.data = records;
+    if (line.size() == 2) {
+        OverlayText label;
+        label.at = (line[0] + line[1]) * 0.5f;
+        label.text = c.id + " in " + std::to_string(s->count_in) + " out " +
+                     std::to_string(s->count_out);
+        label.alert = !out.events.empty();
+        out.overlay.texts.push_back(label);
+        out.overlay.alert = !out.events.empty();
+    }
+    return out;
+}
+
+LogicOutput RunCount(const LogicConfig& c, const std::vector<LogicInput>& inputs) {
+    LogicOutput out;
+    const std::vector<std::string>& classes = List(c, "classes");
+    std::shared_ptr<RecordsData> records(new RecordsData());
+    for (std::size_t i = 0; i < inputs.size(); ++i) {
+        if (inputs[i].per_crop) continue;
+        const BoxesData* boxes =
+            inputs[i].data ? dynamic_cast<const BoxesData*>(inputs[i].data.get()) : NULL;
+        std::size_t total = 0;
+        std::vector<std::size_t> per_class(classes.size(), 0);
+        if (boxes != NULL) {
+            for (std::size_t b = 0; b < boxes->items.size(); ++b) {
+                if (!Listed(classes, boxes->items[b])) continue;
+                ++total;
+                for (std::size_t k = 0; k < classes.size(); ++k) {
+                    if (classes[k] == boxes->items[b].class_name) ++per_class[k];
+                }
+            }
+        }
+        RecordItem item;
+        AddNumber(&item, "total", static_cast<double>(total));
+        for (std::size_t k = 0; k < classes.size(); ++k) {
+            AddNumber(&item, classes[k], static_cast<double>(per_class[k]));
+        }
+        AddText(&item, "node", inputs[i].from);
+        records->items.push_back(item);
+        OverlayText label;  // a line in the top-left panel
+        label.text = c.id + " " + inputs[i].from + ": " + std::to_string(total);
+        out.overlay.texts.push_back(label);
+    }
+    if (inputs.empty()) out.error = "missing boxes input";
+    out.result.data = records;
+    return out;
+}
+
 /// The op's own run; RunLogic sorts the inputs and checks the events.
 LogicOutput RunOp(const LogicConfig& config, const std::vector<LogicInput>& inputs,
                   const LogicFrame& frame, LogicState* s) {
     if (config.op == "filter") return RunFilter(config, inputs);
     if (config.op == "zone") return RunZone(config, inputs, frame, s);
+    if (config.op == "line") return RunLine(config, inputs, frame, s);
+    if (config.op == "count") return RunCount(config, inputs);
     LogicOutput out;
     out.result.data.reset(new RecordsData());
     out.error = "logic op \"" + config.op + "\" cannot run";
