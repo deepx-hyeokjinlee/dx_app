@@ -80,40 +80,12 @@ This section guides you through the environment setup and the initial build proc
 
 > **On the counts below.** The registry lists **497 variants** (498 rows, one alias)
 > across 28 AI tasks, and **all 497 have a downloadable `.dxnn`**.
-> `SCRFD500M_PPU` and `YOLOV5Pose_PPU` example sources stay in the trees; they are
-> not registered, not built, and not downloaded.
->
-> `vit-l-p16_512x512_swag` is published at `q-lite-dxnn/2_5_0`. Whether a model is
-> unpublished is declared (`published` / manifest `pending`), never inferred from the
-> version directory. That set is empty.
->
+
 > **2_5_0 needs DX-RT 3.5.0.** Those `.dxnn` files are container **format version 9**,
 > which DX-RT 3.4.2 refuses (`Model file format version 9 is not supported`) while
 > 3.5.0 parses it. `scripts/sweep_npu_inference.py` probes the runtime once per
 > container version and reports `UNSUPPORTED_FORMAT` rather than a failure of the
 > example code, so the same tree is honest on either runtime.
-
-
-
-> **Two examples depend on something a `.dxnn` cannot carry.**
->
-> * `zero_shot_image_classification/clip` -- zero-shot needs text, and the zoo's only
->   text tower (`clip-text_resnet50_77x512_openai`) emits the transformer's
->   `[1,77,512]` hidden states rather than a joint embedding, from a different
->   checkpoint than any image tower here. So the prompts are encoded once at build
->   time by `scripts/build_clip_prompt_bank.py` into `prompt_bank.json`, and the app
->   stays numpy-only. **The prompt set is therefore fixed at build time** -- re-run the
->   script with `--labels` to change it. Only the ViT-B/32 256x256 variant ships a
->   bank; the other clip variants keep the image-to-image embedding comparison.
-> * `anomaly_detection/efficientad` -- the map is EfficientAD's own combination of the
->   student-teacher and autoencoder disagreements, so the example loads all three
->   networks from one `-m` (the factory declares the companions). What it cannot
->   reproduce is the published SCORE: that divides by q_st/q_ae quantiles fitted on the
->   training set, which no `.dxnn` carries, so severity is comparable across frames for
->   this model set and to nothing else. `patchcore` is still single-network, because
->   its metric needs a memory bank of training features.
->
-> The C++ examples for both families are still the single-model versions.
 
 The project is structured to separate core logic from language-specific implementations.  
 ```text
@@ -215,16 +187,6 @@ For contributor workflows such as model onboarding, validation, filtered executi
 
 ---
 
-## Checks and CI
-
-Every check that needs no NPU (the architecture guards, the model-registry generator, `pytest tests/scripts`; the aarch64 and header checks run where the DX-RT headers are installed) runs from one script, which GitHub Actions also runs on each push and pull request. Details, the list of checks and the opt-in NPU job: [Repository checks](./docs/source/docs/04_DX-APP_CPP_Example_Test.md#repository-checks-github-actions).
-
-```bash
-bash scripts/ci_checks.sh
-```
-
----
-
 # Multi-Model Graph
 
 The multi-model runtime is the node graph: `bin/multi_model_graph_sync`, `bin/multi_model_graph_async`, and the Python module `dx_graph`. Sources are [`src/cpp_example/multi_model_graph/`](./src/cpp_example/multi_model_graph/README.md) and [`src/bindings/python/dx_graph/`](./src/bindings/python/dx_graph/README.md).
@@ -233,7 +195,7 @@ A graph is a JSON file of registry models wired by frame, ROI and image hand-off
 
 The graph binaries and `dx_graph` are built by `./build.sh --all` (the default `--minimal` build does not build them); `./build.sh --all --python_exec <python>` builds `dx_graph` for that interpreter into `bin/python/dx_graph`.
 
-**Model files.** `./setup.sh` downloads all 497 registered models: 493 from DX Model Zoo 2_5_0, whose `.dxnn` files are container v9, which needs DX-RT 3.5.0 (see *Repository Layout* above), and 4 that 2_5_0 does not publish from 2_4_0 (`beit-l-p16_384x384`, `levit-128s_224x224`, `vit-b-p16_384x384`, `vit-t-p16_224x224`). `SCRFD500M_PPU` and `YOLOV5Pose_PPU` are not in this set. The graph runtime checks the container before loading; on a DX-RT older than 3.5.0 it stops with `.dxnn container v9 needs DX-RT >= 3.5.0, but this runtime is <version>. Use the v8 file (dxnn/2_4_0) or upgrade DX-RT.`, and `--check` reports it and exits 1. The graphs were validated on DX-RT 3.4.1 with v8 files and on DX-RT 3.5.0 with both the v8 and the v9 files: the golden reports (9 sample graphs) are byte-identical between `multi_model_graph_sync` and `_async` on either store, and the v8 ones equal the DX-RT 3.4.1 results.
+**Model files.** `./setup.sh` downloads all 497 registered models: 493 from DX Model Zoo 2_5_0, whose `.dxnn` files are container v9, which needs DX-RT 3.5.0 (see *Repository Layout* above), and 4 that 2_5_0 does not publish from 2_4_0 (`beit-l-p16_384x384`, `levit-128s_224x224`, `vit-b-p16_384x384`, `vit-t-p16_224x224`). The graph runtime checks the container before loading; on a DX-RT older than 3.5.0 it stops with `.dxnn container v9 needs DX-RT >= 3.5.0, but this runtime is <version>. Use the v8 file (dxnn/2_4_0) or upgrade DX-RT.`, and `--check` reports it and exits 1. The graphs were validated on DX-RT 3.4.1 with v8 files and on DX-RT 3.5.0 with both the v8 and the v9 files: the golden reports (9 sample graphs) are byte-identical between `multi_model_graph_sync` and `_async` on either store, and the v8 ones equal the DX-RT 3.4.1 results.
 
 ---
 
@@ -257,7 +219,7 @@ All C++ and Python examples share a consistent set of command-line arguments.
 | `-s` / `--save` | `--save` | `--save` | Save rendered output to run directory |
 | `--save-dir` | `--save-dir` | `--save-dir` | Base output directory (default: `artifacts/`) |
 | `--dump-tensors` | `--dump-tensors` | `--dump-tensors` | Dump raw input/output tensors to files |
-| `--config` | `--config` | `--config` | Model config JSON path; its settings override the built-in defaults (read only when given) |
+| `--config` | `--config` | `--config` | Model config JSON path (auto-detected if omitted) |
 | `-h` / `--help` | `-h` | `-h` | Show usage |
 
 > **Input Source Rule:** `--image`, `--video`, `--camera`, and `--rtsp` form a mutually exclusive group. If none is specified, a **default sample image** is automatically selected based on the task type (e.g., `sample/img/sample_street.jpg` for object detection).

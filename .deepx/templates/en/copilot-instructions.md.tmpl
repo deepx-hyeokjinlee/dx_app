@@ -13,11 +13,7 @@
 ## Shared Knowledge
 
 All skills, instructions, toolsets, and memory live in `.deepx/`.
-Read `.deepx/README.md` for the complete index.
-
-## Overview
-
-dx_app provides 497 model variants across 28 AI tasks with Python (4 variants) and C++ examples. All 497 have a downloadable `.dxnn`. `SCRFD500M_PPU` and `YOLOV5Pose_PPU` example sources stay on disk and are not registered.
+dx_app provides {{MODEL_COUNT}} compiled `.dxnn` models across {{TASK_COUNT}} AI tasks with Python (4 variants) and C++ examples.
 
 ## Context Routing Table
 
@@ -203,6 +199,14 @@ src/cpp_example/{task}/{family}/
     ├── factory/{variant}_factory.hpp
     ├── {variant}_sync.cpp
     └── {variant}_async.cpp
+
+
+src/cpp_example/{task}/{family}/
+├── factory/{family}_factory.hpp
+├── {family}_sync.cpp                # variant comes from the .dxnn stem
+├── {family}_async.cpp
+└── {variant}/
+    └── config.json
 ```
 
 {{FRAGMENT:no-placeholder-code}}

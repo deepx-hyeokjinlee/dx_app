@@ -179,9 +179,11 @@ for i in "$@"; do
             ;;
         --internal)
             INTERNAL_FLAG="--internal"
+            INTERNAL_FLAG=""
             ;;
         --internal-path=*)
             INTERNAL_VIDEO_PATH="${1#*=}"
+            INTERNAL_VIDEO_PATH=""
             ;;
         --force)
             FORCE_ARGS="--force"

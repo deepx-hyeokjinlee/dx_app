@@ -35,7 +35,7 @@ def _display(family):
 
 def _variant_media(entry):
     cfg_path = (_ROOT / "src" / "python_example" / entry["task"] / entry["family"]
-                / "variants" / f"{entry['variant']}.json")
+                / entry["variant"] / "config.json")
     if not cfg_path.is_file():
         return None, None
     cfg = _json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -46,7 +46,7 @@ def _variant_media(entry):
 
 _seen = {}
 for _e in sorted(_REG, key=lambda x: (x["task"], x["family"], x["variant"])):
-    if _e["family"] in _seen or _e["alias_of"] is not None:
+    if _e["family"] in _seen or _e.get("alias_of") is not None:
         continue
     _img, _vid = _variant_media(_e)
     if _img is None:

@@ -14,7 +14,7 @@ INTERNAL_VIDEO_PATH?=/mnt/regression_storage/atd/sample_videos_v3.2.2.tar.gz
 .PHONY: all build_app_image container check_dxrt_service
 
 # Check for Ubuntu Version
-SUPPORTED_UBUNTU_VERSIONS := 18.04 20.04 22.04
+SUPPORTED_UBUNTU_VERSIONS := 20.04 22.04
 ifneq ($(filter $(UBUNTU_VERSION),$(SUPPORTED_UBUNTU_VERSIONS)),)
 else
 $(error UBUNTU_VERSION $(UBUNTU_VERSION) is not supported. Supported version is 20.04 & 22.04)

@@ -30,7 +30,7 @@ This section describes the software requirements and installation steps for sett
 
 To run **DX-APP** on Linux, the following components **must** be installed.  
 
-- **OS**: Ubuntu 18.04 / 20.04 / 22.04 / 24.04 (x64) and Debian 12 / 13 (x64)  
+- **OS**: Ubuntu 20.04 / 22.04 / 24.04 (x64) and Debian 12 / 13 (x64)  
 - **DEEPX M1 Runtime Lib Version (DX-RT)**: v3.5.0 or higher  
 - **NPU Device Driver**: v2.7.0 or higher (RT and PCIe driver). The runtime's own minimum driver, firmware and `.dxnn` versions are printed by `dxrt-cli --version`.  
 - **dx_engine** (Python): 3.5.x, matching the runtime's major.minor. `import dx_engine` raises `dx_engine and DX-RT versions do not match` otherwise.  

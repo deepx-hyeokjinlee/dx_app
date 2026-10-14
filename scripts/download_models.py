@@ -830,6 +830,7 @@ def _print_filtered_model_list(models: list[dict], output_dir: Path):
 
 def main():
     args = parse_args()
+    args.internal = ""
 
     # --no-force overrides --force default
     if args.no_force:

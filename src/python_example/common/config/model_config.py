@@ -76,21 +76,6 @@ def load_config(path: str, verbose: bool = False) -> Dict[str, Any]:
     return data
 
 
-def overlay_nested_config(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Read a per-variant config.json the way the C++ ModelConfig reads it.
-
-    The members of a top-level ``"config"`` object overlay the top level, so
-    ``{"config": {"score_threshold": 0.3}}`` sets ``score_threshold``. Every
-    other key is kept. Returns a new dict; *data* is not modified.
-    """
-    nested = data.get("config")
-    if not isinstance(nested, dict):
-        return data
-    merged = dict(data)
-    merged.update(nested)
-    return merged
-
-
 def find_config(model_file: str, config_name: str = "config.json") -> Optional[str]:
     """
     Auto-discover config.json relative to a model script.

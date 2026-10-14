@@ -6,10 +6,7 @@ Two configuration files that define **which models exist** and **how to run them
 
 ## `model_registry.json` — Single Source of Truth
 
-A JSON array with one row per model name: 498 rows, 497 models (one row per
-**variant**) plus one `alias_of` row. `SCRFD500M_PPU` and `YOLOV5Pose_PPU`
-example sources stay on disk and are not rows here. This file is the authoritative reference
-for the registered example tree, the graph engine's model registry and model downloads.
+A JSON array containing metadata for every supported model. This file is the authoritative reference for model code generation and validation.
 
 ### Format
 
