@@ -831,8 +831,9 @@ GraphSpec ParseGraphText(const std::string& json_text,
                               "this model (default 6); fewer use less NPU memory",
                               &bad, &buffers)) {
                     if (buffers > kMaxEngineBuffers) {
-                        bad.Add("\"buffers\" must be at most 100, got " + field->dump(),
-                                "DX-RT accepts 1 to 100");
+                        bad.Add("\"buffers\" must be at most " +
+                                    std::to_string(kMaxEngineBuffers) + ", got " + field->dump(),
+                                "DX-RT accepts 1 to " + std::to_string(kMaxEngineBuffers));
                     } else {
                         parsed.engine.buffers = buffers;
                     }

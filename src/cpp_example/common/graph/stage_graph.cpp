@@ -327,6 +327,11 @@ class SharedStage : public IStage {
     std::shared_ptr<IStage> stage_;
 };
 
+/// The same StageParams, as ValidateGraph compares sharers' "params".
+bool SameStageParams(const StageParams& a, const StageParams& b) {
+    return a.numeric == b.numeric && a.text == b.text && a.lists == b.lists;
+}
+
 }  // namespace
 
 EdgeCargo SelectEdgeCargo(const EdgeRuntime& edge, const StageDataPtr& produced,
@@ -434,6 +439,17 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
                 throw std::logic_error("StageGraph::Build: node \"" + node.id +
                                        "\" shares an engine that was not built");
             }
+            // ValidateGraph rejects sharers whose params or buffers differ
+            // (the one stage runs the owner's configuration); this guards a
+            // Build() on an unvalidated spec, like the unknown-model guard.
+            const NodeSpec* owner_spec = spec.FindNode(owner->second);
+            if (owner_spec == NULL || !SameStageParams(node.params, owner_spec->params) ||
+                node.engine.buffers != owner_spec->engine.buffers) {
+                throw std::logic_error("StageGraph::Build: node \"" + node.id +
+                                       "\" shares the engine of node \"" + owner->second +
+                                       "\" but its params or buffers differ "
+                                       "(the spec was not validated)");
+            }
             runtime.stage.reset(new SharedStage(stage->second));
             runtime.output_shape = info->output_shape;
             runtime.tracked = node.track.present;
@@ -486,8 +502,8 @@ void StageGraph::Build(const GraphSpec& spec, const IModelRegistry& registry,
     }
     } catch (...) {
         // Close every engine this Build opened before the error leaves it,
-        // so the device memory is free at once - for a caller that keeps
-        // this StageGraph (dx_graph) or retries with a smaller graph - and
+        // so the device memory is free at once - for a caller that reuses
+        // this StageGraph or retries with a smaller graph - and
         // the graph is left empty rather than half built.
         shared.clear();
         nodes_.clear();

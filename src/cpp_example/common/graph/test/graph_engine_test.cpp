@@ -12128,6 +12128,17 @@ void TestSharedNodesUseOneStage() {
 
 void TestASharedStageKeepsEachNodesJobsApartUnderPipelining() {
     FakeModelRegistry registry = BuildCascadeRegistry();
+    // Frame i's detector output has its first person at x = 10 + 20 * i,
+    // keyed by the frame's pixel (0,0), so a completion handed to another
+    // frame's job (or swapped between the two sharing nodes across frames)
+    // shows up as the wrong x.
+    for (int i = 0; i < 6; ++i) {
+        std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+        boxes->items.push_back(MakeItem(10.0f + 20.0f * static_cast<float>(i), 10, 40, 60,
+                                        0.8f, "person"));
+        boxes->items.push_back(MakeItem(300, 200, 40, 60, 0.9f, "person"));
+        registry.SetScriptByFirstPixel("yolov8n", i, boxes);
+    }
     registry.SetShuffleSeed("yolov8n", 7);
     const GraphSpec spec = ParseGraphText(SharedDetectorsJson("{\"share\":true}", ""), "s.json");
     StageGraph graph;
@@ -12137,7 +12148,7 @@ void TestASharedStageKeepsEachNodesJobsApartUnderPipelining() {
     options.max_frames_in_flight = 4;
     AsyncExecutor executor(options);
     for (std::size_t i = 0; i < 6; ++i) {
-        executor.Submit(graph, cv::Mat::zeros(480, 640, CV_8UC3), i);
+        executor.Submit(graph, FrameWithKey(static_cast<int>(i)), i);
     }
     executor.Finish(graph);
     FrameReport report;
@@ -12146,10 +12157,46 @@ void TestASharedStageKeepsEachNodesJobsApartUnderPipelining() {
         GRAPH_CHECK(report.frame_index == seen);
         GRAPH_CHECK(report.error.empty());
         GRAPH_CHECK(report.node_results.count("od") == 1 && report.node_results.count("od2") == 1);
+        const float expected_x = 10.0f + 20.0f * static_cast<float>(seen);
+        const char* sharers[] = {"od", "od2"};
+        for (std::size_t n = 0; n < 2; ++n) {
+            std::shared_ptr<const BoxesData> boxes =
+                std::dynamic_pointer_cast<const BoxesData>(report.node_results[sharers[n]].data);
+            GRAPH_CHECK(boxes && boxes->items.size() == 2);
+            if (!boxes || boxes->items.size() != 2) continue;
+            bool found = false;
+            for (std::size_t b = 0; b < boxes->items.size(); ++b) {
+                if (boxes->items[b].box.x == expected_x) found = true;
+            }
+            GRAPH_CHECK(found);
+        }
         GRAPH_CHECK(report.roi_results.count("reid") == 1 && report.roi_results["reid"].size() == 2);
         ++seen;
     }
     GRAPH_CHECK(seen == 6);
+}
+
+// Build() on a spec ValidateGraph never saw: a sharer whose params or
+// buffers differ from the owner's must not silently run the owner's
+// configuration.
+void TestBuildRejectsAnUnvalidatedSharerWithOtherSettings() {
+    const std::string variants[] = {
+        SharedDetectorsJson("{\"share\":true}", ",\"params\":{\"score_threshold\":0.5}"),
+        SharedDetectorsJson("{\"share\":true,\"buffers\":2}", "")};
+    for (std::size_t v = 0; v < 2; ++v) {
+        FakeModelRegistry registry = BuildCascadeRegistry();
+        const GraphSpec spec = ParseGraphText(variants[v], "s.json");
+        StageGraph graph;
+        std::string message;
+        try {
+            graph.Build(spec, registry, "/models", false);  // no ValidateGraph
+        } catch (const std::logic_error& error) {
+            message = error.what();
+        }
+        GRAPH_CHECK(message.find("node \"od2\" shares the engine of node \"od\" but its "
+                                 "params or buffers differ") != std::string::npos);
+        GRAPH_CHECK(graph.nodes().empty());
+    }
 }
 
 namespace {
@@ -12619,6 +12666,7 @@ int main() {
     TestEngineBufferScopeSetsAndRestores();
     TestSharedNodesUseOneStage();
     TestASharedStageKeepsEachNodesJobsApartUnderPipelining();
+    TestBuildRejectsAnUnvalidatedSharerWithOtherSettings();
     TestRealSharedEngineWithBuffers();
     TestSharedEngineRestrictions();
     TestAFailedLoadClosesEveryEngineItOpened();
