@@ -30,6 +30,7 @@
 #include "common/runner/detection_runner_ops.hpp"
 #include "common/utility/common_util.hpp"
 #include "common/utility/progress.hpp"
+#include "common/utility/run_clock.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/run_dir.hpp"
@@ -617,7 +618,8 @@ public:
         display_pump_.stop();
         cv::destroyAllWindows();
 
-        auto e_time = std::chrono::high_resolution_clock::now();
+        // Total Time ends at the last completed frame: the wait, drain and shutdown above are not processing
+        auto e_time = dxapp::asyncRunEnd(metrics_);
         double total_time = std::chrono::duration<double>(e_time - s_time).count();
 
         if (g_interrupted()) {
