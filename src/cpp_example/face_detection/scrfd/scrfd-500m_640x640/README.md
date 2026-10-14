@@ -38,11 +38,7 @@ python src/python_example/face_detection/scrfd/scrfd-500m_640x640/scrfd-500m_640
   --image sample/img/sample_face.jpg
 ```
 
-## Performance
-
-**544 FPS** and **1,000.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | AP(Easy) | AP(Med) | AP(Hard) |
 |---|---:|---:|---:|

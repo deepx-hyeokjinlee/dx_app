@@ -38,11 +38,7 @@ python src/python_example/super_resolution/realesrgan/realesrgan-x2_192x192/real
   -i sample/img/sample_lowres165x90.png
 ```
 
-## Performance
-
-**11 FPS** and **8.6 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | PSNR | SSIM |
 |---|---:|---:|

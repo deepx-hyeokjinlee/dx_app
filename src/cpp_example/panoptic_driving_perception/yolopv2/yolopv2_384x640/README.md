@@ -38,11 +38,7 @@ python src/python_example/panoptic_driving_perception/yolopv2/yolopv2_384x640/yo
   --image sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**36 FPS** and **39.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | det_mAP50 |
 |---|---:|

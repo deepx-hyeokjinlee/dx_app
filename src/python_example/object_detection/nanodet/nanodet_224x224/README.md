@@ -38,11 +38,7 @@ python src/python_example/object_detection/nanodet/nanodet_224x224/nanodet_224x2
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**1,193 FPS** and **396.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

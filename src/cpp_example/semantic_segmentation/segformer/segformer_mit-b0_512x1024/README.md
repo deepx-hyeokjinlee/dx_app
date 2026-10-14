@@ -38,11 +38,7 @@ python src/python_example/semantic_segmentation/segformer/segformer_mit-b0_512x1
   --image sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**366 FPS** and **1,386.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

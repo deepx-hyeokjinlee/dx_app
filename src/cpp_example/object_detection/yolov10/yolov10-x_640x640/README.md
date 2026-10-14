@@ -38,11 +38,7 @@ python src/python_example/object_detection/yolov10/yolov10-x_640x640/yolov10-x_6
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**61 FPS** and **22.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

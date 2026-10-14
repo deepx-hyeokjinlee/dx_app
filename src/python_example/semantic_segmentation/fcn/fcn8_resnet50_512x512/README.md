@@ -38,11 +38,7 @@ python src/python_example/semantic_segmentation/fcn/fcn8_resnet50_512x512/fcn8_r
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**31 FPS** and **14.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/face_recognition/arcface/arcface_resnet50_112x112/arcf
   -i sample/img/face_pair
 ```
 
-## Performance
-
-**588 FPS** and **337.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Accuracy |
 |---|---:|

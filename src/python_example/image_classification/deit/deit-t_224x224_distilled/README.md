@@ -38,11 +38,7 @@ python src/python_example/image_classification/deit/deit-t_224x224_distilled/dei
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**704 FPS** and **871.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

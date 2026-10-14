@@ -38,18 +38,7 @@ python src/python_example/image_retrieval/clip_rn50/clip-img_resnet50_224x224_op
   -i sample/img/sample_person_a2.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/image_retrieval/clip_rn50/clip-img_resnet50_224x224_openai/clip-img_resnet50_224x224_openai_sync.py \
-  --model assets/models/clip-img_resnet50_224x224_openai.dxnn \
-  --image sample/img/sample_person_a2.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 Accuracy |
 |---|---:|

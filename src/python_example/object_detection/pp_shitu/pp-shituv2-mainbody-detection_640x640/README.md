@@ -38,18 +38,7 @@ python src/python_example/object_detection/pp_shitu/pp-shituv2-mainbody-detectio
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/object_detection/pp_shitu/pp-shituv2-mainbody-detection_640x640/pp-shituv2-mainbody-detection_640x640_sync.py \
-  --model assets/models/pp-shituv2-mainbody-detection_640x640.dxnn \
-  --image sample/img/sample_street.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Recall@1 |
 |---|---:|

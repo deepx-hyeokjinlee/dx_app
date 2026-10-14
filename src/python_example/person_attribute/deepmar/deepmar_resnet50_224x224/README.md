@@ -38,11 +38,7 @@ python src/python_example/person_attribute/deepmar/deepmar_resnet50_224x224/deep
   -i sample/img/sample_person_a1.jpg
 ```
 
-## Performance
-
-**1,181 FPS** and **492.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Average Accuracy |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/semantic_segmentation/deeplabv3/deeplabv3_mobilenetv2_
   --image sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**501 FPS** and **629.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

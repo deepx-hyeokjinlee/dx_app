@@ -38,11 +38,7 @@ python src/python_example/pose_estimation/vitpose/vitpose-s_256x192/vitpose-s_25
   --image sample/img/sample_people.jpg
 ```
 
-## Performance
-
-**99 FPS** and **153.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

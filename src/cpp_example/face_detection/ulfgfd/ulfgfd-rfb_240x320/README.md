@@ -38,11 +38,7 @@ python src/python_example/face_detection/ulfgfd/ulfgfd-rfb_240x320/ulfgfd-rfb_24
   --image sample/img/sample_face.jpg
 ```
 
-## Performance
-
-**3,911 FPS** and **7,144.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | AP(Easy) | AP(Med) | AP(Hard) |
 |---|---:|---:|---:|

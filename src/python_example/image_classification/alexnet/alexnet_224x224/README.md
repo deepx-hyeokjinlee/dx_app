@@ -38,11 +38,7 @@ python src/python_example/image_classification/alexnet/alexnet_224x224/alexnet_2
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**659 FPS** and **1,413.6 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

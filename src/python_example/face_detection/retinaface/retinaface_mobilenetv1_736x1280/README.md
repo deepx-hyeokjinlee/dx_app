@@ -38,11 +38,7 @@ python src/python_example/face_detection/retinaface/retinaface_mobilenetv1_736x1
   -i sample/img/sample_face.jpg
 ```
 
-## Performance
-
-**12 FPS** and **53.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | AP(Easy) | AP(Med) | AP(Hard) |
 |---|---:|---:|---:|

@@ -38,11 +38,7 @@ python src/python_example/depth_estimation/fastdepth/fastdepth_224x224/fastdepth
   --image sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**839 FPS** and **1,975.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | RMSE |
 |---|---:|

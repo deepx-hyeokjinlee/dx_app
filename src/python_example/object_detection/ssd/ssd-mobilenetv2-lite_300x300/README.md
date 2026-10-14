@@ -38,11 +38,7 @@ python src/python_example/object_detection/ssd/ssd-mobilenetv2-lite_300x300/ssd-
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**1,572 FPS** and **1,678.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP50 |
 |---|---:|

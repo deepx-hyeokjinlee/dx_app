@@ -38,18 +38,7 @@ python src/python_example/semantic_segmentation/ddrnet/ddrnet23_1024x2048/ddrnet
   --image sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/semantic_segmentation/ddrnet/ddrnet23_1024x2048/ddrnet23_1024x2048_sync.py \
-  --model assets/models/ddrnet23_1024x2048.dxnn \
-  --image sample/img/sample_parking.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

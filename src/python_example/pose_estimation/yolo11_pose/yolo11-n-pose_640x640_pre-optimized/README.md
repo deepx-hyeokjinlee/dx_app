@@ -38,18 +38,7 @@ python src/python_example/pose_estimation/yolo11_pose/yolo11-n-pose_640x640_pre-
   -i sample/img/sample_people.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/pose_estimation/yolo11_pose/yolo11-n-pose_640x640_pre-optimized/yolo11-n-pose_640x640_pre-optimized_sync.py \
-  --model assets/models/yolo11-n-pose_640x640_pre-optimized.dxnn \
-  --image sample/img/sample_people.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

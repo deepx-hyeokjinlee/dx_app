@@ -38,11 +38,7 @@ python src/python_example/pose_estimation/centerpose/centerpose_repvgg-a0_416x41
   --image sample/img/sample_people.jpg
 ```
 
-## Performance
-
-**326 FPS** and **135.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

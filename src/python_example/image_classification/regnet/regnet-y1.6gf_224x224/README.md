@@ -38,11 +38,7 @@ python src/python_example/image_classification/regnet/regnet-y1.6gf_224x224/regn
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**675 FPS** and **725.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

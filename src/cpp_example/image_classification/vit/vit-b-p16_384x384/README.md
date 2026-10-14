@@ -38,11 +38,7 @@ python src/python_example/image_classification/vit/vit-b-p16_384x384/vit-b-p16_3
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**21 FPS** and **25.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/object_detection/ssd/ssd-vgg16_300x300/ssd-vgg16_300x3
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**307 FPS** and **72.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP50 |
 |---|---:|

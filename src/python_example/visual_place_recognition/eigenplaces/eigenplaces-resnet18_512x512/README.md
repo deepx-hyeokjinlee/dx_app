@@ -38,11 +38,7 @@ python src/python_example/visual_place_recognition/eigenplaces/eigenplaces-resne
   -i sample/vpr/queries/q1.jpg
 ```
 
-## Performance
-
-**836 FPS** and **234.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Recall@1 |
 |---|---:|

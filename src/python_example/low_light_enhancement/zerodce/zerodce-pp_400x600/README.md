@@ -38,11 +38,7 @@ python src/python_example/low_light_enhancement/zerodce/zerodce-pp_400x600/zerod
   -i sample/img/sample_lowlight.jpg
 ```
 
-## Performance
-
-**33 FPS** and **116.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | PSNR | SSIM |
 |---|---:|---:|

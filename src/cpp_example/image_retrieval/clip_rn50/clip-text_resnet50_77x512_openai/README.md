@@ -34,17 +34,7 @@ python src/python_example/image_retrieval/clip_rn50/clip-text_resnet50_77x512_op
   --model assets/models/clip-text_resnet50_77x512_openai.dxnn
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/image_retrieval/clip_rn50/clip-text_resnet50_77x512_openai/clip-text_resnet50_77x512_openai_sync.py \
-  --model assets/models/clip-text_resnet50_77x512_openai.dxnn \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 Accuracy |
 |---|---:|

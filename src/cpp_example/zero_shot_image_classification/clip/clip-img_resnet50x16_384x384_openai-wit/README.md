@@ -38,11 +38,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_resnet50x
   --image sample/img/face_pair
 ```
 
-## Performance
-
-**100 FPS** and **30.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_vit-b32_2
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**195 FPS** and **246.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

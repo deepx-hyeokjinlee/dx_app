@@ -38,18 +38,7 @@ python src/python_example/image_matting/ppmatting/ppmatting-hrnet-w48-compositio
   --image sample/img/sample_person_b.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/image_matting/ppmatting/ppmatting-hrnet-w48-composition_512x512/ppmatting-hrnet-w48-composition_512x512_sync.py \
-  --model assets/models/ppmatting-hrnet-w48-composition_512x512.dxnn \
-  --image sample/img/sample_person_b.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | SAD |
 |---|---:|

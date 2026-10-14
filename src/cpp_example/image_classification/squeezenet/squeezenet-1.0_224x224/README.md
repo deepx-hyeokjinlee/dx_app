@@ -38,11 +38,7 @@ python src/python_example/image_classification/squeezenet/squeezenet-1.0_224x224
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**2,145 FPS** and **1,760.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

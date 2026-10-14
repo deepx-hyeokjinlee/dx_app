@@ -38,18 +38,7 @@ python src/python_example/image_classification/yolov12_cls/yolov12-cls-m_224x224
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/image_classification/yolov12_cls/yolov12-cls-m_224x224/yolov12-cls-m_224x224_sync.py \
-  --model assets/models/yolov12-cls-m_224x224.dxnn \
-  --image sample/img/sample_dog.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 Accuracy |
 |---|---:|

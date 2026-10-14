@@ -38,18 +38,7 @@ python src/python_example/semantic_segmentation/stdc_seg/stdc1-seg50_512x1024/st
   --image sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/semantic_segmentation/stdc_seg/stdc1-seg50_512x1024/stdc1-seg50_512x1024_sync.py \
-  --model assets/models/stdc1-seg50_512x1024.dxnn \
-  --image sample/img/sample_parking.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/image_classification/mobilenet/mobilenetv1_224x224/mob
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**4,651 FPS** and **2,954.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

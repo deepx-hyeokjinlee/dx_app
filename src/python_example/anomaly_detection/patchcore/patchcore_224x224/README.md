@@ -38,18 +38,7 @@ python src/python_example/anomaly_detection/patchcore/patchcore_224x224/patchcor
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/anomaly_detection/patchcore/patchcore_224x224/patchcore_224x224_sync.py \
-  --model assets/models/patchcore_224x224.dxnn \
-  --image sample/img/sample_parking.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | image_AUROC |
 |---|---:|

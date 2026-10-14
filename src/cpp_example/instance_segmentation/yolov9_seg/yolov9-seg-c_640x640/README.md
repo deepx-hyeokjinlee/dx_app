@@ -38,18 +38,7 @@ python src/python_example/instance_segmentation/yolov9_seg/yolov9-seg-c_640x640/
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/instance_segmentation/yolov9_seg/yolov9-seg-c_640x640/yolov9-seg-c_640x640_sync.py \
-  --model assets/models/yolov9-seg-c_640x640.dxnn \
-  --image sample/img/sample_street.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

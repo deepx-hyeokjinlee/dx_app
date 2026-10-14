@@ -38,11 +38,7 @@ python src/python_example/object_detection/damoyolo/damoyolo-tinynas-l20m_640x64
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**147 FPS** and **62.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

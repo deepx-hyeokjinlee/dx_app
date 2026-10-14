@@ -38,11 +38,7 @@ python src/python_example/image_classification/fastvit/fastvit-ma36_256x256/fast
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**71 FPS** and **83.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

@@ -38,18 +38,7 @@ python src/python_example/image_classification/pphgnet/pphgnet-small_224x224/pph
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/image_classification/pphgnet/pphgnet-small_224x224/pphgnet-small_224x224_sync.py \
-  --model assets/models/pphgnet-small_224x224.dxnn \
-  --image sample/img/sample_dog.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 Accuracy |
 |---|---:|

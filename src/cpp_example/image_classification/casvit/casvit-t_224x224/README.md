@@ -38,11 +38,7 @@ python src/python_example/image_classification/casvit/casvit-t_224x224/casvit-t_
   --image sample/img/person_pair
 ```
 
-## Performance
-
-**245 FPS** and **305.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

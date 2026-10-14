@@ -38,11 +38,7 @@ python src/python_example/object_detection/yolo_ppu/yolo11-n_640x640_ppu/yolo11-
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**177 FPS** and **318.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

@@ -36,18 +36,7 @@ python src/python_example/image_classification/vit/vit-l-p16_512x512_swag/vit-l-
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/image_classification/vit/vit-l-p16_512x512_swag/vit-l-p16_512x512_swag_sync.py \
-  --model assets/models/vit-l-p16_512x512_swag.dxnn \
-  --image sample/img/sample_dog.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 Accuracy |
 |---|---:|

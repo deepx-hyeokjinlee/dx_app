@@ -38,11 +38,7 @@ python src/python_example/image_classification/resmlp/resmlp24_224x224/resmlp24_
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**361 FPS** and **283.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

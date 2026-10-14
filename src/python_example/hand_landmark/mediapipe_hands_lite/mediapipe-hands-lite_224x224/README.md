@@ -38,11 +38,7 @@ python src/python_example/hand_landmark/mediapipe_hands_lite/mediapipe-hands-lit
   -i sample/img/sample_hand.jpg
 ```
 
-## Performance
-
-**5,142 FPS** and **5,773.5 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | MNAE |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/depth_estimation/depthanythingv2/depthanythingv2-vitb_
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**50 FPS** and **52.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | RMSE |
 |---|---:|

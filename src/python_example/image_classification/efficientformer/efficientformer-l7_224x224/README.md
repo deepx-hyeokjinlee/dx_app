@@ -38,11 +38,7 @@ python src/python_example/image_classification/efficientformer/efficientformer-l
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**143 FPS** and **142.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

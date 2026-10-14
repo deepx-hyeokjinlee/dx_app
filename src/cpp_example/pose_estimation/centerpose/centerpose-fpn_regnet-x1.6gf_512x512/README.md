@@ -38,11 +38,7 @@ python src/python_example/pose_estimation/centerpose/centerpose-fpn_regnet-x1.6g
   --image sample/img/sample_people.jpg
 ```
 
-## Performance
-
-**141 FPS** and **51.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

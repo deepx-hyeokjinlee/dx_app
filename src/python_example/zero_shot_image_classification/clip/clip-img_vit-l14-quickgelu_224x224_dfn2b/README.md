@@ -38,11 +38,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_vit-l14-q
   -i sample/img/face_pair
 ```
 
-## Performance
-
-**22 FPS** and **19.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

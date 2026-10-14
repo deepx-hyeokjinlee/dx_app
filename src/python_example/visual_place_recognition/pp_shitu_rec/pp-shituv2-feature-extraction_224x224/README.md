@@ -38,18 +38,7 @@ python src/python_example/visual_place_recognition/pp_shitu_rec/pp-shituv2-featu
   -i sample/vpr/queries/q1.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/visual_place_recognition/pp_shitu_rec/pp-shituv2-feature-extraction_224x224/pp-shituv2-feature-extraction_224x224_sync.py \
-  --model assets/models/pp-shituv2-feature-extraction_224x224.dxnn \
-  --image sample/vpr/queries/q1.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Recall@1 |
 |---|---:|

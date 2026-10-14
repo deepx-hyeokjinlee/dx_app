@@ -38,18 +38,7 @@ python src/python_example/anomaly_detection/efficientad/efficientad-m-student_25
   --image sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/anomaly_detection/efficientad/efficientad-m-student_256x256/efficientad-m-student_256x256_sync.py \
-  --model assets/models/efficientad-m-student_256x256.dxnn \
-  --image sample/img/sample_parking.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | image_AUROC |
 |---|---:|

@@ -38,18 +38,7 @@ python src/python_example/person_reid/repvgg_reid/repvgg-a0-reid_256x128/repvgg-
   --image sample/reid/queries/sample_person_a2.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/person_reid/repvgg_reid/repvgg-a0-reid_256x128/repvgg-a0-reid_256x128_sync.py \
-  --model assets/models/repvgg-a0-reid_256x128.dxnn \
-  --image sample/reid/queries/sample_person_a2.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Rank-1 | mAP |
 |---|---:|---:|

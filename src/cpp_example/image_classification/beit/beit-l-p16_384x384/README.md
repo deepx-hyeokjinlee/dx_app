@@ -38,11 +38,7 @@ python src/python_example/image_classification/beit/beit-l-p16_384x384/beit-l-p1
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**5 FPS** and **7.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

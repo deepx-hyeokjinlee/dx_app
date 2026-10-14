@@ -38,11 +38,7 @@ python src/python_example/semantic_segmentation/pidnet/pidnet-s_1024x2048/pidnet
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**31 FPS** and **33.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

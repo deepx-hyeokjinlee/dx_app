@@ -38,11 +38,7 @@ python src/python_example/keypoint_detection/superpoint/superpoint_480x640/super
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**266 FPS** and **86.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | HEA | M.Score |
 |---|---:|---:|

@@ -38,11 +38,7 @@ python src/python_example/3d_object_detection/sfa3d/sfa3d_608x608/sfa3d_608x608_
   --image sample/kitti/velodyne/000049.bin
 ```
 
-## Performance
-
-**117 FPS** and **58.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP_BEV@0.5 |
 |---|---:|

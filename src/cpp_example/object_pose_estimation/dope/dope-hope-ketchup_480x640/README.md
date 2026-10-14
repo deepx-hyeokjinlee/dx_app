@@ -38,11 +38,7 @@ python src/python_example/object_pose_estimation/dope/dope-hope-ketchup_480x640/
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**33 FPS** and **8.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | ADD |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/depth_estimation/yolo26_depth/yolo26-depth-s_768x768/y
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**84 FPS** and **50.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | RMSE |
 |---|---:|

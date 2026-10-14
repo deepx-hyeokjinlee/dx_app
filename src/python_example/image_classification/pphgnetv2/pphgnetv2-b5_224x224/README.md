@@ -38,18 +38,7 @@ python src/python_example/image_classification/pphgnetv2/pphgnetv2-b5_224x224/pp
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/image_classification/pphgnetv2/pphgnetv2-b5_224x224/pphgnetv2-b5_224x224_sync.py \
-  --model assets/models/pphgnetv2-b5_224x224.dxnn \
-  --image sample/img/sample_dog.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 Accuracy |
 |---|---:|

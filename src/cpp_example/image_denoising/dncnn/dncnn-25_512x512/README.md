@@ -38,11 +38,7 @@ python src/python_example/image_denoising/dncnn/dncnn-25_512x512/dncnn-25_512x51
   --image sample/img/sample_denoising.jpg
 ```
 
-## Performance
-
-**50 FPS** and **13.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | PSNR | SSIM |
 |---|---:|---:|

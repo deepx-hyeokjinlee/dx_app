@@ -38,18 +38,7 @@ python src/python_example/object_detection/yolov9/yolov9-m_640x640_pre-optimized
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/object_detection/yolov9/yolov9-m_640x640_pre-optimized/yolov9-m_640x640_pre-optimized_sync.py \
-  --model assets/models/yolov9-m_640x640_pre-optimized.dxnn \
-  --image sample/img/sample_street.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

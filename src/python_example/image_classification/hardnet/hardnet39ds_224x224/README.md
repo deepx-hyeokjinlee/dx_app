@@ -38,11 +38,7 @@ python src/python_example/image_classification/hardnet/hardnet39ds_224x224/hardn
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**2,124 FPS** and **2,556.1 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

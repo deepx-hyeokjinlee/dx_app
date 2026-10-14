@@ -38,11 +38,7 @@ python src/python_example/image_classification/repvgg/repvgg-b1_320x320/repvgg-b
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**412 FPS** and **126.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

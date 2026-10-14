@@ -38,18 +38,7 @@ python src/python_example/object_detection/yolo_preopt/yolo26-l_640x640_pre-opti
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/object_detection/yolo_preopt/yolo26-l_640x640_pre-optimized/yolo26-l_640x640_pre-optimized_sync.py \
-  --model assets/models/yolo26-l_640x640_pre-optimized.dxnn \
-  --image sample/img/sample_street.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

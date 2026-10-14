@@ -38,11 +38,7 @@ python src/python_example/zero_shot_instance_segmentation/fastsam/fastsam-s_1024
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**87 FPS** and **35.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | AR10 |
 |---|---:|

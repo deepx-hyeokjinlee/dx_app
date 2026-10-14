@@ -38,11 +38,7 @@ python src/python_example/image_classification/ghostnet/ghostnet_224x224/ghostne
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**399 FPS** and **1,234.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

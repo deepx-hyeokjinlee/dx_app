@@ -38,11 +38,7 @@ python src/python_example/oriented_object_detection/yolo26_obb/yolo26-s-obb_1024
   --image sample/img/sample_airport_satellite_view.png
 ```
 
-## Performance
-
-**62 FPS** and **53.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|
@@ -51,19 +47,6 @@ python src/python_example/oriented_object_detection/yolo26_obb/yolo26-s-obb_1024
 | Q-Pro | 49.36 (−1.92) |
 
 DOTAv1 · difference vs Raw in brackets.
-
-### Measured on host boards
-
-| Board | Throughput FPS | Single-stream FPS | Latency ms |
-|---|---:|---:|---:|
-| DX-H1 Quattro · BIOSTAR | 263.3 | 26.2 | 38.1 |
-| DX-M1 · AIPlayer N97 | 61.3 | 20.4 | 48.9 |
-| DX-M1 · Orange Pi 5+ | 60.4 | 16.1 | 62.3 |
-| DX-M1 · ROCK 5B+ | 60.1 | 15.9 | 62.9 |
-| DX-M1 · Raspberry Pi 5 | 62.7 | 20.5 | 48.8 |
-| DX-M1M · Raspberry Pi 5 | 46.0 | 17.8 | 56.0 |
-
-DX AI Studio Benchmark, July 2026, DX-RT without ORT. Throughput: 5 in-flight buffers. Single-stream: 1.
 
 ## Model
 
@@ -104,4 +87,4 @@ Compile it yourself: DX-COM in dx-compiler, or DX AI Studio → Compiler.
 
 ---
 
-<sub>Generated from the DX Model Zoo publish table (as of 2026-10-13). Board measurements: DX AI Studio Benchmark, July 2026. Open this model in DX AI Studio → Model Zoo for live inference and the model graph.</sub>
+<sub>Generated from the DX Model Zoo publish table (as of 2026-10-13). Open this model in DX AI Studio → Model Zoo for live inference and the model graph.</sub>

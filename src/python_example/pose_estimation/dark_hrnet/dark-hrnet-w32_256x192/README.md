@@ -38,18 +38,7 @@ python src/python_example/pose_estimation/dark_hrnet/dark-hrnet-w32_256x192/dark
   -i sample/img/sample_people.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/pose_estimation/dark_hrnet/dark-hrnet-w32_256x192/dark-hrnet-w32_256x192_sync.py \
-  --model assets/models/dark-hrnet-w32_256x192.dxnn \
-  --image sample/img/sample_people.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

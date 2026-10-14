@@ -38,11 +38,7 @@ python src/python_example/semantic_segmentation/casvit_seg/casvit-t-fpn-resnet50
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**7 FPS** and **21.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

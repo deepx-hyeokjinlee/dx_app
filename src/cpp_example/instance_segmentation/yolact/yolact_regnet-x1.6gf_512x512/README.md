@@ -38,11 +38,7 @@ python src/python_example/instance_segmentation/yolact/yolact_regnet-x1.6gf_512x
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**91 FPS** and **31.6 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

@@ -38,11 +38,7 @@ python src/python_example/image_classification/yolo26_cls/yolo26-cls-s_224x224/y
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**2,065 FPS** and **2,245.9 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

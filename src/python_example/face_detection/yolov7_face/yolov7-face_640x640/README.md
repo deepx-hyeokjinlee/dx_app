@@ -38,11 +38,7 @@ python src/python_example/face_detection/yolov7_face/yolov7-face_640x640/yolov7-
   -i sample/img/sample_face.jpg
 ```
 
-## Performance
-
-**125 FPS** and **38.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | AP(Easy) | AP(Med) | AP(Hard) |
 |---|---:|---:|---:|

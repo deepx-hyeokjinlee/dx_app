@@ -38,11 +38,7 @@ python src/python_example/image_classification/levit/levit-128s_224x224/levit-12
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**938 FPS** and **1,949.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

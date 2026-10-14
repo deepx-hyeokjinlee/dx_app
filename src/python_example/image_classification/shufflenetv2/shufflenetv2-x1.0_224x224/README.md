@@ -38,11 +38,7 @@ python src/python_example/image_classification/shufflenetv2/shufflenetv2-x1.0_22
   -i sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**4,875 FPS** and **6,642.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

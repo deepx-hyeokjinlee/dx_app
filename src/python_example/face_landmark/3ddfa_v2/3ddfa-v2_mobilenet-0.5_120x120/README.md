@@ -38,11 +38,7 @@ python src/python_example/face_landmark/3ddfa_v2/3ddfa-v2_mobilenet-0.5_120x120/
   -i sample/img/sample_face_a1.jpg
 ```
 
-## Performance
-
-**14,336 FPS** and **23,095.7 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | NME |
 |---|---:|

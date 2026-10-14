@@ -38,11 +38,7 @@ python src/python_example/depth_estimation/scdepthv3/scdepthv3_256x320/scdepthv3
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**334 FPS** and **300.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | RMSE |
 |---|---:|

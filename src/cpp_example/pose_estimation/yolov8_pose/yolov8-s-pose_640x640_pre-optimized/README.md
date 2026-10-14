@@ -38,18 +38,7 @@ python src/python_example/pose_estimation/yolov8_pose/yolov8-s-pose_640x640_pre-
   --image sample/img/sample_people.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/pose_estimation/yolov8_pose/yolov8-s-pose_640x640_pre-optimized/yolov8-s-pose_640x640_pre-optimized_sync.py \
-  --model assets/models/yolov8-s-pose_640x640_pre-optimized.dxnn \
-  --image sample/img/sample_people.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

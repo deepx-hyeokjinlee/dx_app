@@ -38,18 +38,7 @@ python src/python_example/zero_shot_image_classification/clip/clip-img_vit-b16-q
   -i sample/img/face_pair
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/zero_shot_image_classification/clip/clip-img_vit-b16-quickgelu_224x224_metaclip-fullcc/clip-img_vit-b16-quickgelu_224x224_metaclip-fullcc_sync.py \
-  --model assets/models/clip-img_vit-b16-quickgelu_224x224_metaclip-fullcc.dxnn \
-  --image sample/img/face_pair \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 Accuracy |
 |---|---:|

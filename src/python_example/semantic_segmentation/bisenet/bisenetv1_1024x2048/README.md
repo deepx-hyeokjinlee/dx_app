@@ -38,11 +38,7 @@ python src/python_example/semantic_segmentation/bisenet/bisenetv1_1024x2048/bise
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**18 FPS** and **14.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

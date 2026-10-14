@@ -38,11 +38,7 @@ python src/python_example/object_detection/efficientdet/efficientdet-d2_768x768/
   -i sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**49 FPS** and **81.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

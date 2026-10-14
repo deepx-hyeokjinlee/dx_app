@@ -38,11 +38,7 @@ python src/python_example/image_classification/efficientnet/efficientnetv2-s_384
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**441 FPS** and **191.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

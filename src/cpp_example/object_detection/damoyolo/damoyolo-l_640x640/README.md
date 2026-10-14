@@ -38,11 +38,7 @@ python src/python_example/object_detection/damoyolo/damoyolo-l_640x640/damoyolo-
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-**111 FPS** and **40.0 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

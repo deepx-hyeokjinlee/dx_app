@@ -38,11 +38,7 @@ python src/python_example/semantic_segmentation/unet/unet_mobilenetv2_256x256/un
   -i sample/img/sample_parking.jpg
 ```
 
-## Performance
-
-**216 FPS** and **848.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mIoU |
 |---|---:|

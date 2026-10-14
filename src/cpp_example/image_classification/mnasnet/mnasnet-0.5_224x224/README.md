@@ -38,11 +38,7 @@ python src/python_example/image_classification/mnasnet/mnasnet-0.5_224x224/mnasn
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**7,307 FPS** and **6,992.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

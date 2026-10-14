@@ -38,11 +38,7 @@ python src/python_example/face_attribute/faceattr/faceattr_resnetv1-18_218x178/f
   -i sample/img/sample_person_a1.jpg
 ```
 
-## Performance
-
-**2,188 FPS** and **1,358.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Average Accuracy |
 |---|---:|

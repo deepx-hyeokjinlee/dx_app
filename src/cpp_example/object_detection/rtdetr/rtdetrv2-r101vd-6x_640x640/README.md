@@ -38,18 +38,7 @@ python src/python_example/object_detection/rtdetr/rtdetrv2-r101vd-6x_640x640/rtd
   --image sample/img/sample_street.jpg
 ```
 
-## Performance
-
-Throughput for this model is not published yet. Measure it on your board:
-
-```bash
-python src/python_example/object_detection/rtdetr/rtdetrv2-r101vd-6x_640x640/rtdetrv2-r101vd-6x_640x640_sync.py \
-  --model assets/models/rtdetrv2-r101vd-6x_640x640.dxnn \
-  --image sample/img/sample_street.jpg \
-  --loop 100 --no-display
-```
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

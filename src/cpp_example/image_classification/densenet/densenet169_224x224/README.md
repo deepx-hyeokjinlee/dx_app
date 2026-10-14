@@ -38,11 +38,7 @@ python src/python_example/image_classification/densenet/densenet169_224x224/dens
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**69 FPS** and **170.4 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

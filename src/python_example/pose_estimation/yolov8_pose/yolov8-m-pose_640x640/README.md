@@ -38,11 +38,7 @@ python src/python_example/pose_estimation/yolov8_pose/yolov8-m-pose_640x640/yolo
   -i sample/img/sample_people.jpg
 ```
 
-## Performance
-
-**154 FPS** and **48.8 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | mAP |
 |---|---:|

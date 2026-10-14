@@ -38,11 +38,7 @@ python src/python_example/image_classification/repghost/repghost-2.0x_224x224/re
   --image sample/img/sample_dog.jpg
 ```
 
-## Performance
-
-**981 FPS** and **1,503.2 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | Top1 |
 |---|---:|

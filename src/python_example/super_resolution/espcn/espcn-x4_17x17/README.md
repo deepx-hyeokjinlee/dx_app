@@ -38,11 +38,7 @@ python src/python_example/super_resolution/espcn/espcn-x4_17x17/espcn-x4_17x17_s
   -i sample/img/sample_lowres275x150.png
 ```
 
-## Performance
-
-**18,011 FPS** and **85,769.3 FPS/W** on DX-M1, DX Model Zoo reference measurement (publish table, 2026-10-13).
-
-### Accuracy
+## Accuracy
 
 | Quantization | PSNR | SSIM |
 |---|---:|---:|
