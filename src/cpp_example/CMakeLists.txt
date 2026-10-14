@@ -179,6 +179,7 @@ add_library(dxapp_graph_obj OBJECT
     ${GRAPH_DIR}/graph_runner_async.cpp
     ${GRAPH_DIR}/graph_visualizer.cpp
     ${GRAPH_DIR}/cpu_reduce.cpp
+    ${GRAPH_DIR}/logic_ops.cpp
 )
 target_compile_options(dxapp_graph_obj PRIVATE ${COMMON_COMPILE_FLAGS})
 # The engine switches on Shape with no default (SamePayload, ToString):

@@ -64,3 +64,11 @@ def test_the_real_engine_tree_is_clean():
     result = subprocess.run([sys.executable, str(GUARD)], cwd=str(ROOT),
                             capture_output=True, text=True, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_the_logic_ops_header_is_an_engine_header():
+    """Logic nodes live in common/graph/logic_ops.{hpp,cpp}, included by the
+    parser, the executors and the visualizer."""
+    guard = load_guard()
+    engine_file = ROOT / "src" / "cpp_example" / "common" / "graph" / "graph_config.cpp"
+    assert guard._include_violation(engine_file, "common/graph/logic_ops.hpp") is None

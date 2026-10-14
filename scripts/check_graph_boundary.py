@@ -216,6 +216,11 @@ ENGINE_INCLUDE_ALLOWLIST = frozenset([
     # finished. It includes only i_registry.hpp and shape.hpp from the graph
     # surface and names no concrete registry and no task string.
     "cpu_reduce.hpp",
+    # Logic nodes ("type": "logic"): the op catalog, the typed config, the
+    # per-stream state and RunLogic. Includes the graph surface, roi_router.hpp
+    # and common/processors/gallery_retrieval_postprocessor.hpp (the DXGAL1
+    # reader); names no concrete registry and no task string.
+    "logic_ops.hpp",
 ])
 ENGINE_INCLUDE_PREFIXES = (
     "common/base/",

@@ -16,6 +16,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -35,6 +36,7 @@
 #include "common/graph/graph_runner_async.hpp"
 #include "common/graph/graph_runner_sync.hpp"
 #include "common/graph/graph_visualizer.hpp"
+#include "common/graph/logic_ops.hpp"
 #include "common/graph/roi_router.hpp"
 #include "common/graph/shape.hpp"
 #include "common/graph/result_to_shape.hpp"
@@ -12342,6 +12344,47 @@ void TestGraphErrorKeepsItsThreeParts() {
     GRAPH_CHECK(where == "g.json node[1] \"od\"");
 }
 
+// ============================================================== Graph Composer P2
+// Logic nodes: one catalog drives validation and --list-ops.
+void TestLogicOpCatalogDescribesEveryOp() {
+    const char* const expected[] = {"filter", "zone", "line", "count",
+                                    "dwell", "condition", "gallery", "user"};
+    const std::vector<LogicOpInfo>& ops = LogicOps();
+    GRAPH_CHECK(ops.size() == 8);
+    for (std::size_t i = 0; i < 8 && i < ops.size(); ++i) GRAPH_CHECK(ops[i].op == expected[i]);
+    for (std::size_t i = 0; i < ops.size(); ++i) {
+        const LogicOpInfo& op = ops[i];
+        GRAPH_CHECK(!op.summary.empty());
+        GRAPH_CHECK(!op.accepts.empty());
+        GRAPH_CHECK(op.min_inputs >= 1 && op.max_inputs >= op.min_inputs);
+        std::set<std::string> names;
+        for (std::size_t p = 0; p < op.params.size(); ++p) {
+            const LogicParamInfo& param = op.params[p];
+            GRAPH_CHECK(!param.help.empty());
+            GRAPH_CHECK(names.insert(param.name).second);
+            if (param.kind == LogicParamInfo::kChoice) {
+                GRAPH_CHECK(!param.choices.empty());
+                if (!param.required) {
+                    GRAPH_CHECK(std::find(param.choices.begin(), param.choices.end(),
+                                          param.text_default) != param.choices.end());
+                }
+            }
+        }
+    }
+    GRAPH_CHECK(FindLogicOp("zone") != NULL && FindLogicOp("zone")->events.size() == 2);
+    GRAPH_CHECK(FindLogicOp("headpose") == NULL);
+    GRAPH_CHECK(FindLogicOp("line")->needs_tracking && FindLogicOp("dwell")->needs_tracking);
+    GRAPH_CHECK(!FindLogicOp("zone")->needs_tracking && !FindLogicOp("count")->needs_tracking);
+    GRAPH_CHECK(FindLogicOp("filter")->same_shape_out && FindLogicOp("user")->same_shape_out);
+    GRAPH_CHECK(!FindLogicOp("line")->same_shape_out);
+    GRAPH_CHECK(FindLogicOp("count")->max_inputs == 8);
+    GRAPH_CHECK(CpuOpInfos().size() == 2);
+    GRAPH_CHECK(FindCpuOpInfo("volume") != NULL && FindCpuOpInfo("volume")->min_inputs == 3);
+    GRAPH_CHECK(FindCpuOpInfo("headpose") != NULL && FindCpuOpInfo("headpose")->numbers.size() == 3);
+    GRAPH_CHECK(std::string(ToString(LogicParamInfo::kPolygon)) == "polygon");
+    GRAPH_CHECK(std::string(ToString(LogicParamInfo::kTextList)) == "text_list");
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12701,6 +12744,7 @@ int main() {
     TestSharedEngineRestrictions();
     TestAFailedLoadClosesEveryEngineItOpened();
     TestGraphErrorKeepsItsThreeParts();
+    TestLogicOpCatalogDescribesEveryOp();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
