@@ -10,6 +10,7 @@
 
 #include "common/graph/graph_error.hpp"
 #include "common/graph/roi_router.hpp"
+#include "common/processors/gallery_retrieval_postprocessor.hpp"
 
 namespace dxapp {
 namespace graph {
@@ -798,6 +799,135 @@ LogicOutput RunCondition(const LogicConfig& c, const std::vector<LogicInput>& in
     return out;
 }
 
+/// An entry's name: its label, else its image's file stem.
+std::string GalleryName(const RetrievalGallery& gallery, std::size_t row) {
+    if (row < gallery.labels.size() && !gallery.labels[row].empty()) return gallery.labels[row];
+    const std::string path = row < gallery.paths.size() ? gallery.paths[row] : std::string();
+    const std::size_t slash = path.find_last_of("/\\");
+    std::string stem = slash == std::string::npos ? path : path.substr(slash + 1);
+    const std::size_t dot = stem.find_last_of('.');
+    if (dot != std::string::npos) stem = stem.substr(0, dot);
+    return stem.empty() ? "entry_" + std::to_string(row) : stem;
+}
+
+/// The nearest gallery row by cosine similarity. False when the widths differ.
+bool BestMatch(const RetrievalGallery& gallery, const std::vector<float>& vector,
+               std::size_t* row, double* score) {
+    if (gallery.count <= 0 || static_cast<int>(vector.size()) != gallery.dim) return false;
+    double norm = 0.0;
+    for (std::size_t d = 0; d < vector.size(); ++d) {
+        norm += static_cast<double>(vector[d]) * vector[d];
+    }
+    norm = std::sqrt(norm);
+    *row = 0;
+    *score = 0.0;
+    if (norm <= 1e-12) return true;
+    double best = -2.0;
+    for (int r = 0; r < gallery.count; ++r) {
+        const float* entry = gallery.vectors.data() + static_cast<std::size_t>(r) * gallery.dim;
+        double dot = 0.0;
+        for (int d = 0; d < gallery.dim; ++d) dot += static_cast<double>(entry[d]) * vector[d];
+        dot /= norm;
+        if (dot > best) {
+            best = dot;
+            *row = static_cast<std::size_t>(r);
+        }
+    }
+    *score = best;
+    return true;
+}
+
+LogicOutput RunGallery(const LogicConfig& c, const std::vector<LogicInput>& inputs,
+                       const LogicFrame& at, LogicState* s) {
+    LogicOutput out;
+    std::shared_ptr<RecordsData> records(new RecordsData());
+    out.result.data = records;
+    if (!c.gallery) {
+        out.error = "no gallery loaded";
+        return out;
+    }
+    if (inputs.empty()) {
+        out.error = "missing vector input";
+        return out;
+    }
+    // One query per crop, or the one full-frame vector.
+    std::vector<std::pair<const VectorData*, RoiRef> > queries;
+    const LogicInput& input = inputs[0];
+    if (input.per_crop) {
+        for (std::size_t i = 0; i < input.crops.size(); ++i) {
+            const VectorData* vector =
+                dynamic_cast<const VectorData*>(input.crops[i].data.get());
+            if (vector != NULL) queries.push_back(std::make_pair(vector, input.crops[i].origin));
+        }
+    } else if (input.data) {
+        const VectorData* vector = dynamic_cast<const VectorData*>(input.data.get());
+        if (vector != NULL) queries.push_back(std::make_pair(vector, input.origin));
+    }
+    const double threshold = Number(c, "threshold");
+    const std::string mode = Text(c, "events");
+    std::set<int> seen;
+    for (std::size_t q = 0; q < queries.size(); ++q) {
+        std::size_t row = 0;
+        double score = 0.0;
+        if (!BestMatch(*c.gallery, queries[q].first->values, &row, &score)) {
+            out.error = "a vector of " + std::to_string(queries[q].first->values.size()) +
+                        " values, but the gallery holds " + std::to_string(c.gallery->dim);
+            continue;
+        }
+        const RoiRef& origin = queries[q].second;
+        const bool known = score >= threshold;
+        const std::string name = known ? GalleryName(*c.gallery, row) : "unknown";
+        RecordItem item;
+        AddNumber(&item, "track_id", static_cast<double>(origin.track_id));
+        AddNumber(&item, "score", score);
+        AddNumber(&item, "parent_index", static_cast<double>(origin.parent_index));
+        AddText(&item, "name", name);
+        records->items.push_back(item);
+        // A track announces a name once, when it gets it or it changes; an
+        // untracked crop every frame.
+        bool announce = true;
+        if (origin.track_id >= 0) {
+            seen.insert(origin.track_id);
+            TrackMemo& memo = s->tracks[origin.track_id];
+            announce = memo.name != name;
+            memo.name = name;
+            memo.last_s = at.time_s;
+        }
+        if (announce && ((known && mode != "none") || (!known && mode == "all"))) {
+            GraphEvent event = MakeEvent(c, known ? "match" : "unknown", origin.track_id, at);
+            AddNumber(&event.data, "score", score);
+            if (known) AddText(&event.data, "name", name);
+            out.events.push_back(event);
+        }
+        OverlayText label;
+        if (origin.from_roi) {
+            label.at = cv::Point2f(origin.src_box.x, origin.src_box.y + origin.src_box.height);
+        }
+        label.text = name + " " + Short(score);
+        label.alert = !known;
+        out.overlay.texts.push_back(label);
+    }
+    Forget(s, seen, at.time_s, kForgetAfterS, [](int, const TrackMemo&) {});
+    return out;
+}
+
+LogicOutput RunUser(const std::vector<LogicInput>& inputs) {
+    LogicOutput out;
+    const LogicInput* input = FirstFullFrame(inputs);
+    if (input == NULL) {
+        out.result.data.reset(new RecordsData());
+        out.error = "missing input";
+        return out;
+    }
+    const std::shared_ptr<BoxesData> boxes = SourceBoxes(*input);
+    if (boxes) {
+        out.result.data = boxes;
+    } else {
+        out.result.data = input->data;
+    }
+    return out;
+}
+
 /// The op's own run; RunLogic sorts the inputs and checks the events.
 LogicOutput RunOp(const LogicConfig& config, const std::vector<LogicInput>& inputs,
                   const LogicFrame& frame, LogicState* s) {
@@ -807,9 +937,11 @@ LogicOutput RunOp(const LogicConfig& config, const std::vector<LogicInput>& inpu
     if (config.op == "count") return RunCount(config, inputs);
     if (config.op == "dwell") return RunDwell(config, inputs, frame, s);
     if (config.op == "condition") return RunCondition(config, inputs, frame, s);
+    if (config.op == "gallery") return RunGallery(config, inputs, frame, s);
+    if (config.op == "user") return RunUser(inputs);
     LogicOutput out;
     out.result.data.reset(new RecordsData());
-    out.error = "logic op \"" + config.op + "\" cannot run";
+    out.error = "unknown logic op \"" + config.op + "\"";
     return out;
 }
 
@@ -855,6 +987,18 @@ LogicConfig MakeLogicConfig(const NodeSpec& node) {
                 break;
             }
         }
+    }
+    if (node.op == "gallery") {
+        std::shared_ptr<RetrievalGallery> gallery(
+            new RetrievalGallery(loadRetrievalGallery(config.text["gallery"])));
+        if (!gallery->loaded) {
+            throw GraphError(GraphErrorCode::kGraphSchema, "node \"" + node.id + "\" \"params\"",
+                             gallery->error,
+                             "build one from an image folder: python3 "
+                             "scripts/build_gallery_database.py --variant <model> --images "
+                             "<folder> --out <file>.bin");
+        }
+        config.gallery = gallery;
     }
     return config;
 }

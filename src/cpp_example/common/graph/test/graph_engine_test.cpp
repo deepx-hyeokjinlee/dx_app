@@ -13342,6 +13342,105 @@ void TestPerCropScoresReachACondition() {
     for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(without[i] == async[i]);
 }
 
+namespace {
+
+std::shared_ptr<VectorData> Embedding(float a, float b, float c, float d) {
+    std::shared_ptr<VectorData> vector(new VectorData());
+    vector->values.push_back(a);
+    vector->values.push_back(b);
+    vector->values.push_back(c);
+    vector->values.push_back(d);
+    return vector;
+}
+
+std::string GalleryGraph(const std::string& path, const std::string& extra) {
+    return LogicJson(
+        ",{\"id\":\"e\",\"model\":\"emb\"},{\"id\":\"g\",\"type\":\"logic\",\"op\":\"gallery\","
+        "\"params\":{\"gallery\":\"" + path + "\",\"threshold\":0.5" + extra + "}}",
+        ",{\"from\":\"od\",\"to\":\"e\",\"roi\":{}},{\"from\":\"e\",\"to\":\"g\",\"carry\":\"result\"}");
+}
+
+std::string TextOf(const RecordItem& item, const std::string& name) {
+    for (std::size_t i = 0; i < item.text.size(); ++i) {
+        if (item.text[i].first == name) return item.text[i].second;
+    }
+    return std::string();
+}
+
+}  // namespace
+
+void TestGalleryNamesEachCropAndAnnouncesNameChanges() {
+    const std::string path =
+        WriteGallery("logic_gallery.bin", "emb", AliceAndBob(), AliceAndBobLabels());
+    FakeModelRegistry registry = LogicRegistry();
+    registry.SetScriptByFirstPixel("emb", 0, Embedding(1.f, 0.f, 0.f, 0.f));
+    const std::vector<FrameReport> reports =
+        RunLogicFrames(GalleryGraph(path, ""), registry, Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    for (std::size_t i = 0; i < 6; ++i) {
+        const RecordsData* records = RecordsOf(reports[i], "g");
+        GRAPH_CHECK(records != NULL && records->items.size() == 1);
+        if (records == NULL || records->items.size() != 1) continue;
+        GRAPH_CHECK(TextOf(records->items[0], "name") == "alice");
+        GRAPH_CHECK(NumberOf(records->items[0], "score") == 1.0);
+        GRAPH_CHECK(NumberOf(records->items[0], "track_id") == 0.0);
+        GRAPH_CHECK(reports[i].overlays.at("g").texts.size() == 1 &&
+                    reports[i].overlays.at("g").texts[0].text == "alice 1");
+    }
+    // Announced once, when track 0 first gets its name.
+    const std::vector<std::size_t> fired = FramesWithEvents(reports);
+    GRAPH_CHECK(fired.size() == 1 && fired[0] == 0);
+    if (!reports[0].events.empty()) {
+        GRAPH_CHECK(reports[0].events[0].event == "match" && reports[0].events[0].track_id == 0);
+        GRAPH_CHECK(TextOf(reports[0].events[0].data, "name") == "alice");
+    }
+    FakeModelRegistry reversed = registry;
+    reversed.SetDeliveryOrder("det", FakeModelRegistry::kReverse);
+    reversed.SetShuffleSeed("emb", 4);
+    const std::vector<FrameReport> async =
+        RunLogicFrames(GalleryGraph(path, ""), reversed, Keys(6), true);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
+
+    // A stranger is "unknown"; "events": "all" announces that too.
+    FakeModelRegistry stranger = LogicRegistry();
+    stranger.SetScriptByFirstPixel("emb", 0, Embedding(0.f, 0.f, 1.f, 0.f));
+    const std::vector<FrameReport> unknown =
+        RunLogicFrames(GalleryGraph(path, ",\"events\":\"all\""), stranger, Keys(2), false);
+    GRAPH_CHECK(unknown.size() == 2 && unknown[0].events.size() == 1 && unknown[1].events.empty());
+    if (unknown.size() == 2 && unknown[0].events.size() == 1) {
+        GRAPH_CHECK(unknown[0].events[0].event == "unknown");
+        GRAPH_CHECK(TextOf(RecordsOf(unknown[0], "g")->items[0], "name") == "unknown");
+    }
+    const std::vector<FrameReport> quiet =
+        RunLogicFrames(GalleryGraph(path, ""), stranger, Keys(2), false);
+    GRAPH_CHECK(FramesWithEvents(quiet).empty());
+    std::remove(path.c_str());
+}
+
+void TestUserNodePassesItsInputThrough() {
+    const std::string text = LogicJson(
+        ",{\"id\":\"u\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"my_rule\",\"input\":\"boxes\",\"output\":\"boxes\"}}" + std::string(kZoneNode),
+        ",{\"from\":\"od\",\"to\":\"u\",\"carry\":\"result\"},"
+        "{\"from\":\"u\",\"to\":\"z\",\"carry\":\"result\"}");
+    const std::vector<FrameReport> reports = RunLogicFrames(text, LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    if (reports.size() != 6) return;
+    for (std::size_t i = 0; i < 6; ++i) {
+        const BoxesData* od = BoxesOf(reports[i], "od");
+        const BoxesData* user = BoxesOf(reports[i], "u");
+        GRAPH_CHECK(od != NULL && user != NULL && user->items.size() == od->items.size());
+        if (od == NULL || user == NULL || user->items.size() != 1 || od->items.size() != 1) continue;
+        GRAPH_CHECK(user->items[0].box == od->items[0].box);
+        GRAPH_CHECK(user->items[0].track_id == od->items[0].track_id);
+        GRAPH_CHECK(reports[i].overlays.count("u") == 1);
+    }
+    GRAPH_CHECK(reports[2].events.size() == 1 && reports[2].events[0].node == "z");
+    const std::vector<FrameReport> async = RunLogicFrames(text, ReversedLogicRegistry(), Keys(6), true);
+    for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13726,6 +13825,8 @@ int main() {
     TestConditionRaisesOnTheRisingEdgeOrEveryCooldown();
     TestAsyncLogicGateOrdersReversedCompletions();
     TestPerCropScoresReachACondition();
+    TestGalleryNamesEachCropAndAnnouncesNameChanges();
+    TestUserNodePassesItsInputThrough();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
