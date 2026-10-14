@@ -121,7 +121,10 @@ const json& RequireArray(const json& parent, const char* key,
 const char* const kTopKeys[] = {"version", "name", "nodes", "edges",
                                 "$schema"};
 const char* const kNodeKeys[] = {"id", "type", "uri", "model", "op", "params",
-                                 "track"};
+                                 "track", "engine"};
+const char* const kEngineKeys[] = {"buffers", "share"};
+/// DX-RT's DXRT_TASK_MAX_LOAD_LIMIT: the largest I/O buffer count it accepts.
+const int kMaxEngineBuffers = 100;
 const char* const kTrackKeys[] = {"algo", "iou", "max_age"};
 const char* const kEdgeKeys[] = {"from", "to", "roi", "port", "carry"};
 const char* const kRoiKeys[] = {"classes", "min_score", "min_area", "pad",
@@ -809,6 +812,44 @@ GraphSpec ParseGraphText(const std::string& json_text,
             bad.ThrowIfAny(Where(origin, detail.str()));
         }
 
+        json::const_iterator engine = node.find("engine");
+        if (engine != node.end()) {
+            if (parsed.is_source || parsed.is_cpu) {
+                throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
+                                 "\"engine\" belongs on a model node",
+                                 "remove \"engine\" from this node");
+            }
+            RequireObject(*engine, origin, node_label + " \"engine\"");
+            RejectUnknownKeys(*engine, kEngineKeys, origin, node_label + " \"engine\"");
+            parsed.engine.present = true;
+            Violations bad;
+            json::const_iterator field = engine->find("buffers");
+            if (field != engine->end()) {
+                int buffers = 0;
+                if (ReadCount(*field, "buffers", 1,
+                              "\"buffers\" is how many inputs DX-RT keeps in flight for "
+                              "this model (default 6); fewer use less NPU memory",
+                              &bad, &buffers)) {
+                    if (buffers > kMaxEngineBuffers) {
+                        bad.Add("\"buffers\" must be at most 100, got " + field->dump(),
+                                "DX-RT accepts 1 to 100");
+                    } else {
+                        parsed.engine.buffers = buffers;
+                    }
+                }
+            }
+            field = engine->find("share");
+            if (field != engine->end()) {
+                if (!field->is_boolean()) {
+                    bad.Add("\"share\" must be true or false, got " + field->dump(),
+                            "\"share\": true lets nodes of the same model use one engine");
+                } else {
+                    parsed.engine.share = field->get<bool>();
+                }
+            }
+            bad.ThrowIfAny(Where(origin, node_label + " \"engine\""));
+        }
+
         if (parsed.is_cpu && parsed.track.present) {
             throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
                              "a cpu node cannot track",
@@ -1108,6 +1149,37 @@ void CheckCpuInputs(const NodeSpec& node, const std::vector<Shape>& got) {
                      "connect a detector, a segmenter and a depth model with "
                      "\"carry\": \"result\"");
 }
+
+std::map<std::string, std::string> SharedEngineOwners(const GraphSpec& spec,
+                                                      const IModelRegistry& registry) {
+    std::map<std::string, std::string> owner_of;
+    std::map<std::string, std::string> first_of_variant;
+    for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
+        const NodeSpec& node = spec.nodes[i];
+        if (node.is_source || node.is_cpu || !node.engine.share) continue;
+        const ModelInfo* info = registry.find(node.model);
+        if (info == NULL) continue;
+        std::map<std::string, std::string>::iterator first =
+            first_of_variant.find(info->model_name);
+        if (first == first_of_variant.end()) {
+            first = first_of_variant.insert(std::make_pair(info->model_name, node.id)).first;
+        }
+        owner_of[node.id] = first->second;
+    }
+    return owner_of;
+}
+
+namespace {
+
+bool SameParams(const StageParams& a, const StageParams& b) {
+    return a.numeric == b.numeric && a.text == b.text && a.lists == b.lists;
+}
+
+std::string BuffersText(int buffers) {
+    return buffers == 0 ? std::string("the default") : std::to_string(buffers);
+}
+
+}  // namespace
 
 void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
     // 1. Resolve every node against the registry.
@@ -1560,6 +1632,33 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
                 GraphErrorCode::kGraphOrphan, "node \"" + spec.nodes[i].id + "\"",
                 "unreachable from any source",
                 "connect it with an edge, or remove it");
+        }
+    }
+
+    // 6. Shared engines: one engine, one configuration. The factory, the
+    // preprocessor and the postprocessor of the one stage are set up from
+    // the owner's params, and DX-RT's buffer pool is the owner's.
+    const std::map<std::string, std::string> owners = SharedEngineOwners(spec, registry);
+    for (std::map<std::string, std::string>::const_iterator it = owners.begin();
+         it != owners.end(); ++it) {
+        if (it->first == it->second) continue;
+        const NodeSpec& node = *spec.FindNode(it->first);
+        const NodeSpec& owner = *spec.FindNode(it->second);
+        const std::string where = "node \"" + node.id + "\" \"engine\"";
+        if (!SameParams(node.params, owner.params)) {
+            throw GraphError(GraphErrorCode::kGraphSchema, where,
+                             "shares the engine of node \"" + owner.id +
+                                 "\", but its \"params\" differ",
+                             "one engine runs one configuration: give both nodes the same "
+                             "\"params\", or remove \"share\" from one of them");
+        }
+        if (node.engine.buffers != owner.engine.buffers) {
+            throw GraphError(GraphErrorCode::kGraphSchema, where,
+                             "shares the engine of node \"" + owner.id +
+                                 "\", but its \"buffers\" differ (" +
+                                 BuffersText(node.engine.buffers) + " vs " +
+                                 BuffersText(owner.engine.buffers) + ")",
+                             "set the same \"buffers\" on every node that shares the engine");
         }
     }
 }

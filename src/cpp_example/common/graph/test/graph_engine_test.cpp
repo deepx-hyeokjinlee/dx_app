@@ -11966,6 +11966,73 @@ void TestReportToJsonWritesNodeMsOnlyWhenAsked() {
     GRAPH_CHECK(without.dump() == plain.dump());
 }
 
+namespace {
+
+std::string EngineNodeJson(const std::string& engine) {
+    return "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+           "{\"id\":\"od\",\"model\":\"yolov8n\",\"engine\":" + engine + "}],"
+           "\"edges\":[{\"from\":\"cam\",\"to\":\"od\"}]}";
+}
+
+std::string SharedDetectorsJson(const std::string& od2_engine, const std::string& od2_params) {
+    return "{\"version\":1,\"name\":\"shared\",\"nodes\":["
+           "{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+           "{\"id\":\"od\",\"model\":\"yolov8n\",\"engine\":{\"share\":true}},"
+           "{\"id\":\"od2\",\"model\":\"yolov8n\",\"engine\":" + od2_engine + od2_params + "},"
+           "{\"id\":\"reid\",\"model\":\"casvit_t\"}],"
+           "\"edges\":[{\"from\":\"cam\",\"to\":\"od\"},{\"from\":\"cam\",\"to\":\"od2\"},"
+           "{\"from\":\"od2\",\"to\":\"reid\",\"roi\":{\"classes\":[\"person\"]}}]}";
+}
+
+}  // namespace
+
+void TestEngineKeyParsesAndValidates() {
+    const GraphSpec plain = ParseGraphText(CascadeJson(), "t.json");
+    GRAPH_CHECK(!plain.nodes[1].engine.present);
+    GRAPH_CHECK(plain.nodes[1].engine.buffers == 0 && !plain.nodes[1].engine.share);
+
+    const GraphSpec set = ParseGraphText(EngineNodeJson("{\"buffers\":2,\"share\":true}"), "e.json");
+    GRAPH_CHECK(set.nodes[1].engine.present);
+    GRAPH_CHECK(set.nodes[1].engine.buffers == 2);
+    GRAPH_CHECK(set.nodes[1].engine.share);
+
+    std::string message;
+    GRAPH_CHECK(ThrowsWithCode(EngineNodeJson("{\"buffers\":0}"), GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"buffers\" must be a whole number of at least 1") != std::string::npos);
+    GRAPH_CHECK(ThrowsWithCode(EngineNodeJson("{\"buffers\":101}"), GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"buffers\" must be at most 100") != std::string::npos);
+    GRAPH_CHECK(ThrowsWithCode(EngineNodeJson("{\"buffers\":2.5}"), GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(ThrowsWithCode(EngineNodeJson("{\"share\":\"yes\"}"), GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"share\" must be true or false") != std::string::npos);
+    GRAPH_CHECK(ThrowsWithCode(EngineNodeJson("{\"bufers\":2}"), GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("did you mean \"buffers\"") != std::string::npos);
+    GRAPH_CHECK(ThrowsWithCode(EngineNodeJson("[2]"), GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(ThrowsWithCode(
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\","
+        "\"engine\":{\"buffers\":2}}],\"edges\":[]}",
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"engine\" belongs on a model node") != std::string::npos);
+
+    // Sharers must want the same engine.
+    FakeModelRegistry registry = BuildCascadeRegistry();
+    GRAPH_CHECK(CpuValidateThrows(SharedDetectorsJson("{\"share\":true}", ",\"params\":{\"score_threshold\":0.5}"),
+                                  registry, GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("node \"od2\" \"engine\"") != std::string::npos);
+    GRAPH_CHECK(message.find("shares the engine of node \"od\", but its \"params\" differ") != std::string::npos);
+    GRAPH_CHECK(CpuValidateThrows(SharedDetectorsJson("{\"share\":true,\"buffers\":2}", ""),
+                                  registry, GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("but its \"buffers\" differ (2 vs the default)") != std::string::npos);
+    const GraphSpec ok = ParseGraphText(SharedDetectorsJson("{\"share\":true}", ""), "s.json");
+    ValidateGraph(ok, registry);
+
+    // Who owns each shared engine: the first sharer of the variant.
+    const std::map<std::string, std::string> owners = SharedEngineOwners(ok, registry);
+    GRAPH_CHECK(owners.size() == 2);
+    GRAPH_CHECK(owners.count("od") == 1 && owners.at("od") == "od");
+    GRAPH_CHECK(owners.count("od2") == 1 && owners.at("od2") == "od");
+    GRAPH_CHECK(owners.count("reid") == 0);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12315,6 +12382,7 @@ int main() {
     TestSyncExecutorTimesEveryNode();
     TestAsyncExecutorTimesEveryNode();
     TestReportToJsonWritesNodeMsOnlyWhenAsked();
+    TestEngineKeyParsesAndValidates();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

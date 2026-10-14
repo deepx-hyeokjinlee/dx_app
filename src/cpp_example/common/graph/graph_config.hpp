@@ -10,6 +10,7 @@
 #ifndef DXAPP_GRAPH_GRAPH_CONFIG_HPP
 #define DXAPP_GRAPH_GRAPH_CONFIG_HPP
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -42,6 +43,15 @@ struct TrackSpec {
     TrackSpec() : present(false), algo("iou"), iou(0.3f), max_age(30) {}
 };
 
+/// NPU engine settings of a model node ("engine"). All optional.
+struct EngineSpec {
+    bool present;
+    int buffers;  ///< DX-RT I/O buffer count, 1..100; 0 = DX-RT's default (6)
+    bool share;   ///< one engine for every share node of the same model variant
+
+    EngineSpec() : present(false), buffers(0), share(false) {}
+};
+
 struct NodeSpec {
     std::string id;
     bool is_source;
@@ -51,6 +61,7 @@ struct NodeSpec {
     std::string op;     ///< cpu only: "headpose" or "volume"
     StageParams params;
     TrackSpec track;
+    EngineSpec engine;
 
     NodeSpec() : is_source(false), is_cpu(false) {}
 };
@@ -89,6 +100,13 @@ struct StreamSpec {
 /// reachability the stream model uses: ValidateGraph, --check and
 /// StageGraph::Build all call it.
 std::vector<StreamSpec> ListStreams(const GraphSpec& spec);
+
+/// Node id -> the id of the node whose engine it uses, for every model node
+/// with "engine": {"share": true} whose model resolves: the first such node
+/// (declaration order) of the same model variant, itself included. Nodes
+/// that do not share are absent. StageGraph::Build and --check --json use it.
+std::map<std::string, std::string> SharedEngineOwners(const GraphSpec& spec,
+                                                      const IModelRegistry& registry);
 
 /// Syntax only. Throws GraphError with kGraphSchema, kGraphVersion or
 /// kGraphReserved. origin appears in the message so the reader knows the file.
