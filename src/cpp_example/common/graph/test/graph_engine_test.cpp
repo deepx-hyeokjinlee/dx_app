@@ -11949,6 +11949,23 @@ void TestAsyncExecutorTimesEveryNode() {
     GRAPH_CHECK(no_crops.node_ms.count("reid") == 1 && no_crops.node_ms.at("reid") == 0.0);
 }
 
+// --report-timing: "node_ms" is written only when asked, and changes nothing else.
+void TestReportToJsonWritesNodeMsOnlyWhenAsked() {
+    FrameReport report;
+    report.frame_index = 3;
+    report.node_ms["od"] = 12.34567;
+    report.node_ms["reid"] = 0.0;
+    const nlohmann::json plain = consumer::ReportToJson(report, false);
+    GRAPH_CHECK(!plain.contains("node_ms"));
+    const nlohmann::json timed = consumer::ReportToJson(report, false, true);
+    GRAPH_CHECK(timed.contains("node_ms"));
+    GRAPH_CHECK(std::fabs(timed["node_ms"]["od"].get<double>() - 12.346) < 1e-9);
+    GRAPH_CHECK(timed["node_ms"]["reid"].get<double>() == 0.0);
+    nlohmann::json without = timed;
+    without.erase("node_ms");
+    GRAPH_CHECK(without.dump() == plain.dump());
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12297,6 +12314,7 @@ int main() {
     TestVolumeProxyMatchesSyncAndAsync();
     TestSyncExecutorTimesEveryNode();
     TestAsyncExecutorTimesEveryNode();
+    TestReportToJsonWritesNodeMsOnlyWhenAsked();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

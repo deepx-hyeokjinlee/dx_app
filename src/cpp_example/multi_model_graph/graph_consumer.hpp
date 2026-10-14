@@ -84,8 +84,13 @@ std::string DefaultModelDir();
  * Streams (SP2 R4): with `name_stream` it adds "stream": report.stream.
  * Every call site decides; pass NamesStreams(graph), so a one-source
  * report is byte-identical to what it was before streams existed.
+ *
+ * Timing: with `with_timing` it adds "node_ms": {"<node id>": ms, ...},
+ * FrameReport::node_ms rounded to 0.001 ms. Off by default, so a report
+ * stays free of anything executor-specific (--report-timing turns it on).
  */
-nlohmann::json ReportToJson(const FrameReport& report, bool name_stream);
+nlohmann::json ReportToJson(const FrameReport& report, bool name_stream,
+                            bool with_timing = false);
 
 /// True when a graph's reports name their stream: it has more than one source.
 bool NamesStreams(const StageGraph& graph);

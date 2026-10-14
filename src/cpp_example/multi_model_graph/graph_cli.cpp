@@ -30,6 +30,7 @@
 #include "common/registry/static_model_registry.hpp"
 #include "common/third_party/nlohmann_json.hpp"
 #include "common/utility/dxnn_container.hpp"
+#include "common/utility/progress.hpp"
 #include "common/utility/repo_path.hpp"
 #include "multi_model_graph/graph_cli_interrupt.hpp"
 #include "multi_model_graph/graph_cli_output.hpp"
@@ -99,6 +100,7 @@ struct GraphCliArgs {
     bool list_models;
     bool display;           ///< show each rendered frame in a window
     bool help;
+    bool report_timing;   ///< --report-timing: node_ms in --report
 
     GraphCliArgs()
         : model_dir(DefaultModelDir()),
@@ -109,7 +111,8 @@ struct GraphCliArgs {
           check_only(false),
           list_models(false),
           display(false),
-          help(false) {}
+          help(false),
+          report_timing(false) {}
 };
 
 void PrintUsage(const char* program) {
@@ -149,6 +152,9 @@ void PrintUsage(const char* program) {
         "                        the run as Ctrl-C does\n"
         "  --report <file>       write every FrameReport as JSON, ordered by\n"
         "                        (node, parent_index, roi_index)\n"
+        "  --report-timing       with --report: add each frame's \"node_ms\", the\n"
+        "                        time per node. Off by default, so the sync and\n"
+        "                        async reports stay byte-identical\n"
         "  --model-dir <dir>     where the .dxnn files live\n"
         "                        (default: %s)\n"
         "  --max-inflight <N>    frames in flight at once (default: %u, at"
@@ -224,6 +230,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         }
         if (option == "--display") {
             args->display = true;
+            continue;
+        }
+        if (option == "--report-timing") {
+            args->report_timing = true;
             continue;
         }
         if (option == "--check") {
@@ -318,6 +328,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
     }
     if (!args->list_models && !args->produces.empty()) {
         *error = "--produces only applies to --list-models";
+        return false;
+    }
+    if (args->report_timing && args->report.empty()) {
+        *error = "--report-timing needs --report <file>";
         return false;
     }
     return true;
@@ -910,6 +924,16 @@ struct StreamSink {
     StreamSink() : single_frame(false), failed(0) {}
 };
 
+/// This frame's FrameReport::node_ms in graph declaration order, for [PROGRESS].
+NodeMs ProgressNodeMs(const GraphSpec& spec, const FrameReport& report) {
+    NodeMs out;
+    for (std::size_t n = 0; n < spec.nodes.size(); ++n) {
+        std::map<std::string, double>::const_iterator ms = report.node_ms.find(spec.nodes[n].id);
+        if (ms != report.node_ms.end()) out.push_back(std::make_pair(ms->first, ms->second));
+    }
+    return out;
+}
+
 int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& spec,
                  const GraphCliArgs& args, const std::vector<StreamUri>& uris) {
     // Every stream is opened before the report file: a uri that will not
@@ -980,9 +1004,10 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
             }
         }
         PrintFrameLine(spec, report, several);
+        progress().tickNodes(ProgressNodeMs(spec, report));  // DXAPP_PROGRESS=1 only
         WarnAboutEmptyRoiEdges(spec, report, &warned_edges);
         if (report_file.is_open() &&
-            !report_file.Append(ReportToJson(report, several), &problem)) {
+            !report_file.Append(ReportToJson(report, several, args.report_timing), &problem)) {
             std::fprintf(stderr, "%s\n", problem.c_str());
             return false;
         }
@@ -1073,6 +1098,7 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
                         static_cast<unsigned>(read), read == 1 ? "" : "s", sinks[s].failed);
         }
     }
+    progress().finish();  // the run averages, before the summary line
     std::printf("%u frame%s, %d failed\n", static_cast<unsigned>(total),
                 total == 1 ? "" : "s", failed_frames);
     return failed_frames == 0 && !no_frames ? 0 : 1;

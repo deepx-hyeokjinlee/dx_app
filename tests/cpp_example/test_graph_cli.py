@@ -329,7 +329,8 @@ def test_help_lists_every_option(binary):
     assert result.returncode == 0
     for option in ("--graph", "--input", "--output", "--model-dir",
                    "--max-inflight", "--report", "--check", "--list-models",
-                   "--max-jobs-per-stage", "--stall-timeout-ms", "--display"):
+                   "--max-jobs-per-stage", "--stall-timeout-ms", "--display",
+                   "--report-timing"):
         assert option in result.stdout
 
 
@@ -2866,3 +2867,99 @@ def test_check_names_the_container_version_of_a_loadable_file(tmp_path):
         check = run(binary, "--graph", str(graph), "--check", "--model-dir", str(v9_dir))
         assert check.returncode == 0, check.stdout + check.stderr
         assert "yolov8-n_640x640.dxnn  [present, v9]" in check.stdout, check.stdout
+
+
+# ---------------------------------------------------------------- graph composer P1
+
+
+def run_env(binary, env, *args):
+    """run() with extra environment variables."""
+    path = resolve_bin_dir() / binary
+    if not path.exists():
+        pytest.skip("{} not built".format(binary))
+    return run_bounded([str(path)] + list(args), capture_output=True, text=True,
+                       cwd=str(PROJECT_ROOT), timeout=RUN_TIMEOUT_S,
+                       env=dict(os.environ, **env))
+
+
+def _progress_lines(stdout):
+    return [line for line in stdout.splitlines() if line.startswith("[PROGRESS] ")]
+
+
+def _field(line, key):
+    for token in line.split():
+        if token.startswith(key + "="):
+            return token[len(key) + 1:]
+    return None
+
+
+def _node_ms(line):
+    value = _field(line, "node_ms")
+    if value is None:
+        return {}
+    return {name: float(ms) for name, ms in (part.rsplit(":", 1) for part in value.split(","))}
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("binary", BINARIES)
+def test_help_lists_report_timing(binary):
+    result = run(binary, "--help")
+    assert result.returncode == 0
+    assert "--report-timing" in result.stdout
+
+
+@pytest.mark.graph
+def test_report_timing_needs_a_report():
+    result = run(BINARIES[0], "--graph", "{}/cascade_od_reid_track.json".format(GRAPHS),
+                 "--report-timing")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--report-timing needs --report <file>" in result.stderr, result.stderr
+
+
+@pytest.mark.graph_e2e
+@pytest.mark.parametrize("binary", BINARIES)
+def test_progress_lines_carry_time_per_node(tmp_path, binary):
+    graph = "cascade_od_reid_track.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    video = write_moving_video(tmp_path / "moving.avi")
+    result = run_env(binary, {"DXAPP_PROGRESS": "1"}, "--graph",
+                     "{}/{}".format(GRAPHS, graph), "--input", str(video))
+    assert result.returncode == 0, result.stdout + result.stderr
+    lines = _progress_lines(result.stdout)
+    assert lines, result.stdout
+    last = lines[-1]
+    assert _field(last, "frames") == "8", last
+    assert _field(last, "avg_fps") is not None, last
+    times = _node_ms(last)
+    assert set(times) == {"od", "reid"}, last
+    assert all(ms > 0.0 for ms in times.values()), last
+    assert "read_ms=" not in last, last
+    # The run averages come before the summary line. (DX-RT may print its own
+    # "[DXRT] ..." line at exit, so the summary is not always the last line.)
+    out = result.stdout.splitlines()
+    assert "8 frames, 0 failed" in out, result.stdout[-300:]
+    assert out.index(last) < out.index("8 frames, 0 failed"), result.stdout[-300:]
+
+
+@pytest.mark.graph_e2e
+@pytest.mark.parametrize("binary", BINARIES)
+def test_report_timing_adds_node_ms_and_nothing_else(tmp_path, binary):
+    graph = "cascade_od_reid_track.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    plain, timed = tmp_path / "plain.json", tmp_path / "timed.json"
+    a = run(binary, "--graph", "{}/{}".format(GRAPHS, graph), "--report", str(plain))
+    b = run(binary, "--graph", "{}/{}".format(GRAPHS, graph), "--report", str(timed),
+            "--report-timing")
+    assert a.returncode == 0, a.stdout + a.stderr
+    assert b.returncode == 0, b.stdout + b.stderr
+    plain_frames = json.loads(plain.read_text())["frames"]
+    timed_frames = json.loads(timed.read_text())["frames"]
+    assert all("node_ms" not in frame for frame in plain_frames)
+    for frame in timed_frames:
+        assert set(frame["node_ms"]) == {"od", "reid"}, frame["node_ms"]
+        assert frame["node_ms"]["od"] > 0.0
+    assert [{k: v for k, v in f.items() if k != "node_ms"} for f in timed_frames] == plain_frames

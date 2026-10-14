@@ -445,7 +445,7 @@ void PrepareGraph(const std::string& graph_path, const std::string& model_dir,
 
 bool NamesStreams(const StageGraph& graph) { return graph.streams().size() > 1; }
 
-json ReportToJson(const FrameReport& report, bool name_stream) {
+json ReportToJson(const FrameReport& report, bool name_stream, bool with_timing) {
     json out = json::object();
     out["index"] = static_cast<unsigned>(report.frame_index);
     out["error"] = report.error;
@@ -471,6 +471,14 @@ json ReportToJson(const FrameReport& report, bool name_stream) {
     }
     out["roi_nodes"] = roi_nodes;
     if (name_stream) out["stream"] = report.stream;
+    if (with_timing) {
+        json timing = json::object();
+        for (std::map<std::string, double>::const_iterator it = report.node_ms.begin();
+             it != report.node_ms.end(); ++it) {
+            timing[it->first] = std::round(it->second * 1000.0) / 1000.0;
+        }
+        out["node_ms"] = timing;
+    }
     EncodeNonFinite(&out);
     return out;
 }
