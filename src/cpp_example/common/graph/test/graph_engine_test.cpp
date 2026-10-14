@@ -12385,6 +12385,107 @@ void TestLogicOpCatalogDescribesEveryOp() {
     GRAPH_CHECK(std::string(ToString(LogicParamInfo::kTextList)) == "text_list");
 }
 
+namespace {
+
+/// cam -> od (model "det", tracked unless `tracked` is false), then `nodes`
+/// and `edges`, each a JSON list fragment that starts with a comma.
+std::string LogicJson(const std::string& nodes, const std::string& edges, bool tracked = true) {
+    return std::string("{\"version\":1,\"name\":\"logic\",\"nodes\":["
+                       "{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+                       "{\"id\":\"od\",\"model\":\"det\"") +
+           (tracked ? ",\"track\":{\"algo\":\"iou\",\"iou\":0.3,\"max_age\":30}" : "") + "}" +
+           nodes + "],\"edges\":[{\"from\":\"cam\",\"to\":\"od\"}" + edges + "]}";
+}
+
+const char kZoneNode[] =
+    ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\","
+    "\"params\":{\"polygon\":[0.5,0,1,0,1,1,0.5,1]}}";
+const char kOdToZ[] = ",{\"from\":\"od\",\"to\":\"z\",\"carry\":\"result\"}";
+
+}  // namespace
+
+void TestParseReadsALogicNode() {
+    const GraphSpec spec = ParseGraphText(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"params\":"
+        "{\"polygon\":[0,0,1,0,1,1],\"mode\":\"inside\",\"classes\":[]}}",
+        kOdToZ), "l.json");
+    GRAPH_CHECK(spec.nodes.size() == 3);
+    if (spec.nodes.size() != 3) return;
+    const NodeSpec& z = spec.nodes[2];
+    GRAPH_CHECK(z.is_logic && !z.is_cpu && !z.is_source && z.op == "zone");
+    GRAPH_CHECK(!IsModelNode(z) && IsModelNode(spec.nodes[1]) && !IsModelNode(spec.nodes[0]));
+    GRAPH_CHECK(z.arrays.count("polygon") == 1 && z.arrays.at("polygon").size() == 6);
+    if (z.arrays.count("polygon") == 1) GRAPH_CHECK(z.arrays.at("polygon")[2] == 1.0);
+    GRAPH_CHECK(z.params.text.count("mode") == 1 && z.params.text.at("mode") == "inside");
+    GRAPH_CHECK(z.params.lists.count("classes") == 1 && z.params.lists.at("classes").empty());
+    GRAPH_CHECK(spec.edges[1].carry_result);
+}
+
+void TestParseRejectsBadLogicNodes() {
+    std::string message;
+    GRAPH_CHECK(ThrowsWithCode(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zon\"}", ""),
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("unknown logic op \"zon\"") != std::string::npos);
+    GRAPH_CHECK(message.find("did you mean \"zone\"") != std::string::npos);
+    GRAPH_CHECK(message.find("filter, zone, line, count, dwell, condition, gallery, user") !=
+                std::string::npos);
+
+    GRAPH_CHECK(ThrowsWithCode(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"model\":\"det\"}", ""),
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("a logic node has no \"model\" and no \"uri\"") != std::string::npos);
+
+    GRAPH_CHECK(ThrowsWithCode(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"track\":{\"algo\":\"iou\"}}", ""),
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("a logic node cannot track") != std::string::npos);
+
+    GRAPH_CHECK(ThrowsWithCode(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"engine\":{\"buffers\":2}}", ""),
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"engine\" belongs on a model node") != std::string::npos);
+
+    GRAPH_CHECK(ThrowsWithCode(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":[0,\"a\"]}}",
+        ""), GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"polygon\" must be a number, a string, or an array of strings "
+                             "or of numbers, got [0,\"a\"]") != std::string::npos);
+
+    // A model node keeps its message: number arrays are for logic nodes.
+    GRAPH_CHECK(ThrowsWithCode(ParamsGraph("yolov8n", "{\"b\":[1,2]}"),
+                               GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("\"b\" must be a number, a string or an array of strings, "
+                             "got [1,2]") != std::string::npos);
+
+    GRAPH_CHECK(ThrowsWithCode(
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"z\",\"type\":\"logik\",\"op\":\"zone\"}],\"edges\":[]}",
+        GraphErrorCode::kGraphSchema, &message));
+    GRAPH_CHECK(message.find("did you mean \"logic\"") != std::string::npos);
+    GRAPH_CHECK(message.find("accepted node types are \"source\", \"cpu\" and \"logic\"") !=
+                std::string::npos);
+}
+
+// Until Task 4 checks a logic node's params and inputs, a valid logic graph
+// must at least validate without touching a model entry it does not have.
+void TestValidateTakesALogicNodeAsANonModelNode() {
+    FakeModelRegistry registry;
+    registry.AddModel(CpuFixtureModel("det", Shape::kBoxes),
+                      StageDataPtr(new BoxesData(Shape::kBoxes)));
+    GRAPH_CHECK(ValidationError(LogicJson(kZoneNode, kOdToZ), registry).empty());
+    std::string message;
+    GRAPH_CHECK(CpuValidateThrows(LogicJson(kZoneNode, ",{\"from\":\"od\",\"to\":\"z\"}"),
+                                  registry, GraphErrorCode::kGraphEdge, &message));
+    GRAPH_CHECK(message.find("a logic node accepts only \"carry\": \"result\" edges") !=
+                std::string::npos);
+    GRAPH_CHECK(CpuValidateThrows(LogicJson(
+        ",{\"id\":\"m\",\"model\":\"det\"}",
+        ",{\"from\":\"od\",\"to\":\"m\",\"carry\":\"result\"}"),
+        registry, GraphErrorCode::kGraphEdge, &message));
+    GRAPH_CHECK(message.find("accepted only by a cpu node or a logic node") != std::string::npos);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12745,6 +12846,9 @@ int main() {
     TestAFailedLoadClosesEveryEngineItOpened();
     TestGraphErrorKeepsItsThreeParts();
     TestLogicOpCatalogDescribesEveryOp();
+    TestParseReadsALogicNode();
+    TestParseRejectsBadLogicNodes();
+    TestValidateTakesALogicNodeAsANonModelNode();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

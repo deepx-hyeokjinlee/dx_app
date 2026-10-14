@@ -326,7 +326,7 @@ std::vector<MissingArtifact> CollectMissing(const GraphSpec& spec,
     std::vector<MissingArtifact> missing;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
-        if (node.is_source || node.is_cpu) continue;
+        if (!IsModelNode(node)) continue;
         const ModelInfo* info = registry.find(node.model);
         if (info == NULL) continue;  // ValidateGraph already rejected this
         const std::string path = model_dir + "/" + info->dxnn_file;
@@ -431,7 +431,7 @@ std::string AliasNotes(const GraphSpec& spec, const IModelRegistry& registry) {
     std::string text;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
-        if (node.is_source || node.is_cpu) continue;
+        if (!IsModelNode(node)) continue;
         const ModelInfo* info = registry.find(node.model);
         if (info == NULL) continue;
         const std::string note = AliasNote(node.model, *info, alias_by_name);

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "common/third_party/nlohmann_json.hpp"
+#include "common/graph/logic_ops.hpp"
 
 namespace dxapp {
 namespace graph {
@@ -133,6 +134,7 @@ const char* const kRoiKeys[] = {"classes", "min_score", "min_area", "pad",
 /// RejectReserved() before the type check runs, with a better message.
 const char kSourceType[] = "source";
 const char kCpuType[] = "cpu";
+const char kLogicType[] = "logic";
 const char* const kCpuOps[] = {"headpose", "volume"};
 
 /**
@@ -250,6 +252,23 @@ std::string JoinKeys(const char* const (&known)[N]) {
         all += known[i];
     }
     return all;
+}
+
+std::string JoinList(const std::vector<std::string>& names) {
+    std::string all;
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        if (i != 0) all += ", ";
+        all += names[i];
+    }
+    return all;
+}
+
+/// The logic op names in catalog order.
+std::vector<std::string> LogicOpNames() {
+    std::vector<std::string> names;
+    const std::vector<LogicOpInfo>& ops = LogicOps();
+    for (std::size_t i = 0; i < ops.size(); ++i) names.push_back(ops[i].op);
+    return names;
 }
 
 std::string Quote(const std::string& text) { return "\"" + text + "\""; }
@@ -433,17 +452,20 @@ void RejectUnknownNodeType(const json& node, const std::string& origin,
                          "\"type\" must be a string", "");
     }
     const std::string value = type->get<std::string>();
-    if (value == kSourceType || value == kCpuType) return;
+    if (value == kSourceType || value == kCpuType || value == kLogicType) return;
 
     std::string how;
     const std::size_t source_distance = Closeness(value, kSourceType);
     const std::size_t cpu_distance = Closeness(value, kCpuType);
-    if (source_distance < kNoSuggestion && source_distance <= cpu_distance) {
-        how = "did you mean \"source\"? ";
-    } else if (cpu_distance < kNoSuggestion) {
-        how = "did you mean \"cpu\"? ";
+    const std::size_t logic_distance = Closeness(value, kLogicType);
+    const std::size_t best = std::min(source_distance, std::min(cpu_distance, logic_distance));
+    if (best < kNoSuggestion) {
+        const char* nearest = best == source_distance ? kSourceType
+                              : best == cpu_distance  ? kCpuType
+                                                      : kLogicType;
+        how = std::string("did you mean \"") + nearest + "\"? ";
     }
-    how += "accepted node types are \"source\" and \"cpu\"; a model node carries a "
+    how += "accepted node types are \"source\", \"cpu\" and \"logic\"; a model node carries a "
            "\"model\" name and no \"type\"";
     throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, detail),
                      "unknown node type " + Quote(value), how);
@@ -690,6 +712,9 @@ GraphSpec ParseGraphText(const std::string& json_text,
         const bool declared_cpu =
             type != node.end() && type->is_string() &&
             type->get<std::string>() == kCpuType;
+        const bool declared_logic =
+            type != node.end() && type->is_string() &&
+            type->get<std::string>() == kLogicType;
         json::const_iterator model = node.find("model");
         json::const_iterator op = node.find("op");
 
@@ -719,6 +744,24 @@ GraphSpec ParseGraphText(const std::string& json_text,
                 throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
                                  "unknown cpu op " + Quote(parsed.op),
                                  "accepted \"op\" values: " + JoinKeys(kCpuOps));
+            }
+        } else if (declared_logic) {
+            if (model != node.end() || node.find("uri") != node.end()) {
+                throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
+                                 "a logic node has no \"model\" and no \"uri\"",
+                                 "keep \"type\": \"logic\", \"op\" and \"params\" only");
+            }
+            parsed.is_logic = true;
+            const std::vector<std::string> names = LogicOpNames();
+            const std::string op_how = "add \"op\": one of " + JoinList(names);
+            parsed.op = RequireString(node, "op", origin, node_label, op_how.c_str());
+            if (FindLogicOp(parsed.op) == NULL) {
+                const std::string nearest = NearestName(parsed.op, names);
+                throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
+                                 "unknown logic op " + Quote(parsed.op),
+                                 (nearest.empty() ? std::string()
+                                                  : "did you mean " + Quote(nearest) + "? ") +
+                                     "accepted \"op\" values: " + JoinList(names));
             }
         } else if (model != node.end()) {
             if (op != node.end()) {
@@ -762,12 +805,21 @@ GraphSpec ParseGraphText(const std::string& json_text,
                     for (json::const_iterator e = value.begin(); e != value.end(); ++e) {
                         list.push_back(e->get<std::string>());
                     }
+                } else if (parsed.is_logic && value.is_array() && !value.empty() &&
+                           std::all_of(value.begin(), value.end(),
+                                       [](const json& e) { return e.is_number(); })) {
+                    // Logic only: a zone's "polygon", a line's "line".
+                    std::vector<double>& numbers = parsed.arrays[it.key()];
+                    for (json::const_iterator e = value.begin(); e != value.end(); ++e) {
+                        numbers.push_back(e->get<double>());
+                    }
                 } else {
                     const bool hint = value.is_boolean() && !switch_hinted;
                     switch_hinted = switch_hinted || hint;
-                    bad.Add(Quote(it.key()) +
-                                " must be a number, a string or an array of strings, got " +
-                                value.dump(),
+                    const char* kinds = parsed.is_logic
+                        ? " must be a number, a string, or an array of strings or of numbers, got "
+                        : " must be a number, a string or an array of strings, got ";
+                    bad.Add(Quote(it.key()) + kinds + value.dump(),
                             hint ? "write a switch as 1 or 0" : "");
                 }
             }
@@ -819,7 +871,7 @@ GraphSpec ParseGraphText(const std::string& json_text,
 
         json::const_iterator engine = node.find("engine");
         if (engine != node.end()) {
-            if (parsed.is_source || parsed.is_cpu) {
+            if (parsed.is_source || parsed.is_cpu || parsed.is_logic) {
                 throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
                                  "\"engine\" belongs on a model node",
                                  "remove \"engine\" from this node");
@@ -856,9 +908,10 @@ GraphSpec ParseGraphText(const std::string& json_text,
             bad.ThrowIfAny(Where(origin, node_label + " \"engine\""));
         }
 
-        if (parsed.is_cpu && parsed.track.present) {
+        if ((parsed.is_cpu || parsed.is_logic) && parsed.track.present) {
             throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
-                             "a cpu node cannot track",
+                             parsed.is_cpu ? "a cpu node cannot track"
+                                           : "a logic node cannot track",
                              "put \"track\" on the detector that produces the boxes");
         }
 
@@ -1162,7 +1215,7 @@ std::map<std::string, std::string> SharedEngineOwners(const GraphSpec& spec,
     std::map<std::string, std::string> first_of_variant;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
-        if (node.is_source || node.is_cpu || !node.engine.share) continue;
+        if (!IsModelNode(node) || !node.engine.share) continue;
         const ModelInfo* info = registry.find(node.model);
         if (info == NULL) continue;
         std::map<std::string, std::string>::iterator first =
@@ -1202,6 +1255,8 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
             entry.output_shape = Shape::kFrame;
         } else if (node.is_cpu) {
             entry.output_shape = Shape::kRecords;
+        } else if (node.is_logic) {
+            entry.output_shape = Shape::kRecords;  // Task 4: from its input, after step 3
         } else {
             const ModelInfo* info = registry.find(node.model);
             if (info == NULL) {
@@ -1289,6 +1344,7 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
         if (node.is_source) continue;
+        if (node.is_logic) continue;  // Task 4: CheckLogicParams
         if (node.is_cpu) {
             Violations cpu_bad;
             CheckCpuParams(node, &cpu_bad);
@@ -1409,7 +1465,9 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
             }
             if (producer.info == NULL) {
                 throw GraphError(GraphErrorCode::kGraphEdge, label,
-                                 "\"" + edge.from + "\" is a cpu node and has no output ports",
+                                 "\"" + edge.from + "\" is a " +
+                                     (producer.spec->is_logic ? "logic" : "cpu") +
+                                     " node and has no output ports",
                                  "remove \"port\" from this edge");
             }
             if (edge.port != ToString(producer.output_shape)) {
@@ -1426,15 +1484,18 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
             }
         }
 
-        if (consumer.spec->is_cpu || edge.carry_result) {
-            if (!consumer.spec->is_cpu) {
+        if (consumer.spec->is_cpu || consumer.spec->is_logic || edge.carry_result) {
+            if (!consumer.spec->is_cpu && !consumer.spec->is_logic) {
                 throw GraphError(GraphErrorCode::kGraphEdge, label,
-                                 "\"carry\": \"result\" is accepted only by a cpu node",
-                                 "point this edge at a node with \"type\": \"cpu\"");
+                                 "\"carry\": \"result\" is accepted only by a cpu node or a "
+                                 "logic node",
+                                 "point this edge at a node with \"type\": \"cpu\" or "
+                                 "\"type\": \"logic\"");
             }
             if (!edge.carry_result) {
                 throw GraphError(GraphErrorCode::kGraphEdge, label,
-                                 "a cpu node accepts only \"carry\": \"result\" edges",
+                                 std::string(consumer.spec->is_cpu ? "a cpu node" : "a logic node") +
+                                     " accepts only \"carry\": \"result\" edges",
                                  "add \"carry\": \"result\" and remove \"roi\" or a plain frame edge");
             }
             if (producer.spec->is_source) {
@@ -1442,6 +1503,7 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
                                  "\"" + edge.from + "\" is a source and produces a frame, not a result",
                                  "carry the result of a model node");
             }
+            if (consumer.spec->is_logic) continue;  // Task 4: its inputs are checked there
             carried[edge.to].push_back(out_shape);
             continue;
         }
@@ -1469,15 +1531,18 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
                         edge.port + "\" of \"" + edge.from + "\" carries none",
                     "remove \"align\", or crop from \"" + edge.from + "\"'s primary boxes");
             }
-            if (!edge.roi.align.empty() && !producer.info->produces_landmarks) {
-                // producer.info is never NULL here: a source producer would
-                // already have failed the ProducesRoi() check above, since
-                // ProducesRoi(kFrame) is false.
+            if (!edge.roi.align.empty() &&
+                (producer.info == NULL || !producer.info->produces_landmarks)) {
+                // A source never gets here (ProducesRoi(kFrame) is false). A
+                // logic producer has no model entry: Task 4 looks through it
+                // to the model its boxes come from.
                 throw GraphError(
                     GraphErrorCode::kGraphAlign, label,
-                    "\"align\": \"face5\" needs five facial landmarks, and "
-                    "model \"" + producer.info->model_name +
-                        "\" produces no landmarks",
+                    "\"align\": \"face5\" needs five facial landmarks, and " +
+                        (producer.info == NULL
+                             ? "\"" + edge.from + "\" carries none"
+                             : "model \"" + producer.info->model_name +
+                                   "\" produces no landmarks"),
                     "remove \"align\", or use a face detector as the source");
             }
         } else {

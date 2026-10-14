@@ -2,10 +2,10 @@
  * @file graph_config.hpp
  * @brief Graph file structs, parsing and validation.
  *
- * Three node kinds (source, model, cpu) and three edge kinds (frame, ROI,
- * result) express every pipeline this example supports. A result edge is
- * accepted only by a cpu node. Keeping that surface small is the point: the
- * schema is the only interface a customer sees.
+ * Four node kinds (source, model, cpu, logic) and three edge kinds (frame,
+ * ROI, result) express every pipeline this example supports. A result edge
+ * is accepted only by a cpu or a logic node. Keeping that surface small is
+ * the point: the schema is the only interface a customer sees.
  */
 #ifndef DXAPP_GRAPH_GRAPH_CONFIG_HPP
 #define DXAPP_GRAPH_GRAPH_CONFIG_HPP
@@ -56,15 +56,24 @@ struct NodeSpec {
     std::string id;
     bool is_source;
     bool is_cpu;
+    bool is_logic;
     std::string uri;    ///< source only
     std::string model;  ///< model only
-    std::string op;     ///< cpu only: "headpose" or "volume"
+    std::string op;     ///< cpu: "headpose" or "volume"; logic: a LogicOps() name
     StageParams params;
+    /// Logic only: params that are arrays of numbers (a zone's "polygon", a
+    /// line's "line"), fractions 0..1 of the source frame.
+    std::map<std::string, std::vector<double> > arrays;
     TrackSpec track;
     EngineSpec engine;
 
-    NodeSpec() : is_source(false), is_cpu(false) {}
+    NodeSpec() : is_source(false), is_cpu(false), is_logic(false) {}
 };
+
+/// True for a model node: not a source, a cpu node or a logic node.
+inline bool IsModelNode(const NodeSpec& node) {
+    return !node.is_source && !node.is_cpu && !node.is_logic;
+}
 
 struct EdgeSpec {
     std::string from;

@@ -610,7 +610,7 @@ void PrintCheckSummary(const GraphSpec& spec, const IModelRegistry& registry,
                        const std::string& model_dir) {
     std::size_t model_nodes = 0;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
-        if (!spec.nodes[i].is_source && !spec.nodes[i].is_cpu) ++model_nodes;
+        if (IsModelNode(spec.nodes[i])) ++model_nodes;
     }
     std::printf("OK: graph \"%s\" is valid (%u nodes, %u edges, %u models)\n",
                 spec.name.empty() ? graph_path.c_str() : spec.name.c_str(),
@@ -678,7 +678,7 @@ void PrintCheckSummary(const GraphSpec& spec, const IModelRegistry& registry,
     std::ostringstream resources;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
-        if (node.is_source || node.is_cpu) continue;
+        if (!IsModelNode(node)) continue;
         const ModelInfo* info = registry.find(node.model);
         if (info == NULL) continue;
         for (std::size_t r = 0; r < info->resources.size(); ++r) {
@@ -737,7 +737,7 @@ std::vector<GraphError> ModelFileProblems(const GraphSpec& spec,
     std::vector<GraphError> problems;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
-        if (node.is_source || node.is_cpu) continue;
+        if (!IsModelNode(node)) continue;
         const ModelInfo* info = registry.find(node.model);
         if (info == NULL) continue;
         const std::string path = model_dir + "/" + info->dxnn_file;
@@ -876,7 +876,7 @@ nlohmann::json ModelsJson(const GraphSpec& spec, const IModelRegistry& registry,
     nlohmann::json models = nlohmann::json::array();
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
-        if (node.is_source || node.is_cpu) continue;
+        if (!IsModelNode(node)) continue;
         nlohmann::json row = nlohmann::json::object();
         row["node"] = node.id;
         nlohmann::json engine = nlohmann::json::object();
