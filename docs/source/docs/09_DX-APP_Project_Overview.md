@@ -81,6 +81,7 @@ Download the required models and sample media files.
 | `--no-force` | Skip download if the file already exists |
 | `--force-remove-models` | Force remove models if they exist |
 | `--force-remove-videos` | Force remove videos if they exist |
+| `--internal`, `--internal-path`, `--internal-video-path` | Ignored with a warning: the local-copy mode was removed, and models and sample videos always come from S3. Kept so existing command lines still run |
 | `--verbose` | Enable verbose logging |
 
 - **Models:** Saved to `assets/models/`. By default, an interactive menu lets you select which model categories and models to download. Use `--all` to skip the menu and download everything automatically.

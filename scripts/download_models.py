@@ -574,6 +574,10 @@ environment:
                       metavar="FILE",    help="save parsed model list to a JSON file")
     misc.add_argument("--manifest", type=str, default=None, metavar="FILE",
                       help=f"path to manifest JSON file (default: {DEFAULT_MANIFEST})")
+    # The --internal local-copy mode is gone. Its options still parse so existing
+    # command lines (CI jobs) keep working; main() ignores them with a warning.
+    misc.add_argument("--internal", action="store_true", help=argparse.SUPPRESS)
+    misc.add_argument("--internal-path", type=str, default=None, help=argparse.SUPPRESS)
     return parser.parse_args()
 
 
@@ -750,6 +754,12 @@ def _print_filtered_model_list(models: list[dict], output_dir: Path):
 
 def main():
     args = parse_args()
+    ignored = [opt for opt, given in (("--internal", args.internal),
+                                      ("--internal-path", args.internal_path is not None))
+               if given]
+    if ignored:
+        warn(f"Ignoring {' '.join(ignored)}: the --internal local-copy mode was removed "
+             "(the options go in a future release); models come from S3.")
 
     # --no-force overrides --force default
     if args.no_force:

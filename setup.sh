@@ -25,6 +25,7 @@ CATEGORY_ARG=""
 DEMO_MODELS_ARG=""
 MODELS_ARG=""
 MODELS_ARGS=()
+IGNORED_INTERNAL_OPTS=()
 
 # If the user only asked for downloader help, forward to the inner setup_sample_models helper
 if [ "$#" -eq 1 ]; then
@@ -95,6 +96,20 @@ while [ $# -gt 0 ]; do
             ;;
         --docker_volume_path)
             DOCKER_VOLUME_PATH="$2"
+            shift 2
+            ;;
+        # The --internal local-copy mode is gone. Its options still parse so
+        # existing command lines (CI jobs) keep working; they are ignored.
+        --internal)
+            IGNORED_INTERNAL_OPTS+=("$1")
+            shift
+            ;;
+        --internal-path=*|--internal-video-path=*)
+            IGNORED_INTERNAL_OPTS+=("${1%%=*}")
+            shift
+            ;;
+        --internal-path|--internal-video-path)
+            IGNORED_INTERNAL_OPTS+=("$1")
             shift 2
             ;;
         --all)
@@ -186,6 +201,10 @@ while [ $# -gt 0 ]; do
             ;;
     esac
 done
+
+if [ ${#IGNORED_INTERNAL_OPTS[@]} -gt 0 ]; then
+    print_colored "Ignoring ${IGNORED_INTERNAL_OPTS[*]}: the --internal local-copy mode was removed (the options go in a future release); models and sample videos come from S3." "WARNING"
+fi
 
 print_colored "======== PATH INFO =========" "DEBUG"
 print_colored "RUNTIME_PATH($RUNTIME_PATH)" "DEBUG"

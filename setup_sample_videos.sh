@@ -14,6 +14,7 @@ OUTPUT_DIR="$SCRIPT_DIR/assets/videos"
 SYMLINK_TARGET_PATH=""
 SYMLINK_ARGS=""
 FORCE_ARGS="--force"
+IGNORED_INTERNAL_OPTS=()
 
 # Function to display help message
 show_help() {
@@ -97,6 +98,14 @@ for i in "$@"; do
             SYMLINK_TARGET_PATH="${1#*=}"
             SYMLINK_ARGS="--symlink_target_path=$SYMLINK_TARGET_PATH"
             ;;
+        # The --internal local-copy mode is gone. Its options still parse so
+        # existing command lines (CI jobs) keep working; they are ignored.
+        --internal)
+            IGNORED_INTERNAL_OPTS+=("$1")
+            ;;
+        --internal-path=*)
+            IGNORED_INTERNAL_OPTS+=("${1%%=*}")
+            ;;
         --force)
             FORCE_ARGS="--force"
             ;;
@@ -113,6 +122,10 @@ for i in "$@"; do
     esac
     shift
 done
+
+if [ ${#IGNORED_INTERNAL_OPTS[@]} -gt 0 ]; then
+    print_colored "Ignoring ${IGNORED_INTERNAL_OPTS[*]}: the --internal local-copy mode was removed (the options go in a future release); sample videos come from S3." "WARNING"
+fi
 
 main
 
