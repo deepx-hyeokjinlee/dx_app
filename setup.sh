@@ -25,9 +25,6 @@ CATEGORY_ARG=""
 DEMO_MODELS_ARG=""
 MODELS_ARG=""
 MODELS_ARGS=()
-INTERNAL_ARG=""
-INTERNAL_PATH_ARG=""
-INTERNAL_VIDEO_PATH_ARG=""
 
 # If the user only asked for downloader help, forward to the inner setup_sample_models helper
 if [ "$#" -eq 1 ]; then
@@ -59,10 +56,6 @@ show_help() {
     print_colored "  [--no-force]                   Skip download if the file already exists" "GREEN"
     print_colored "  [--force-remove-models]        Force remove models if they exist" "GREEN"
     print_colored "  [--force-remove-videos]        Force remove videos if they exist" "GREEN"
-    print_colored "  [--internal]                   Use local mount instead of S3 (internal/air-gapped network)" "GREEN"
-    print_colored "  [--internal-path=<dir>]        Local model directory to copy from (required with --internal)" "GREEN"
-    print_colored "  [--internal-video-path=<file>] Local sample video archive (.tar.gz) to extract" "GREEN"
-    print_colored "                                 (required with --internal, except with --list/--dry-run)" "GREEN"
     print_colored "  [--verbose]                    Enable verbose (debug) logging." "GREEN"
     print_colored "  [--help]                       Show this help message" "GREEN"
     print_colored "Environment:" "GREEN"
@@ -102,26 +95,6 @@ while [ $# -gt 0 ]; do
             ;;
         --docker_volume_path)
             DOCKER_VOLUME_PATH="$2"
-            shift 2
-            ;;
-        --internal)
-            INTERNAL_ARG="--internal"
-            shift
-            ;;
-        --internal-path=*)
-            INTERNAL_PATH_ARG="--internal-path=${1#*=}"
-            shift
-            ;;
-        --internal-path)
-            INTERNAL_PATH_ARG="--internal-path=$2"
-            shift 2
-            ;;
-        --internal-video-path=*)
-            INTERNAL_VIDEO_PATH_ARG="--internal-path=${1#*=}"
-            shift
-            ;;
-        --internal-video-path)
-            INTERNAL_VIDEO_PATH_ARG="--internal-path=$2"
             shift 2
             ;;
         --all)
@@ -214,24 +187,6 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# --internal is passed on purpose and names its sources; there are no default
-# paths. Check before anything is downloaded.
-if [ -n "$INTERNAL_ARG" ]; then
-    if [ -z "$INTERNAL_PATH_ARG" ]; then
-        show_help "error" "--internal requires --internal-path=<model directory>"
-    fi
-    if [ -z "$INTERNAL_VIDEO_PATH_ARG" ] && [ -z "$LIST_ARG" ] && [ -z "$DRY_RUN_ARG" ]; then
-        show_help "error" "--internal requires --internal-video-path=<video archive>"
-    fi
-else
-    if [ -n "$INTERNAL_PATH_ARG" ]; then
-        show_help "error" "--internal-path requires --internal"
-    fi
-    if [ -n "$INTERNAL_VIDEO_PATH_ARG" ]; then
-        show_help "error" "--internal-video-path requires --internal"
-    fi
-fi
-
 print_colored "======== PATH INFO =========" "DEBUG"
 print_colored "RUNTIME_PATH($RUNTIME_PATH)" "DEBUG"
 print_colored "DX_AS_PATH($DX_AS_PATH)" "DEBUG"
@@ -296,18 +251,6 @@ setup_assets() {
     if [ -n "$MODELS_ARG" ]; then
         SETUP_MODEL_ARGS="$SETUP_MODEL_ARGS $MODELS_ARG"
     fi
-    if [ -n "$INTERNAL_ARG" ]; then
-        SETUP_MODEL_ARGS="$SETUP_MODEL_ARGS $INTERNAL_ARG"
-    fi
-    if [ -n "$INTERNAL_PATH_ARG" ]; then
-        SETUP_MODEL_ARGS="$SETUP_MODEL_ARGS $INTERNAL_PATH_ARG"
-    fi
-    if [ -n "$INTERNAL_ARG" ]; then
-        SETUP_VIDEO_ARGS="$SETUP_VIDEO_ARGS $INTERNAL_ARG"
-    fi
-    if [ -n "$INTERNAL_VIDEO_PATH_ARG" ]; then
-        SETUP_VIDEO_ARGS="$SETUP_VIDEO_ARGS $INTERNAL_VIDEO_PATH_ARG"
-    fi
 
     print_colored " MODEL_PATH: ${MODEL_PATH}" "INFO"
     MODEL_REAL_PATH=$(readlink -f "$MODEL_PATH")
@@ -346,9 +289,8 @@ setup_assets() {
         if [ "${FORCE_REMOVE_VIDEOS:-0}" -eq 1 ]; then
             VIDEO_FORCE_ARGS="--force"
         fi
-        # Always delegate: under --no-force setup_sample_videos.sh skips an
-        # existing extracted directory (internal mode) and get_resource.sh
-        # keeps the cached archive (S3 mode), so nothing is re-downloaded.
+        # Always delegate: under --no-force get_resource.sh keeps the cached
+        # archive, so nothing is re-downloaded.
         print_colored " Running setup videos script... ($VIDEO_REAL_PATH)" "INFO"
         VIDEO_PATH_EXISTED=0
         if [ -e "$VIDEO_PATH" ] || [ -L "$VIDEO_PATH" ]; then

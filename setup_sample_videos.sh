@@ -14,8 +14,6 @@ OUTPUT_DIR="$SCRIPT_DIR/assets/videos"
 SYMLINK_TARGET_PATH=""
 SYMLINK_ARGS=""
 FORCE_ARGS="--force"
-INTERNAL_FLAG=""
-INTERNAL_VIDEO_PATH=""
 
 # Function to display help message
 show_help() {
@@ -23,8 +21,6 @@ show_help() {
   echo "Options:"
   echo "  [--force]                  Force overwrite if the file already exists (default)"
   echo "  [--no-force]               Skip download if the file already exists"
-  echo "  [--internal]               Use local mount instead of S3 (internal/air-gapped network)"
-  echo "  [--internal-path=<file>]   Local video archive (.tar.gz) to extract (required with --internal)"
   echo "  [--help]                   Show this help message"
 
   if [ "$1" == "error" ]; then
@@ -34,84 +30,8 @@ show_help() {
   exit 0
 }
 
-main_internal() {
-    local src_file="$INTERNAL_VIDEO_PATH"
-
-    if [ ! -f "$src_file" ]; then
-        print_colored "Internal video archive not found: $src_file" "ERROR"
-        exit 1
-    fi
-
-    # Use the same versioned subdir name as S3 mode (get_resource.sh) so that
-    # both modes produce identical directory layouts and symlinks.
-    local versioned_dir="sample_videos_${VIDEO_VERSION}"
-
-    # Determine where to extract
-    local extract_base
-    local extract_target
-    if [ -n "$SYMLINK_TARGET_PATH" ]; then
-        extract_base="$SYMLINK_TARGET_PATH"
-    else
-        extract_base="$OUTPUT_DIR"
-    fi
-    extract_target="$extract_base/$versioned_dir"
-
-    if [ -d "$extract_target" ] && [ -z "$FORCE_ARGS" ]; then
-        print_colored "Video directory already exists ($extract_target) — skipping" "INFO"
-    else
-        # Clean up stale artifacts from either mode to avoid leftover dirs
-        rm -rf "$extract_target"
-        # Remove legacy "sample_videos" dir if it exists (old internal mode name)
-        if [ -n "$SYMLINK_TARGET_PATH" ] && [ -d "$extract_base/sample_videos" ]; then
-            rm -rf "$extract_base/sample_videos"
-        fi
-        mkdir -p "$extract_target"
-        print_colored "Extracting $src_file → $extract_target" "INFO"
-        local first_entry
-        first_entry=$(tar tf "$src_file" | head -n 1)
-        if [[ "$first_entry" == */* ]]; then
-            tar xf "$src_file" --strip-components=1 -C "$extract_target"
-        else
-            tar xf "$src_file" -C "$extract_target"
-        fi
-        if [ $? -ne 0 ]; then
-            print_colored "Extraction failed!" "ERROR"
-            exit 1
-        fi
-    fi
-
-    # Create symlink OUTPUT_DIR → extract_target (mirrors get_resource.sh behaviour)
-    if [ -n "$SYMLINK_TARGET_PATH" ]; then
-        if [ -L "$OUTPUT_DIR" ] || [ -d "$OUTPUT_DIR" ]; then
-            rm -rf "$OUTPUT_DIR"
-        fi
-        mkdir -p "$(dirname "$OUTPUT_DIR")"
-        ln -s "$(readlink -f "$extract_target")" "$OUTPUT_DIR"
-        print_colored "Created symbolic link: $OUTPUT_DIR → $(readlink -f "$extract_target")" "INFO"
-    else
-        # No symlink mode: flatten versioned subdir into OUTPUT_DIR (same as S3 mode)
-        local media_count
-        media_count=$(find "$extract_target" -maxdepth 1 -type f \( -name '*.mp4' -o -name '*.mov' -o -name '*.avi' -o -name '*.mkv' \) 2>/dev/null | wc -l)
-        if [ "$media_count" -gt 0 ]; then
-            print_colored "Flattening $extract_target → $OUTPUT_DIR" "INFO"
-            shopt -s dotglob
-            mv "$extract_target"/* "$OUTPUT_DIR/"
-            shopt -u dotglob
-            rmdir "$extract_target" 2>/dev/null || true
-            print_colored "[OK] Videos moved directly into $OUTPUT_DIR" "INFO"
-        fi
-    fi
-
-    print_colored "[OK] Sample videos setup complete (internal mode)" "INFO"
-}
-
 main() {
     SCRIPT_DIR=$(realpath "$(dirname "$0")")
-
-    if [ -n "$INTERNAL_FLAG" ]; then
-        main_internal
-        return
-    fi
 
     GET_RES_CMD="$SCRIPT_DIR/scripts/get_resource.sh --src_path=$SOURCE_PATH --output=$OUTPUT_DIR $SYMLINK_ARGS $FORCE_ARGS --extract"
     echo "Get Resources from remote server ..."
@@ -133,7 +53,7 @@ main() {
 
     # When no symlink_target_path is set, get_resource.sh extracts into a versioned subdir
     # (e.g. assets/videos/sample_videos_v3.2.2/). Flatten it so videos live directly in OUTPUT_DIR.
-    # The internal directory name may differ from the tar filename, so detect any single
+    # The extracted directory name may differ from the tar filename, so detect any single
     # subdirectory that contains media files and flatten it.
     if [ -z "$SYMLINK_TARGET_PATH" ]; then
         local subdirs=()
@@ -177,14 +97,6 @@ for i in "$@"; do
             SYMLINK_TARGET_PATH="${1#*=}"
             SYMLINK_ARGS="--symlink_target_path=$SYMLINK_TARGET_PATH"
             ;;
-        --internal)
-            INTERNAL_FLAG="--internal"
-            INTERNAL_FLAG=""
-            ;;
-        --internal-path=*)
-            INTERNAL_VIDEO_PATH="${1#*=}"
-            INTERNAL_VIDEO_PATH=""
-            ;;
         --force)
             FORCE_ARGS="--force"
             ;;
@@ -201,16 +113,6 @@ for i in "$@"; do
     esac
     shift
 done
-
-# --internal is passed on purpose and names its archive; there is no default.
-if [ -n "$INTERNAL_FLAG" ] && [ -z "$INTERNAL_VIDEO_PATH" ]; then
-    print_colored "--internal requires --internal-path=<video archive>" "ERROR"
-    exit 1
-fi
-if [ -z "$INTERNAL_FLAG" ] && [ -n "$INTERNAL_VIDEO_PATH" ]; then
-    print_colored "--internal-path requires --internal" "ERROR"
-    exit 1
-fi
 
 main
 

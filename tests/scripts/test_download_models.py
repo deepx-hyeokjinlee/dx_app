@@ -351,47 +351,6 @@ def test_requested_model_missing_from_manifest_fails(dm, monkeypatch, tmp_path, 
     assert (tmp_path / "out" / "good.dxnn").exists()
 
 
-def test_internal_copy_failure_exits_nonzero(dm, monkeypatch, tmp_path, capsys):
-    mount = tmp_path / "mount"
-    mount.mkdir()
-    (mount / "good.dxnn").write_bytes(b"g")
-    code = _run_main(dm, monkeypatch, tmp_path, _Session({}), "--all", "--internal",
-                     "--internal-path", str(mount))
-    combined = "".join(capsys.readouterr())
-    assert code not in (0, None)
-    assert "1 of 2 file(s) failed" in combined
-    assert "source not found" in combined
-
-
-# ── --internal is opt-in and names its own source ─────────────────────────────
-
-def _downloader(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(DOWNLOADER), "--dry-run", "--no-json",
-         "--output", str(tmp_path / "models"), "--models", "yolov8n", *args],
-        cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-
-
-def test_internal_without_internal_path_is_rejected(tmp_path):
-    result = _downloader(tmp_path, "--internal")
-    assert result.returncode != 0
-    assert "--internal requires --internal-path" in result.stderr
-
-
-def test_internal_path_without_internal_is_rejected(tmp_path):
-    mount = tmp_path / "mount"
-    mount.mkdir()
-    result = _downloader(tmp_path, "--internal-path", str(mount))
-    assert result.returncode != 0
-    assert "--internal-path requires --internal" in result.stderr
-    assert "switching to internal mode" not in result.stdout
-
-
-def test_downloader_has_no_built_in_internal_path(dm):
-    assert not hasattr(dm, "DEFAULT_INTERNAL_PATH")
-    assert "/mnt/regression_storage" not in DOWNLOADER.read_text(encoding="utf-8")
-
-
 # ── Fix round 1 ───────────────────────────────────────────────────────────────
 
 def _run_demo_filenames() -> set[str]:
