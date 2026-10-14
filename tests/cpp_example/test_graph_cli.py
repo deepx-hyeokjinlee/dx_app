@@ -1482,7 +1482,12 @@ def test_every_sample_graph_is_retargetable_without_a_rebuild(tmp_path, graph):
     assert swapped, "no swappable model in " + graph
     path = tmp_path / graph
     path.write_text(json.dumps(spec))
-    result = run(BINARIES[0], "--check", str(path))
+    # The question is validity, not what is downloaded: an empty model dir
+    # lists every .dxnn as missing (not an error), where a broken file in
+    # assets/models would make --check exit 1 (MODEL_LOAD).
+    no_models = tmp_path / "no_models"
+    no_models.mkdir()
+    result = run(BINARIES[0], "--check", str(path), "--model-dir", str(no_models))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "OK" in result.stdout
 
@@ -2496,7 +2501,11 @@ def test_check_widens_its_columns_for_long_names(tmp_path):
             "edges": [{"from": "front_door_camera", "to": "face_detector_1"}]}
     path = tmp_path / "wide.json"
     path.write_text(json.dumps(spec))
-    result = run(BINARIES[0], "--check", str(path))
+    # Columns, not artifacts: an empty model dir keeps a broken file in
+    # assets/models from turning this into a MODEL_LOAD exit.
+    no_models = tmp_path / "no_models"
+    no_models.mkdir()
+    result = run(BINARIES[0], "--check", str(path), "--model-dir", str(no_models))
     assert result.returncode == 0, result.stdout + result.stderr
     rows = [line for line in result.stdout.splitlines() if line.startswith("face_detector_1")]
     assert rows and re.match(r"face_detector_1 +retinaface_mobilenetv1_736x1280 "
@@ -2966,3 +2975,22 @@ def test_report_timing_adds_node_ms_and_nothing_else(tmp_path, binary):
         assert set(frame["node_ms"]) == {"od", "reid"}, frame["node_ms"]
         assert frame["node_ms"]["od"] > 0.0
     assert [{k: v for k, v in f.items() if k != "node_ms"} for f in timed_frames] == plain_frames
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("content", [b"", b"ONNX-not-a-dxnn"], ids=["empty", "not-dxnn"])
+def test_check_fails_on_a_model_file_that_is_not_a_dxnn(tmp_path, content):
+    """A 0-byte or foreign file used to print [present, invalid] and exit 0;
+    a run then failed inside DX-RT. Like a v9 file on an old runtime, it is a
+    graph that cannot run with these files: exit 1, MODEL_LOAD per node."""
+    models = tmp_path / "models"
+    models.mkdir()
+    dxnn = _registry()["yolov8n"]["dxnn_file"]
+    (models / dxnn).write_bytes(content)
+    graph = _write_graph(tmp_path, [{"id": "od", "model": "yolov8n"}])
+    result = run(BINARIES[0], "--check", str(graph), "--model-dir", str(models))
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "{}  [present, invalid]".format(dxnn) in result.stdout, result.stdout
+    assert 'ERROR [MODEL_LOAD] node "od": model "yolov8n" ({}) is not a loadable .dxnn: '.format(
+        dxnn) in result.stderr, result.stderr
+    assert "  -> download it again: ./setup.sh --models YoloV8N" in result.stderr, result.stderr

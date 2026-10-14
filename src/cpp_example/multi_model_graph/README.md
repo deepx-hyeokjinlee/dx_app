@@ -619,8 +619,11 @@ The exit code answers *is this graph valid, and can this runtime load what
 is here?* — a question a fresh checkout with nothing downloaded must still
 be able to ask — so a missing `.dxnn` is reported but does not make
 `--check` fail. A real run does fail on it, with the same list and the same
-recovery command. A `.dxnn` that is present but that this DX-RT cannot load
-does make `--check` fail: the artifact column says
+recovery command. A `.dxnn` that is present but cannot load here does make `--check` fail:
+a file that is not a `.dxnn` at all (empty, cut short, no `DXNN` header;
+the artifact column says `[present, invalid]`, and the error says
+`download it again: ./setup.sh --models <name>`), or one this DX-RT cannot
+load: the artifact column says
 `[present, v9 (needs DX-RT >= 3.5.0)]`, one line per such node follows on
 stderr, and the exit code is 1 (output on DX-RT 3.4.1):
 
@@ -997,7 +1000,7 @@ happens, remove a node or use a smaller model.
 | `--max-jobs-per-stage <N>` | `0` | jobs one stage may have outstanding across frames; 0 = no limit. Async only: `multi_model_graph_sync` refuses it (exit 2) |
 | `--stall-timeout-ms <N>` | `0` | fail with `ERROR: AsyncExecutor stalled: …` (exit 1) when work is outstanding and nothing completes for N ms; 0 = wait forever. Async only: `multi_model_graph_sync` refuses it (exit 2) |
 | `--frames <N>` | all | stop after N frames; with several sources, after N frames of each stream |
-| `--check [<file>]` | — | validate and report without opening the NPU, then exit: 0 for a valid graph (missing `.dxnn` files are listed, not an error), 1 for an invalid graph or a present `.dxnn` this DX-RT cannot load |
+| `--check [<file>]` | — | validate and report without opening the NPU, then exit: 0 for a valid graph (missing `.dxnn` files are listed, not an error), 1 for an invalid graph or a present `.dxnn` that cannot load here (not a `.dxnn`, or a container this DX-RT cannot load) |
 | `--list-models` | — | every model, then the `alias of` rows; filter with `--consumes` / `--produces`; `--model-dir` sets the directory the `file` column reads |
 | `--help` | — | |
 

@@ -180,9 +180,9 @@ void PrintUsage(const char* program) {
         " missing\n"
         "                        .dxnn is reported but is not an error here;"
         " a .dxnn\n"
-        "                        this DX-RT cannot load (v9 before 3.5.0) is"
-        " one\n"
-        "                        (exit 1)\n"
+        "                        that cannot load here (not a .dxnn, or v9"
+        " before\n"
+        "                        DX-RT 3.5.0) is one (exit 1)\n"
         "  --list-models         print every model this build can put in a"
         " graph, with\n"
         "                        its published flag and the container version"
@@ -585,7 +585,7 @@ void PrintCheckSummary(const GraphSpec& spec, const IModelRegistry& registry,
         if (info == NULL) continue;
         // A present file names its container version, as --list-models
         // does ("[present, v8]"); one this runtime cannot load also says why
-        // (R12), and the error itself follows on stderr (UnloadableContainers).
+        // (R12), and the error itself follows on stderr (ModelFileProblems).
         const std::string column = ContainerColumn(*info, model_dir);
         const std::string status = column == "missing" ? "[MISSING]" : "[present, " + column + "]";
         table << std::setw(model_w) << info->model_name
@@ -644,32 +644,45 @@ void PrintCheckSummary(const GraphSpec& spec, const IModelRegistry& registry,
 }
 
 /**
- * @brief R12: one MODEL_LOAD error per model node whose .dxnn is present
- *        but a container this DX-RT cannot load (v9 before 3.5.0).
+ * @brief One MODEL_LOAD error per model node whose .dxnn is present but
+ *        cannot load here: not a .dxnn at all (empty, short, no DXNN
+ *        header), or a container this DX-RT cannot load (v9 before 3.5.0,
+ *        R12).
  *
  * --check exits 1 on any of them: unlike a missing file, which a download
- * fixes, the graph cannot run here with these files, and a run would stop
- * on the same text before opening an engine (detail::LoadableModelPath).
+ * fixes and which --check only reports, the graph cannot run with these
+ * files, and a run would stop on them when the engine opens.
  */
-std::vector<std::string> UnloadableContainers(const GraphSpec& spec,
-                                              const IModelRegistry& registry,
-                                              const std::string& model_dir) {
-    std::vector<std::string> errors;
+std::vector<GraphError> ModelFileProblems(const GraphSpec& spec,
+                                          const IModelRegistry& registry,
+                                          const std::string& model_dir) {
+    std::vector<GraphError> problems;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
         if (node.is_source || node.is_cpu) continue;
         const ModelInfo* info = registry.find(node.model);
         if (info == NULL) continue;
-        const std::string error =
-            ContainerLoadError(model_dir + "/" + info->dxnn_file, RuntimeVersion());
+        const std::string path = model_dir + "/" + info->dxnn_file;
+        if (!FileExists(path)) continue;  // missing: reported, not an error
+        uint32_t version = 0;
+        std::string header_error;
+        if (!ReadDxnnContainerVersion(path, &version, &header_error)) {
+            problems.push_back(GraphError(
+                GraphErrorCode::kModelLoad, "node \"" + node.id + "\"",
+                "model \"" + node.model + "\" (" + info->dxnn_file +
+                    ") is not a loadable .dxnn: " + header_error,
+                "download it again: ./setup.sh --models " +
+                    (info->download_name.empty() ? node.model : info->download_name)));
+            continue;
+        }
+        const std::string error = ContainerLoadError(path, RuntimeVersion());
         if (error.empty()) continue;
-        errors.push_back(GraphError(GraphErrorCode::kModelLoad, "node \"" + node.id + "\"",
-                                    "model \"" + node.model + "\" (" + info->dxnn_file +
-                                        ") cannot be loaded here: " + error,
-                                    "")
-                             .what());
+        problems.push_back(GraphError(GraphErrorCode::kModelLoad, "node \"" + node.id + "\"",
+                                      "model \"" + node.model + "\" (" + info->dxnn_file +
+                                          ") cannot be loaded here: " + error,
+                                      ""));
     }
-    return errors;
+    return problems;
 }
 
 // ---------------------------------------------------------------------
@@ -1138,16 +1151,16 @@ int Main(int argc, char** argv, ExecutorKind kind) {
             ValidateGraph(spec, registry);                      // T0
             // T1 is reported, not enforced: the exit code answers "is this
             // graph valid?", which is a question a checkout with no models
-            // downloaded must still be able to ask. A present file this
-            // DX-RT cannot load is the exception (R12): exit 1.
+            // downloaded must still be able to ask. A present file that
+            // cannot load here (not a .dxnn, or R12) is the exception: exit 1.
             PrintCheckSummary(spec, registry, args.graph_path, args.model_dir);
             std::fflush(stdout);
-            const std::vector<std::string> unloadable =
-                UnloadableContainers(spec, registry, args.model_dir);
-            for (std::size_t i = 0; i < unloadable.size(); ++i) {
-                std::fprintf(stderr, "%s\n", unloadable[i].c_str());
+            const std::vector<GraphError> problems =
+                ModelFileProblems(spec, registry, args.model_dir);
+            for (std::size_t i = 0; i < problems.size(); ++i) {
+                std::fprintf(stderr, "%s\n", problems[i].what());
             }
-            return unloadable.empty() ? 0 : 1;
+            return problems.empty() ? 0 : 1;
         }
 
         // Usage errors that need the graph's uri or the environment, found
