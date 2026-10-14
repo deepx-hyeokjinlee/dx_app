@@ -211,6 +211,11 @@ ENGINE_INCLUDE_ALLOWLIST = frozenset([
     "graph_runner_sync.hpp",
     "graph_runner_async.hpp",
     "graph_visualizer.hpp",
+    # The engine's own CPU nodes ("type": "cpu", ops headpose and volume):
+    # both executors call ReduceCpu once a cpu node's "carry" parents have
+    # finished. It includes only i_registry.hpp and shape.hpp from the graph
+    # surface and names no concrete registry and no task string.
+    "cpu_reduce.hpp",
 ])
 ENGINE_INCLUDE_PREFIXES = (
     "common/base/",

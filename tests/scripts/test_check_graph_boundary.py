@@ -55,3 +55,12 @@ def test_the_shared_roi_crop_header_is_the_only_utility_header_the_engine_may_in
     engine_file = ROOT / "src" / "cpp_example" / "common" / "graph" / "roi_router.cpp"
     assert guard._include_violation(engine_file, "common/utility/roi_crop.hpp") is None
     assert guard._include_violation(engine_file, "common/utility/common_util.hpp") is not None
+
+
+def test_the_real_engine_tree_is_clean():
+    """The whole guard, as CI runs it: exit 0 on this checkout."""
+    import subprocess
+    import sys
+    result = subprocess.run([sys.executable, str(GUARD)], cwd=str(ROOT),
+                            capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
