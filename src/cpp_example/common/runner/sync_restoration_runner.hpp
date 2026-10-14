@@ -616,7 +616,7 @@ private:
                 metrics.sum_preprocess += t_preprocess;
                 metrics.sum_inference += t_inference_total;
                 metrics.infer_completed++;
-                dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
+                dxapp::progressTick(metrics);   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
                 return true;
             }
             result_frame = std::move(maybe.second);
@@ -661,7 +661,7 @@ private:
         metrics.sum_save += t_save;
         metrics.sum_display += t_display;
         metrics.infer_completed++;
-        dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
+        dxapp::progressTick(metrics);   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
 
         return !quit_requested;
     }

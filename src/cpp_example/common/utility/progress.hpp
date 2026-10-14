@@ -1,13 +1,26 @@
 /**
  * @file progress.hpp
- * @brief Machine-readable progress for front ends: "[PROGRESS] frames=N".
+ * @brief Machine-readable progress for front ends:
+ *        "[PROGRESS] frames=N fps=F avg_fps=A read_ms=R pre_ms=P infer_ms=I post_ms=Q".
  *
  * A front end showing a running example (DX AI Studio's live view) cannot tell how
  * many frames have been processed: most runners print nothing per frame, and the
  * [DET] / [OBB] / [ISEG] tags print one line per OBJECT. With DXAPP_PROGRESS=1 every
- * runner calls progressTick() once per completed frame and this prints the running
- * total at most once per second, plus once when the process ends. Without the
- * variable nothing is printed and the cost is one branch.
+ * runner calls progressTick(metrics) once per completed frame and this prints, at most
+ * once per second plus once when the process ends, what the runner measured itself:
+ *
+ *   frames   frames completed so far (always first, always present)
+ *   fps      frames since the previous line / seconds since it -- the live rate
+ *   avg_fps  frames after the first / seconds since the first -- start-up and model
+ *            load are not in it, unlike frames / process time
+ *   *_ms     the read / preprocess / inference / postprocess average over the same
+ *            window, from the runner's own sums (async inference is the submit-to-
+ *            callback turnaround the runner's summary prints)
+ *
+ * A field that cannot be computed yet is left out: the first line is "frames=1" only,
+ * and a tick without metrics prints no *_ms. The final line carries run averages
+ * (fps = avg_fps, *_ms = sum / frames) up to the last frame. Without the variable
+ * nothing is printed and the cost is one branch.
  *
  * stdoutMutex() is shared by everything that writes pipeline-parsed lines, so lines
  * from concurrent async callbacks are written whole ("3.50273.5913" was two scores
@@ -21,10 +34,12 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <mutex>
+#include <string>
 
 namespace dxapp {
 
@@ -34,51 +49,146 @@ inline std::mutex& stdoutMutex() {
     return m;
 }
 
+/** Running stage-time sums in milliseconds, as the runners' metric structs keep them. */
+struct StageSums {
+    double read_ms = 0.0;
+    double pre_ms = 0.0;
+    double infer_ms = 0.0;
+    double post_ms = 0.0;
+};
+
 class Progress {
 public:
-    explicit Progress(double interval_s = 1.0)
-        : interval_ns_(static_cast<int64_t>(interval_s * 1e9)), enabled_(envEnabled()) {}
+    using Clock = int64_t (*)();  // nanoseconds; tests pass their own
+
+    explicit Progress(double interval_s = 1.0, Clock clock = nullptr)
+        : interval_ns_(static_cast<int64_t>(interval_s * 1e9)),
+          enabled_(envEnabled()),
+          clock_(clock ? clock : &steadyNs) {}
     ~Progress() { finish(); }
     Progress(const Progress&) = delete;
     Progress& operator=(const Progress&) = delete;
 
     /** One frame finished. Thread-safe. */
-    void tick() {
-        if (!enabled_) return;
-        const long n = ++frames_;
-        const int64_t t = nowNs();
-        int64_t last = last_ns_.load(std::memory_order_relaxed);
-        if (last != 0 && t - last < interval_ns_) return;
-        if (last_ns_.compare_exchange_strong(last, t)) print(n);
-    }
+    void tick() { tickImpl(nullptr); }
 
-    /** Final total; printed once. */
+    /** One frame finished; @p sums is the runner's running stage sums after it. Thread-safe. */
+    void tick(const StageSums& sums) { tickImpl(&sums); }
+
+    /** Final line with the run averages; printed once. */
     void finish() {
         if (!enabled_ || finished_.exchange(true)) return;
-        print(frames_.load());
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        const long n = frames_.load();
+        std::string line = "[PROGRESS] frames=" + std::to_string(n);
+        const double avg = avgFps(n, last_tick_ns_);
+        if (avg >= 0) {
+            appendField(line, "fps", avg, 1);
+            appendField(line, "avg_fps", avg, 1);
+        }
+        if (has_sums_ && n > 0) appendStages(line, last_sums_, StageSums{}, static_cast<double>(n));
+        print(line);
     }
 
     long frames() const { return frames_.load(); }
 
 private:
+    void tickImpl(const StageSums* sums) {
+        if (!enabled_) return;
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        const long n = ++frames_;
+        const int64_t t = clock_();
+        if (n == 1) first_ns_ = t;
+        last_tick_ns_ = t;
+        if (sums) {
+            // A runner that starts new metrics (a new loop) restarts its sums from zero:
+            // carry what it had, so the window and the run average keep adding up.
+            if (has_sums_ && (sums->read_ms < raw_sums_.read_ms || sums->pre_ms < raw_sums_.pre_ms ||
+                              sums->infer_ms < raw_sums_.infer_ms || sums->post_ms < raw_sums_.post_ms))
+                base_sums_ = plus(base_sums_, raw_sums_);
+            raw_sums_ = *sums;
+            last_sums_ = plus(base_sums_, raw_sums_);
+            has_sums_ = true;
+        }
+        if (printed_ && t - prev_ns_ < interval_ns_) return;
+
+        std::string line = "[PROGRESS] frames=" + std::to_string(n);
+        if (printed_) {
+            const long df = n - prev_frames_;
+            const double dt = static_cast<double>(t - prev_ns_) / 1e9;
+            if (df > 0 && dt > 0) appendField(line, "fps", df / dt, 1);
+            const double avg = avgFps(n, t);
+            if (avg >= 0) appendField(line, "avg_fps", avg, 1);
+            if (sums && prev_has_sums_ && df > 0)
+                appendStages(line, last_sums_, prev_sums_, static_cast<double>(df));
+        }
+        print(line);
+        printed_ = true;
+        prev_ns_ = t;
+        prev_frames_ = n;
+        prev_sums_ = last_sums_;
+        prev_has_sums_ = has_sums_;
+    }
+
+    static StageSums plus(const StageSums& a, const StageSums& b) {
+        return StageSums{a.read_ms + b.read_ms, a.pre_ms + b.pre_ms, a.infer_ms + b.infer_ms, a.post_ms + b.post_ms};
+    }
+
+    /** Frames after the first over the time since it; -1 when there is no span yet. */
+    double avgFps(long n, int64_t t) const {
+        if (n < 2 || t <= first_ns_) return -1.0;
+        return (n - 1) / (static_cast<double>(t - first_ns_) / 1e9);
+    }
+
+    static void appendField(std::string& line, const char* key, double value, int decimals) {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), " %s=%.*f", key, decimals, value);
+        line += buf;
+    }
+
+    /** (now - before) / frames for each stage; a stage that went backwards is left out. */
+    static void appendStages(std::string& line, const StageSums& now, const StageSums& before, double frames) {
+        const struct { const char* key; double v; } stages[] = {
+            {"read_ms", now.read_ms - before.read_ms},
+            {"pre_ms", now.pre_ms - before.pre_ms},
+            {"infer_ms", now.infer_ms - before.infer_ms},
+            {"post_ms", now.post_ms - before.post_ms},
+        };
+        for (const auto& s : stages)
+            if (s.v >= 0) appendField(line, s.key, s.v / frames, 2);
+    }
+
     static bool envEnabled() {
         const char* v = std::getenv("DXAPP_PROGRESS");
         return v && *v && std::strcmp(v, "0") != 0;
     }
-    static int64_t nowNs() {
+    static int64_t steadyNs() {
         return std::chrono::duration_cast<std::chrono::nanoseconds>(
                    std::chrono::steady_clock::now().time_since_epoch()).count();
     }
-    static void print(long n) {
+    static void print(const std::string& line) {
         std::lock_guard<std::mutex> lock(stdoutMutex());
-        std::cout << "[PROGRESS] frames=" << n << '\n' << std::flush;
+        std::cout << line << '\n' << std::flush;
     }
 
     const int64_t interval_ns_;
     const bool enabled_;
+    const Clock clock_;
     std::atomic<long> frames_{0};
-    std::atomic<int64_t> last_ns_{0};
     std::atomic<bool> finished_{false};
+
+    std::mutex state_mutex_;  // everything below
+    bool printed_ = false;
+    int64_t first_ns_ = 0;
+    int64_t last_tick_ns_ = 0;
+    int64_t prev_ns_ = 0;
+    long prev_frames_ = 0;
+    StageSums raw_sums_;   // as the runner passed them last
+    StageSums base_sums_;  // what earlier metrics had when the runner restarted them
+    StageSums last_sums_;  // base + raw: the run so far
+    StageSums prev_sums_;
+    bool has_sums_ = false;
+    bool prev_has_sums_ = false;
 };
 
 /** The process-wide counter the runners tick. */
@@ -88,6 +198,13 @@ inline Progress& progress() {
 }
 
 inline void progressTick() { progress().tick(); }
+
+/** Tick with a runner's metrics (SyncProfilingMetrics / AsyncProfilingMetrics: sum_* in ms).
+ *  Async runners call it under their metrics mutex, so the sums are a consistent snapshot. */
+template <class Metrics>
+inline void progressTick(const Metrics& m) {
+    progress().tick(StageSums{m.sum_read, m.sum_preprocess, m.sum_inference, m.sum_postprocess});
+}
 
 }  // namespace dxapp
 

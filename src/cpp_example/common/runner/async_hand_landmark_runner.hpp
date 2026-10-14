@@ -222,7 +222,7 @@ public:
                 metrics_.inflight_last_ts = now;
                 metrics_.infer_last_ts = now;
                 metrics_.infer_completed++;
-                dxapp::progressTick();   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
+                dxapp::progressTick(metrics_);   // [PROGRESS] for front ends (DXAPP_PROGRESS=1)
             }
             metrics_.notifySlot();
 
