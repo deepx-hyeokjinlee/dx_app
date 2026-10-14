@@ -38,6 +38,9 @@
 #ifndef DXAPP_GRAPH_GRAPH_VISUALIZER_HPP
 #define DXAPP_GRAPH_GRAPH_VISUALIZER_HPP
 
+#include <string>
+#include <vector>
+
 #include <opencv2/core.hpp>
 
 #include "common/graph/shape.hpp"
@@ -89,10 +92,21 @@ cv::Point2f RestorePointWarped(const cv::Point2f& roi_local, const RoiRef& ref);
  * aligned crop it blends its whole footprint). A non-spatial dense map
  * (`DenseMapData::spatial` false) is never drawn.
  *
+ * Logic nodes (FrameReport::overlays) are drawn by pass 5 only, after all
+ * of the above: their polygons tinted and outlined, their lines with an
+ * arrow to the "in" side (the right of A->B), highlighted boxes, then their
+ * labels, at a point or stacked in a panel from the top left. A logic
+ * node's own payload is not drawn by the shape passes: a zone's boxes are
+ * its detector's boxes, already drawn.
+ *
  * An empty `source` returns it unchanged; a default (empty) `report`
  * draws nothing and returns a clone of `source`.
  */
 cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report);
+
+/// The CLI's recent-events panel: `lines` bottom-left, oldest first, the
+/// newest at the bottom. Kept out of RenderReport, which draws one report.
+void DrawEventLog(cv::Mat* canvas, const std::vector<std::string>& lines);
 
 }  // namespace graph
 }  // namespace dxapp

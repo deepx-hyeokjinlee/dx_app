@@ -580,6 +580,75 @@ void DrawVector(cv::Mat* canvas, const StageResult& result) {
 }
 
 // ---------------------------------------------------------------------
+// Pass 5: logic nodes - zones, lines, highlighted boxes, labels.
+// ---------------------------------------------------------------------
+
+const cv::Scalar kLogicColor(255, 191, 0);  // BGR: light blue
+const cv::Scalar kAlertColor(0, 0, 255);    // BGR: red
+const int kPanelLineHeight = 20;
+
+cv::Point Pixel(const cv::Point2f& point) {
+    return cv::Point(cvRound(point.x), cvRound(point.y));
+}
+
+/// White text on a black (alerted: red) box, baseline at `at`, kept inside the canvas.
+void DrawLabel(cv::Mat* canvas, const std::string& text, cv::Point at, bool alert) {
+    int baseline = 0;
+    const cv::Size size = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
+    at.x = std::max(0, std::min(at.x, canvas->cols - size.width - 1));
+    at.y = std::max(size.height + 2, std::min(at.y, canvas->rows - baseline - 1));
+    cv::rectangle(*canvas, cv::Point(at.x, at.y - size.height - 2),
+                  cv::Point(at.x + size.width, at.y + baseline),
+                  alert ? kAlertColor : cv::Scalar(0, 0, 0), cv::FILLED);
+    cv::putText(*canvas, text, at, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
+}
+
+void DrawLogicOverlay(cv::Mat* canvas, const LogicOverlay& overlay, int* panel_line) {
+    const cv::Scalar color = overlay.alert ? kAlertColor : kLogicColor;
+    for (std::size_t i = 0; i < overlay.polygons.size(); ++i) {
+        if (overlay.polygons[i].size() < 3) continue;
+        std::vector<std::vector<cv::Point> > contour(1);
+        for (std::size_t k = 0; k < overlay.polygons[i].size(); ++k) {
+            contour[0].push_back(Pixel(overlay.polygons[i][k]));
+        }
+        cv::Mat tint = canvas->clone();
+        cv::fillPoly(tint, contour, color);
+        cv::addWeighted(tint, 0.2, *canvas, 0.8, 0.0, *canvas);
+        cv::polylines(*canvas, contour, true, color, 2);
+    }
+    for (std::size_t i = 0; i < overlay.lines.size(); ++i) {
+        const cv::Point2f a = overlay.lines[i].first;
+        const cv::Point2f b = overlay.lines[i].second;
+        cv::line(*canvas, Pixel(a), Pixel(b), color, 2);
+        const float dx = b.x - a.x;
+        const float dy = b.y - a.y;
+        const float length = std::sqrt(dx * dx + dy * dy);
+        if (length <= 0.f) continue;
+        // The "in" side: the right of A->B on the image (y down) is (-dy, dx).
+        const cv::Point2f mid = (a + b) * 0.5f;
+        const cv::Point2f normal(-dy / length * 24.f, dx / length * 24.f);
+        cv::arrowedLine(*canvas, Pixel(mid), Pixel(mid + normal), color, 2, cv::LINE_8, 0, 0.4);
+    }
+    for (std::size_t i = 0; i < overlay.highlights.size(); ++i) {
+        const cv::Rect2f& box = overlay.highlights[i];
+        cv::rectangle(*canvas,
+                      cv::Rect(cvRound(box.x), cvRound(box.y), cvRound(box.width),
+                               cvRound(box.height)),
+                      color, 3);
+    }
+    for (std::size_t i = 0; i < overlay.texts.size(); ++i) {
+        const OverlayText& text = overlay.texts[i];
+        if (text.at.x < 0.f) {
+            DrawLabel(canvas, text.text, cv::Point(10, 24 + kPanelLineHeight * (*panel_line)),
+                      text.alert);
+            ++*panel_line;
+        } else {
+            DrawLabel(canvas, text.text, Pixel(text.at), text.alert);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
 // Driver: run one Draw* over every result of a given shape, in
 // report.node_results then report.roi_results order (both std::map, so
 // both iterate in a fixed, deterministic key order; roi_results' vectors
@@ -609,6 +678,7 @@ void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, Draw
     for (std::map<std::string, StageResult>::const_iterator it =
              report.node_results.begin();
          it != report.node_results.end(); ++it) {
+        if (report.overlays.count(it->first) != 0) continue;  // a logic node: pass 5
         DrawResultAndPorts(it->second, canvas, shape, fn);
     }
     for (std::map<std::string, std::vector<StageResult> >::const_iterator it =
@@ -650,7 +720,23 @@ cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report) {
     ForEachResult(report, &canvas, Shape::kScores, &DrawScores);
     ForEachResult(report, &canvas, Shape::kVector, &DrawVector);
 
+    // Pass 5: logic nodes, over everything else, in node-id order.
+    int panel_line = 0;
+    for (std::map<std::string, LogicOverlay>::const_iterator it = report.overlays.begin();
+         it != report.overlays.end(); ++it) {
+        DrawLogicOverlay(&canvas, it->second, &panel_line);
+    }
     return canvas;
+}
+
+void DrawEventLog(cv::Mat* canvas, const std::vector<std::string>& lines) {
+    if (canvas == NULL || canvas->empty()) return;
+    const int kLineHeight = 22;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        const int from_bottom = static_cast<int>(lines.size() - 1 - i);
+        DrawLabel(canvas, lines[i], cv::Point(10, canvas->rows - 10 - kLineHeight * from_bottom),
+                  false);
+    }
 }
 
 }  // namespace graph

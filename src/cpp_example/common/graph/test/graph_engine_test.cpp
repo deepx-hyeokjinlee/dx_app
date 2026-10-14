@@ -13441,6 +13441,58 @@ void TestUserNodePassesItsInputThrough() {
     for (std::size_t i = 0; i < 6 && i < async.size(); ++i) GRAPH_CHECK(reports[i] == async[i]);
 }
 
+void TestRenderReportDrawsLogicOverlaysButNotTheirBoxes() {
+    const cv::Mat black = cv::Mat::zeros(100, 200, CV_8UC3);
+    const cv::Vec3b none(0, 0, 0);
+    FrameReport report;
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(120, 20, 40, 40, 0.9f, "person"));
+    StageResult zone;
+    zone.data = boxes;
+    report.node_results["z"] = zone;
+    LogicOverlay overlay;
+    std::vector<cv::Point2f> square;
+    square.push_back(cv::Point2f(10.f, 10.f));
+    square.push_back(cv::Point2f(90.f, 10.f));
+    square.push_back(cv::Point2f(90.f, 90.f));
+    square.push_back(cv::Point2f(10.f, 90.f));
+    overlay.polygons.push_back(square);
+    report.overlays["z"] = overlay;
+    const cv::Mat drawn = RenderReport(black, report);
+    GRAPH_CHECK(drawn.at<cv::Vec3b>(10, 50) != none);   // the polygon's edge
+    GRAPH_CHECK(drawn.at<cv::Vec3b>(50, 50) != none);   // its tinted inside
+    GRAPH_CHECK(drawn.at<cv::Vec3b>(20, 140) == none);  // the zone's boxes are not redrawn
+    report.overlays["z"].highlights.push_back(cv::Rect2f(120.f, 20.f, 40.f, 40.f));
+    GRAPH_CHECK(RenderReport(black, report).at<cv::Vec3b>(20, 140) != none);
+
+    // A line from A (bottom) to B (top): its "in" arrow points right.
+    FrameReport crossing;
+    LogicOverlay line;
+    line.lines.push_back(std::make_pair(cv::Point2f(50.f, 90.f), cv::Point2f(50.f, 10.f)));
+    crossing.overlays["l"] = line;
+    const cv::Mat arrow = RenderReport(black, crossing);
+    GRAPH_CHECK(arrow.at<cv::Vec3b>(50, 50) != none);
+    GRAPH_CHECK(arrow.at<cv::Vec3b>(50, 65) != none);
+    GRAPH_CHECK(arrow.at<cv::Vec3b>(50, 35) == none);
+
+    // Panel labels (at.x < 0) stack from the top left.
+    FrameReport counted;
+    LogicOverlay panel;
+    OverlayText label;
+    label.text = "n cam: 3";
+    panel.texts.push_back(label);
+    counted.overlays["n"] = panel;
+    const cv::Mat labelled = RenderReport(black, counted);
+    GRAPH_CHECK(cv::countNonZero(labelled(cv::Rect(0, 0, 200, 40)).reshape(1)) > 0);
+    GRAPH_CHECK(cv::countNonZero(labelled(cv::Rect(0, 60, 200, 40)).reshape(1)) == 0);
+
+    // The recent-events panel: bottom left, nothing elsewhere.
+    cv::Mat log = black.clone();
+    DrawEventLog(&log, std::vector<std::string>(1, "0.2s z enter #0"));
+    GRAPH_CHECK(cv::countNonZero(log(cv::Rect(0, 70, 200, 30)).reshape(1)) > 0);
+    GRAPH_CHECK(cv::countNonZero(log(cv::Rect(0, 0, 200, 40)).reshape(1)) == 0);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -13827,6 +13879,7 @@ int main() {
     TestPerCropScoresReachACondition();
     TestGalleryNamesEachCropAndAnnouncesNameChanges();
     TestUserNodePassesItsInputThrough();
+    TestRenderReportDrawsLogicOverlaysButNotTheirBoxes();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
