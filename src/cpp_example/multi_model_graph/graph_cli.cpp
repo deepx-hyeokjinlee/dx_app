@@ -26,6 +26,7 @@
 #include "common/graph/graph_runner_sync.hpp"
 #include "common/graph/graph_visualizer.hpp"
 #include "common/graph/i_registry.hpp"
+#include "common/graph/logic_ops.hpp"
 #include "common/graph/shape.hpp"
 #include "common/graph/stage_graph.hpp"
 #include "common/registry/static_model_registry.hpp"
@@ -107,6 +108,7 @@ struct GraphCliArgs {
     bool report_timing;   ///< --report-timing: node_ms in --report
     bool json;            ///< --check / --list-models: JSON on stdout
     bool loop;            ///< --loop: a video starts again at its end
+    bool list_ops;        ///< --list-ops: the logic and cpu op catalog
 
     GraphCliArgs()
         : model_dir(DefaultModelDir()),
@@ -120,7 +122,8 @@ struct GraphCliArgs {
           help(false),
           report_timing(false),
           json(false),
-          loop(false) {}
+          loop(false),
+          list_ops(false) {}
 };
 
 /// The usage text, on `out`: stdout for --help and for a usage error,
@@ -137,6 +140,7 @@ void PrintUsage(std::FILE* out, const char* program) {
         "       %s --list-models [--consumes <roi|frame|either>]"
         " [--produces <shape>]\n"
         "                     [--model-dir <dir>] [--json]\n"
+        "       %s --list-ops [--json]\n"
         "\n"
         "Options:\n"
         "  --graph <file>        the node-graph JSON to run\n"
@@ -215,14 +219,17 @@ void PrintUsage(std::FILE* out, const char* program) {
         "                        keypoints, labelmap, densemap, image,"
         " scores,\n"
         "                        vector, boxes3d\n"
-        "  --json                with --check or --list-models: one JSON document\n"
-        "                        on stdout instead of the tables (shapes: README)\n"
+        "  --json                with --check, --list-models or --list-ops: one JSON\n"
+        "                        document on stdout instead of the tables (README)\n"
+        "  --list-ops            print every logic and cpu op a graph can use: its\n"
+        "                        inputs, output, events and params (--json: the\n"
+        "                        catalog a front end builds its palette from)\n"
         "  --help                this message\n"
         "\n"
         "Sample graphs: src/cpp_example/multi_model_graph/\n"
         "Model list:    docs/graph_models.md\n"
         "Schema:        src/cpp_example/multi_model_graph/README.md\n",
-        program, program, program, DefaultModelDir().c_str(),
+        program, program, program, program, DefaultModelDir().c_str(),
         static_cast<unsigned>(kDefaultMaxInflight));
 }
 
@@ -245,6 +252,10 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         }
         if (option == "--list-models") {
             args->list_models = true;
+            continue;
+        }
+        if (option == "--list-ops") {
+            args->list_ops = true;
             continue;
         }
         if (option == "--display") {
@@ -346,7 +357,7 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         return false;
     }
 
-    if (!args->list_models && args->graph_path.empty()) {
+    if (!args->list_models && !args->list_ops && args->graph_path.empty()) {
         *error = "no graph: pass --graph <file.json>";
         return false;
     }
@@ -362,8 +373,13 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         *error = "--report-timing needs --report <file>";
         return false;
     }
-    if (args->json && !args->list_models && !args->check_only) {
-        *error = "--json applies to --check and --list-models";
+    if (args->json && !args->list_models && !args->check_only && !args->list_ops) {
+        *error = "--json applies to --check, --list-models and --list-ops";
+        return false;
+    }
+    if (args->list_ops && (args->list_models || args->check_only || !args->graph_path.empty())) {
+        *error = "--list-ops is a mode of its own: pass it without --graph, --check or "
+                 "--list-models";
         return false;
     }
     if (args->list_models && args->check_only) {
@@ -372,11 +388,11 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
         *error = "--list-models and --check are separate modes: pass one of them";
         return false;
     }
-    if (!args->events.empty() && (args->check_only || args->list_models)) {
+    if (!args->events.empty() && (args->check_only || args->list_models || args->list_ops)) {
         *error = "--events applies to a run (--graph), not to a listing or --check";
         return false;
     }
-    if (args->loop && (args->check_only || args->list_models)) {
+    if (args->loop && (args->check_only || args->list_models || args->list_ops)) {
         *error = "--loop applies to a run (--graph), not to a listing or --check";
         return false;
     }
@@ -566,6 +582,112 @@ nlohmann::json ModelRowJson(const ModelInfo& info, const std::string& model_dir)
     row["ports"] = ports;
     row["alias_of"] = nullptr;
     return row;
+}
+
+// ---------------------------------------------------------------------
+// --list-ops
+// ---------------------------------------------------------------------
+
+nlohmann::json ParamJson(const LogicParamInfo& param) {
+    using consumer::JsonNumber;
+    nlohmann::json out = nlohmann::json::object();
+    out["name"] = param.name;
+    out["type"] = ToString(param.kind);
+    out["required"] = param.required;
+    switch (param.kind) {
+        case LogicParamInfo::kNumber:
+            if (!param.required) out["default"] = JsonNumber<nlohmann::json>(param.number_default);
+            if (param.low > -kLogicUnbounded) out["min"] = JsonNumber<nlohmann::json>(param.low);
+            if (param.low_open) out["min_exclusive"] = true;
+            if (param.high < kLogicUnbounded) out["max"] = JsonNumber<nlohmann::json>(param.high);
+            break;
+        case LogicParamInfo::kText:
+            if (!param.required) out["default"] = param.text_default;
+            break;
+        case LogicParamInfo::kChoice:
+            if (!param.required) out["default"] = param.text_default;
+            out["choices"] = param.choices;
+            break;
+        case LogicParamInfo::kTextList:
+            out["default"] = nlohmann::json::array();
+            break;
+        case LogicParamInfo::kPolygon:
+            out["min_points"] = 3;
+            break;
+        case LogicParamInfo::kLine:
+            out["points"] = 2;
+            break;
+    }
+    out["help"] = param.help;
+    return out;
+}
+
+nlohmann::json OpJson(const LogicOpInfo& info, const char* type) {
+    nlohmann::json out = nlohmann::json::object();
+    out["op"] = info.op;
+    out["type"] = type;
+    out["summary"] = info.summary;
+    nlohmann::json accepts = nlohmann::json::array();
+    for (std::size_t i = 0; i < info.accepts.size(); ++i) {
+        nlohmann::json port = nlohmann::json::object();
+        port["shape"] = ToString(info.accepts[i].shape);
+        port["per_crop"] = info.accepts[i].per_crop;
+        accepts.push_back(port);
+    }
+    nlohmann::json inputs = nlohmann::json::object();
+    inputs["min"] = info.min_inputs;
+    inputs["max"] = info.max_inputs;
+    inputs["accepts"] = accepts;
+    out["inputs"] = inputs;
+    out["output"] = info.same_shape_out ? "same" : "records";
+    out["tracking"] = info.needs_tracking;
+    out["events"] = info.events;
+    out["numbers"] = info.numbers;
+    nlohmann::json params = nlohmann::json::array();
+    for (std::size_t p = 0; p < info.params.size(); ++p) params.push_back(ParamJson(info.params[p]));
+    out["params"] = params;
+    return out;
+}
+
+/// --list-ops --json: logic ops, then cpu ops. Always 0.
+int PrintOpsJson() {
+    nlohmann::json ops = nlohmann::json::array();
+    for (std::size_t i = 0; i < LogicOps().size(); ++i) ops.push_back(OpJson(LogicOps()[i], "logic"));
+    for (std::size_t i = 0; i < CpuOpInfos().size(); ++i) ops.push_back(OpJson(CpuOpInfos()[i], "cpu"));
+    std::printf("%s\n", ops.dump(2).c_str());
+    return 0;
+}
+
+/// "boxes, obboxes, instances"; per-crop inputs end in "/crop".
+std::string AcceptsColumn(const LogicOpInfo& info) {
+    std::string text;
+    for (std::size_t i = 0; i < info.accepts.size(); ++i) {
+        if (i != 0) text += ",";
+        text += ToString(info.accepts[i].shape);
+        if (info.accepts[i].per_crop) text += "/crop";
+    }
+    return text;
+}
+
+/// --list-ops: one row per op. Always 0.
+int PrintOps() {
+    std::printf("%-10s %-6s %-6s %-8s %-8s %s\n", "op", "type", "inputs", "output", "tracking",
+                "accepts");
+    for (int pass = 0; pass < 2; ++pass) {
+        const std::vector<LogicOpInfo>& ops = pass == 0 ? LogicOps() : CpuOpInfos();
+        for (std::size_t i = 0; i < ops.size(); ++i) {
+            const LogicOpInfo& info = ops[i];
+            const std::string count =
+                info.min_inputs == info.max_inputs
+                    ? std::to_string(info.min_inputs)
+                    : std::to_string(info.min_inputs) + "-" + std::to_string(info.max_inputs);
+            std::printf("%-10s %-6s %-6s %-8s %-8s %s\n", info.op.c_str(),
+                        pass == 0 ? "logic" : "cpu", count.c_str(),
+                        info.same_shape_out ? "same" : "records",
+                        info.needs_tracking ? "yes" : "no", AcceptsColumn(info).c_str());
+        }
+    }
+    return 0;
 }
 
 /// --list-models --json: the table as one array. 0, or 2 on a bad filter.
@@ -1472,6 +1594,7 @@ int Main(int argc, char** argv, ExecutorKind kind) {
         PrintUsage(stdout, argv[0]);
         return 0;
     }
+    if (args.list_ops) return args.json ? PrintOpsJson() : PrintOps();
 
     // The constructor populates itself from the generated tables; this
     // one line is the entire cost of naming a concrete registry.

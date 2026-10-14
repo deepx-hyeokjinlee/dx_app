@@ -334,7 +334,8 @@ def test_help_lists_every_option(binary):
     for option in ("--graph", "--input", "--output", "--model-dir",
                    "--max-inflight", "--report", "--check", "--list-models",
                    "--max-jobs-per-stage", "--stall-timeout-ms", "--display",
-                   "--report-timing", "--json", "--events", "--loop"):
+                   "--report-timing", "--json", "--events", "--loop",
+                   "--list-ops"):
         assert option in result.stdout
 
 
@@ -3097,7 +3098,7 @@ def test_list_models_json_honours_the_filters():
 def test_json_is_only_for_check_and_list_models():
     result = run(BINARIES[0], "--graph", "{}/cascade_od_reid_track.json".format(GRAPHS), "--json")
     assert result.returncode == 2, result.stdout + result.stderr
-    assert "--json applies to --check and --list-models" in result.stderr
+    assert "--json applies to --check, --list-models and --list-ops" in result.stderr
 
 
 def _check_json(path, *args):
@@ -3442,3 +3443,55 @@ def test_loop_restarts_a_video_until_frames(tmp_path, binary):
     assert boxes[4] == boxes[0] and boxes[8] == boxes[0], "frame 4 and 8 are frame 0 again"
     assert "10 frames, 0 failed" in result.stdout.splitlines(), result.stdout[-300:]
     assert _field(_progress_lines(result.stdout)[-1], "frames") == "10"
+
+
+OP_KEYS = {"op", "type", "summary", "inputs", "output", "tracking", "events", "numbers", "params"}
+
+
+@pytest.mark.graph
+def test_list_ops_json_describes_every_op():
+    result = run(BINARIES[0], "--list-ops", "--json")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stderr == ""
+    ops = json.loads(result.stdout)
+    assert [op["op"] for op in ops] == ["filter", "zone", "line", "count", "dwell",
+                                        "condition", "gallery", "user", "headpose", "volume"]
+    assert all(set(op) == OP_KEYS for op in ops)
+    by = {op["op"]: op for op in ops}
+    assert by["zone"]["type"] == "logic" and by["volume"]["type"] == "cpu"
+    assert by["line"]["tracking"] is True and by["zone"]["tracking"] is False
+    assert by["count"]["inputs"]["max"] == 8 and by["volume"]["inputs"]["min"] == 3
+    assert {"shape": "scores", "per_crop": True} in by["condition"]["inputs"]["accepts"]
+    assert by["filter"]["output"] == "same" and by["line"]["output"] == "records"
+    params = {p["name"]: p for p in by["zone"]["params"]}
+    assert params["polygon"] == {"name": "polygon", "type": "polygon", "required": True,
+                                 "min_points": 3, "help": params["polygon"]["help"]}
+    assert params["mode"]["default"] == "inside" and params["mode"]["choices"] == ["inside",
+                                                                                   "outside"]
+    dwell = {p["name"]: p for p in by["dwell"]["params"]}
+    assert dwell["threshold_s"]["min"] == 0 and dwell["threshold_s"]["min_exclusive"] is True
+    assert "max" not in dwell["threshold_s"] and dwell["threshold_s"]["default"] == 10
+    condition = {p["name"]: p for p in by["condition"]["params"]}
+    assert "min" not in condition["threshold"] and "max" not in condition["threshold"]
+    assert condition["value"]["default"] == "count"
+    assert by["condition"]["events"] == ["<event>"]
+    assert by["line"]["numbers"] == ["in", "out", "total"]
+
+
+@pytest.mark.graph
+def test_list_ops_prints_a_table():
+    result = run(BINARIES[0], "--list-ops")
+    assert result.returncode == 0, result.stdout + result.stderr
+    lines = result.stdout.splitlines()
+    assert lines[0].split()[:5] == ["op", "type", "inputs", "output", "tracking"]
+    rows = {line.split()[0]: line.split() for line in lines[1:] if line.strip()}
+    assert rows["count"][:5] == ["count", "logic", "1-8", "records", "no"]
+    assert rows["line"][:5] == ["line", "logic", "1", "records", "yes"]
+    assert rows["volume"][:4] == ["volume", "cpu", "3", "records"]
+
+
+@pytest.mark.graph
+def test_list_ops_is_a_mode_of_its_own():
+    result = run(BINARIES[0], "--list-ops", "--list-models")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--list-ops is a mode of its own" in result.stderr

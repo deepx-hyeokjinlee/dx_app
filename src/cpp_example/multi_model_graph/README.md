@@ -1112,7 +1112,8 @@ front end can add up `parse_model` figures itself.
 | `--loop` | off | a video file that ends starts again from its first frame, so the run goes on until Ctrl-C, `q`/ESC in `--display` or `--frames N` (per stream). Frame indices, stream time, `[PROGRESS]` and events keep counting; the tracker starts new ids after each restart, so a zone raises `enter` again. Images, cameras and RTSP are unaffected. With per-frame image `--output` it needs `--frames N` (exit 2 otherwise); with `--check` or `--list-models` it is a usage error |
 | `--check [<file>]` | — | validate and report without opening the NPU, then exit: 0 for a valid graph (missing `.dxnn` files are listed, not an error), 1 for an invalid graph or a present `.dxnn` that cannot load here (not a `.dxnn`, or a container this DX-RT cannot load) |
 | `--list-models` | — | every model, then the `alias of` rows; filter with `--consumes` / `--produces`; `--model-dir` sets the directory the `file` column reads |
-| `--json` | off | with `--check` or `--list-models`: one JSON document on stdout instead of the tables (see *`--list-models --json`* and *`--check --json`*). With anything else it is a usage error (exit 2) |
+| `--list-ops` | — | every logic and cpu op: inputs, output, tracking, accepted kinds; with `--json` the full catalog, params included (see *`--list-ops --json`*). Takes no graph |
+| `--json` | off | with `--check`, `--list-models` or `--list-ops`: one JSON document on stdout instead of the tables (see *`--list-models --json`* and *`--check --json`*). With anything else it is a usage error (exit 2) |
 | `--help` | — | |
 
 `--max-jobs-per-stage` and `--stall-timeout-ms` are `dx_graph`'s
