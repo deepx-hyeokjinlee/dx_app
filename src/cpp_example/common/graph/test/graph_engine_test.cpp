@@ -12486,6 +12486,241 @@ void TestValidateTakesALogicNodeAsANonModelNode() {
     GRAPH_CHECK(message.find("accepted only by a cpu node or a logic node") != std::string::npos);
 }
 
+namespace {
+
+/// det (boxes), attr (scores, crops), emb (vector, crops), lmk (boxes with landmarks).
+FakeModelRegistry LogicCheckRegistry() {
+    FakeModelRegistry registry;
+    registry.AddModel(CpuFixtureModel("det", Shape::kBoxes),
+                      StageDataPtr(new BoxesData(Shape::kBoxes)));
+    ModelInfo attr = CpuFixtureModel("attr", Shape::kScores);
+    attr.input_contract = InputContract::kEither;
+    registry.AddModel(attr, StageDataPtr(new ScoresData()));
+    ModelInfo emb = CpuFixtureModel("emb", Shape::kVector);
+    emb.input_contract = InputContract::kEither;
+    registry.AddModel(emb, StageDataPtr(new VectorData()));
+    return registry;
+}
+
+/// A DXGAL1 file (gallery_retrieval_postprocessor.hpp's format) under the
+/// scratch directory: `rows` vectors of one width, built by `model`.
+std::string WriteGallery(const std::string& name, const std::string& model,
+                         const std::vector<std::vector<float> >& rows,
+                         const std::vector<std::string>& labels) {
+    const std::string path = ScratchPath(name);
+    std::ofstream out(path.c_str(), std::ios::binary);
+    out.write("DXGAL1\0\0", 8);
+    const auto u32 = [&out](std::size_t value) {
+        const unsigned char bytes[4] = {
+            static_cast<unsigned char>(value & 0xFF), static_cast<unsigned char>((value >> 8) & 0xFF),
+            static_cast<unsigned char>((value >> 16) & 0xFF),
+            static_cast<unsigned char>((value >> 24) & 0xFF)};
+        out.write(reinterpret_cast<const char*>(bytes), 4);
+    };
+    const auto blob = [&out, &u32](const std::string& text) {
+        u32(text.size());
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+    };
+    u32(rows.size());
+    u32(rows.empty() ? 0 : rows[0].size());
+    for (std::size_t r = 0; r < rows.size(); ++r) {
+        out.write(reinterpret_cast<const char*>(rows[r].data()),
+                  static_cast<std::streamsize>(rows[r].size() * sizeof(float)));
+    }
+    blob(model);
+    std::string paths;
+    std::string joined;
+    for (std::size_t r = 0; r < rows.size(); ++r) {
+        paths += (r == 0 ? "" : "\n") + std::string("gallery/") + labels[r] + ".jpg";
+        joined += (r == 0 ? "" : "\n") + labels[r];
+    }
+    blob(paths);
+    blob(joined);
+    return path;
+}
+
+std::vector<std::vector<float> > AliceAndBob() {
+    std::vector<std::vector<float> > rows(2, std::vector<float>(4, 0.f));
+    rows[0][0] = 1.f;  // alice
+    rows[1][1] = 1.f;  // bob
+    return rows;
+}
+
+std::vector<std::string> AliceAndBobLabels() {
+    std::vector<std::string> labels;
+    labels.push_back("alice");
+    labels.push_back("bob");
+    return labels;
+}
+
+/// The error ValidateGraph throws for `text` with LogicCheckRegistry(), or "".
+std::string LogicError(const std::string& text) {
+    return ValidationError(text, LogicCheckRegistry());
+}
+
+}  // namespace
+
+void TestValidateChecksLogicParams() {
+    GRAPH_CHECK(LogicError(LogicJson(kZoneNode, kOdToZ)).empty());
+    std::string m = LogicError(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":[0,0,1,0]}}",
+        kOdToZ));
+    GRAPH_CHECK(m.find("ERROR [GRAPH_SCHEMA] node \"z\" \"params\": \"polygon\" must hold at "
+                       "least 3 points") != std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":"
+        "[0,0,640,0,640,480]}}", kOdToZ));
+    GRAPH_CHECK(m.find("\"polygon\" values are fractions of the frame from 0 to 1, got 640 "
+                       "at [2]") != std::string::npos);
+    m = LogicError(LogicJson(",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\"}", kOdToZ));
+    GRAPH_CHECK(m.find("missing param \"polygon\"") != std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polgon\":[0,0,1,0,1,1]}}",
+        kOdToZ));
+    GRAPH_CHECK(m.find("unknown param \"polgon\" for op \"zone\"") != std::string::npos);
+    GRAPH_CHECK(m.find("did you mean \"polygon\"?") != std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"z\",\"type\":\"logic\",\"op\":\"zone\",\"params\":"
+        "{\"polygon\":[0,0,1,0,1,1],\"mode\":\"inner\"}}", kOdToZ));
+    GRAPH_CHECK(m.find("\"mode\" must be one of inside, outside, got \"inner\"") !=
+                std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\",\"params\":{\"min_score\":35}}",
+        ",{\"from\":\"od\",\"to\":\"f\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"min_score\" must be a number from 0 to 1, got 35") != std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"l\",\"type\":\"logic\",\"op\":\"line\",\"params\":{\"line\":[0.5,0,0.5,0]}}",
+        ",{\"from\":\"od\",\"to\":\"l\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"line\" needs two different points") != std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"d\",\"type\":\"logic\",\"op\":\"dwell\",\"params\":{\"threshold_s\":0}}",
+        ",{\"from\":\"od\",\"to\":\"d\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"threshold_s\" must be a number greater than 0, got 0") !=
+                std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"c\",\"type\":\"logic\",\"op\":\"condition\",\"params\":{\"event\":\"a b\"}}",
+        ",{\"from\":\"od\",\"to\":\"c\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"event\" may hold letters, digits, _ . : - (1 to 64), got \"a b\"") !=
+                std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"u\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"2nd\",\"input\":\"boxes\",\"output\":\"boxes\"}}",
+        ",{\"from\":\"od\",\"to\":\"u\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"name\" must be a C identifier, got \"2nd\"") != std::string::npos);
+}
+
+void TestValidateChecksLogicInputs() {
+    // Wrong kind: a zone fed per-crop scores.
+    std::string m = LogicError(LogicJson(
+        ",{\"id\":\"a\",\"model\":\"attr\"}" + std::string(kZoneNode),
+        ",{\"from\":\"od\",\"to\":\"a\",\"roi\":{}},{\"from\":\"a\",\"to\":\"z\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("ERROR [GRAPH_EDGE] edge \"a\"->\"z\": zone accepts boxes, obboxes or "
+                       "instances, got scores per crop from \"a\"") != std::string::npos);
+    // Too few inputs.
+    m = LogicError(LogicJson(kZoneNode, ""));
+    GRAPH_CHECK(m.find("zone takes 1 input, got nothing") != std::string::npos);
+    // A line needs track ids, and says where to add them, through a filter.
+    m = LogicError(LogicJson(
+        ",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\"}"
+        ",{\"id\":\"l\",\"type\":\"logic\",\"op\":\"line\",\"params\":{\"line\":[0.5,1,0.5,0]}}",
+        ",{\"from\":\"od\",\"to\":\"f\",\"carry\":\"result\"},"
+        "{\"from\":\"f\",\"to\":\"l\",\"carry\":\"result\"}", false));
+    GRAPH_CHECK(m.find("line needs track ids, and the boxes from \"f\" have none") !=
+                std::string::npos);
+    GRAPH_CHECK(m.find("add \"track\": {\"algo\": \"iou\"} to node \"od\"") != std::string::npos);
+    // The same graph tracked validates; a zone's boxes feed an ROI edge.
+    GRAPH_CHECK(LogicError(LogicJson(
+        ",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\"}"
+        ",{\"id\":\"l\",\"type\":\"logic\",\"op\":\"line\",\"params\":{\"line\":[0.5,1,0.5,0]}}",
+        ",{\"from\":\"od\",\"to\":\"f\",\"carry\":\"result\"},"
+        "{\"from\":\"f\",\"to\":\"l\",\"carry\":\"result\"}")).empty());
+    GRAPH_CHECK(LogicError(LogicJson(
+        std::string(kZoneNode) + ",{\"id\":\"a\",\"model\":\"attr\"}",
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"a\",\"roi\":{\"pad\":0.05}}")).empty());
+    // face5 through a zone looks at the model the boxes come from.
+    m = LogicError(LogicJson(
+        std::string(kZoneNode) + ",{\"id\":\"a\",\"model\":\"attr\"}",
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"a\",\"roi\":{\"align\":\"face5\"}}"));
+    GRAPH_CHECK(m.find("model \"det\" produces no landmarks") != std::string::npos);
+    // A count node's records: a condition reads one of its numbers.
+    const std::string counted =
+        ",{\"id\":\"n\",\"type\":\"logic\",\"op\":\"count\",\"params\":{\"classes\":[\"person\"]}}"
+        ",{\"id\":\"c\",\"type\":\"logic\",\"op\":\"condition\",\"params\":{\"value\":\"%s\"}}";
+    const std::string count_edges =
+        ",{\"from\":\"od\",\"to\":\"n\",\"carry\":\"result\"},"
+        "{\"from\":\"n\",\"to\":\"c\",\"carry\":\"result\"}";
+    std::string good = counted;
+    good.replace(good.find("%s"), 2, "person");
+    GRAPH_CHECK(LogicError(LogicJson(good, count_edges)).empty());
+    std::string bad = counted;
+    bad.replace(bad.find("%s"), 2, "people");
+    m = LogicError(LogicJson(bad, count_edges));
+    GRAPH_CHECK(m.find("\"value\" is \"people\", a number \"n\" does not write") !=
+                std::string::npos);
+    GRAPH_CHECK(m.find("\"n\" writes: total, person") != std::string::npos);
+    // Crops with scores: with:/without: a label.
+    const std::string crops =
+        ",{\"id\":\"a\",\"model\":\"attr\"}"
+        ",{\"id\":\"c\",\"type\":\"logic\",\"op\":\"condition\",\"params\":{\"value\":\"%s\"}}";
+    const std::string crop_edges =
+        ",{\"from\":\"od\",\"to\":\"a\",\"roi\":{}},{\"from\":\"a\",\"to\":\"c\",\"carry\":\"result\"}";
+    good = crops;
+    good.replace(good.find("%s"), 2, "without:Hat");
+    GRAPH_CHECK(LogicError(LogicJson(good, crop_edges)).empty());
+    bad = crops;
+    bad.replace(bad.find("%s"), 2, "hat");
+    m = LogicError(LogicJson(bad, crop_edges));
+    GRAPH_CHECK(m.find("give \"count\", \"with:<label>\" or \"without:<label>\"") !=
+                std::string::npos);
+    // A user node passes its input through.
+    m = LogicError(LogicJson(
+        ",{\"id\":\"u\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"mine\",\"input\":\"boxes\",\"output\":\"records\"}}",
+        ",{\"from\":\"od\",\"to\":\"u\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"output\" is \"records\", and a user node passes its input through") !=
+                std::string::npos);
+    m = LogicError(LogicJson(
+        ",{\"id\":\"u\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"mine\",\"input\":\"scores\",\"output\":\"scores\"}}",
+        ",{\"from\":\"od\",\"to\":\"u\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(m.find("\"input\" is \"scores\", but \"od\" gives boxes") != std::string::npos);
+}
+
+void TestValidateChecksTheGalleryFile() {
+    const std::string mine = WriteGallery("emb.bin", "emb", AliceAndBob(), AliceAndBobLabels());
+    const std::string theirs = WriteGallery("other.bin", "other", AliceAndBob(), AliceAndBobLabels());
+    const std::string edges =
+        ",{\"from\":\"od\",\"to\":\"e\",\"roi\":{}},{\"from\":\"e\",\"to\":\"g\",\"carry\":\"result\"}";
+    const auto graph = [](const std::string& path) {
+        return ",{\"id\":\"e\",\"model\":\"emb\"},{\"id\":\"g\",\"type\":\"logic\",\"op\":"
+               "\"gallery\",\"params\":{\"gallery\":\"" + path + "\"}}";
+    };
+    GRAPH_CHECK(LogicError(LogicJson(graph(mine), edges)).empty());
+    std::string m = LogicError(LogicJson(graph(theirs), edges));
+    GRAPH_CHECK(m.find("the gallery was built by \"other\", but \"e\" runs \"emb\"") !=
+                std::string::npos);
+    m = LogicError(LogicJson(graph(ScratchPath("absent.bin")), edges));
+    GRAPH_CHECK(m.find("gallery not found") != std::string::npos);
+    GRAPH_CHECK(m.find("python3 scripts/build_gallery_database.py") != std::string::npos);
+    std::remove(mine.c_str());
+    std::remove(theirs.c_str());
+}
+
+void TestNodeOutputShapeFollowsFilterZoneAndUser() {
+    const GraphSpec spec = ParseGraphText(LogicJson(
+        ",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\"}" + std::string(kZoneNode) +
+            ",{\"id\":\"c\",\"type\":\"logic\",\"op\":\"count\"}",
+        ",{\"from\":\"od\",\"to\":\"f\",\"carry\":\"result\"},"
+        "{\"from\":\"f\",\"to\":\"z\",\"carry\":\"result\"},"
+        "{\"from\":\"z\",\"to\":\"c\",\"carry\":\"result\"}"), "s.json");
+    const FakeModelRegistry registry = LogicCheckRegistry();
+    GRAPH_CHECK(NodeOutputShape(spec, registry, "z") == Shape::kBoxes);
+    GRAPH_CHECK(NodeOutputShape(spec, registry, "c") == Shape::kRecords);
+    GRAPH_CHECK(NodeOutputShape(spec, registry, "cam") == Shape::kFrame);
+    GRAPH_CHECK(BoxSourceNode(spec, "z") != NULL && BoxSourceNode(spec, "z")->id == "od");
+    GRAPH_CHECK(BoxSourceNode(spec, "c") == NULL);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -12849,6 +13084,10 @@ int main() {
     TestParseReadsALogicNode();
     TestParseRejectsBadLogicNodes();
     TestValidateTakesALogicNodeAsANonModelNode();
+    TestValidateChecksLogicParams();
+    TestValidateChecksLogicInputs();
+    TestValidateChecksTheGalleryFile();
+    TestNodeOutputShapeFollowsFilterZoneAndUser();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

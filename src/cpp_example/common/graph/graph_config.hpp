@@ -117,6 +117,18 @@ std::vector<StreamSpec> ListStreams(const GraphSpec& spec);
 std::map<std::string, std::string> SharedEngineOwners(const GraphSpec& spec,
                                                       const IModelRegistry& registry);
 
+/// The model node whose boxes reach node `id` through filter, zone and user
+/// nodes (their "carry": "result" input): `id` itself for a model node;
+/// NULL for a source, a cpu node, a logic node of another op, or an unknown
+/// id. Bounded by the node count, so a cyclic graph cannot loop it.
+const NodeSpec* BoxSourceNode(const GraphSpec& spec, const std::string& id);
+
+/// What node `id` hands on: a source a frame, a model its registry shape,
+/// a cpu node records, a logic node records, or (filter, zone, user) the
+/// shape of its input. kRecords for an unknown id or an unresolved model.
+Shape NodeOutputShape(const GraphSpec& spec, const IModelRegistry& registry,
+                      const std::string& id);
+
 /// Syntax only. Throws GraphError with kGraphSchema, kGraphVersion or
 /// kGraphReserved. origin appears in the message so the reader knows the file.
 GraphSpec ParseGraphText(const std::string& json_text, const std::string& origin);

@@ -3240,3 +3240,55 @@ def test_check_json_duplicate_node_id_names_the_node_index(tmp_path):
     error = out["errors"][0]
     assert error["where"].endswith(' node[2] "od"'), error
     assert error["node"] == "od", error
+
+
+# ---------------------------------------------------------------- graph composer P2
+
+# A tracked person detector, a person filter, a right-half zone and an alarm.
+# On sample_people.jpg the zone holds one of the two people.
+INTRUSION_GRAPH = {
+    "version": 1, "name": "intrusion",
+    "nodes": [{"id": "cam", "type": "source", "uri": "sample/img/sample_people.jpg"},
+              {"id": "od", "model": "yolov8-n_640x640", "params": {"score_threshold": 0.35},
+               "track": {"algo": "iou", "iou": 0.3, "max_age": 30}},
+              {"id": "person", "type": "logic", "op": "filter",
+               "params": {"classes": ["person"]}},
+              {"id": "zone", "type": "logic", "op": "zone",
+               "params": {"polygon": [0.45, 0.35, 1.0, 0.35, 1.0, 1.0, 0.45, 1.0]}},
+              {"id": "alarm", "type": "logic", "op": "condition",
+               "params": {"value": "count", "comparator": ">", "threshold": 0,
+                          "event": "intrusion"}}],
+    "edges": [{"from": "cam", "to": "od"},
+              {"from": "od", "to": "person", "carry": "result"},
+              {"from": "person", "to": "zone", "carry": "result"},
+              {"from": "zone", "to": "alarm", "carry": "result"}],
+}
+
+
+@pytest.mark.graph
+def test_check_lists_logic_nodes(tmp_path):
+    path = tmp_path / "intrusion.json"
+    path.write_text(json.dumps(INTRUSION_GRAPH))
+    result = run(BINARIES[0], "--check", str(path))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'OK: graph "intrusion" is valid (5 nodes, 4 edges, 1 models)' in result.stdout
+    rows = {line.split()[0]: line for line in result.stdout.splitlines() if line.split()}
+    assert "(logic zone)" in rows["zone"] and " boxes " in rows["zone"], rows["zone"]
+    assert "result" in rows["zone"], rows["zone"]
+    assert "(logic condition)" in rows["alarm"] and " records " in rows["alarm"], rows["alarm"]
+    code, out = _check_json(path)
+    assert code == 0 and out["ok"] is True, out
+    assert [m["node"] for m in out["models"]] == ["od"]
+
+
+@pytest.mark.graph
+def test_check_json_pins_a_logic_error_to_its_node(tmp_path):
+    graph = json.loads(json.dumps(INTRUSION_GRAPH))
+    graph["nodes"][3]["params"] = {"polygon": [0.1, 0.1, 0.9, 0.1]}
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(graph))
+    code, out = _check_json(path)
+    assert code == 1, out
+    error = out["errors"][0]
+    assert error["code"] == "GRAPH_SCHEMA" and error["node"] == "zone", error
+    assert '"polygon" must hold at least 3 points' in error["what"], error

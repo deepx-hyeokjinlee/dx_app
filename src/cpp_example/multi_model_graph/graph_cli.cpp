@@ -629,8 +629,9 @@ void PrintCheckSummary(const GraphSpec& spec, const IModelRegistry& registry,
     std::size_t model_width = 30;
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         id_width = std::max(id_width, spec.nodes[i].id.size() + 1);
-        if (spec.nodes[i].is_cpu) {
-            model_width = std::max(model_width, std::string("(cpu ").size() + spec.nodes[i].op.size() + 2);
+        if (spec.nodes[i].is_cpu || spec.nodes[i].is_logic) {
+            const std::string kind = spec.nodes[i].is_cpu ? "(cpu " : "(logic ";
+            model_width = std::max(model_width, kind.size() + spec.nodes[i].op.size() + 2);
             continue;
         }
         if (!spec.nodes[i].is_source) {
@@ -657,6 +658,12 @@ void PrintCheckSummary(const GraphSpec& spec, const IModelRegistry& registry,
         if (node.is_cpu) {
             table << std::setw(model_w) << ("(cpu " + node.op + ")")
                   << std::setw(11) << "records" << std::setw(11) << "result" << "-\n";
+            continue;
+        }
+        if (node.is_logic) {
+            table << std::setw(model_w) << ("(logic " + node.op + ")")
+                  << std::setw(11) << ToString(NodeOutputShape(spec, registry, node.id))
+                  << std::setw(11) << "result" << "-\n";
             continue;
         }
         const ModelInfo* info = registry.find(node.model);

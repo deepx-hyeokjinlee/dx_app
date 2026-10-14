@@ -14,6 +14,7 @@
 
 #include "common/third_party/nlohmann_json.hpp"
 #include "common/graph/logic_ops.hpp"
+#include "common/processors/gallery_retrieval_postprocessor.hpp"
 
 namespace dxapp {
 namespace graph {
@@ -1209,6 +1210,378 @@ void CheckCpuInputs(const NodeSpec& node, const std::vector<Shape>& got) {
                      "\"carry\": \"result\"");
 }
 
+namespace {
+
+/// The "carry": "result" edge into node `id` (the first one), or NULL.
+const EdgeSpec* ResultEdgeInto(const GraphSpec& spec, const std::string& id) {
+    for (std::size_t e = 0; e < spec.edges.size(); ++e) {
+        if (spec.edges[e].to == id && spec.edges[e].carry_result) return &spec.edges[e];
+    }
+    return NULL;
+}
+
+/// filter, zone and user hand on their input's shape.
+bool PassesShapeThrough(const NodeSpec& node) {
+    if (!node.is_logic) return false;
+    const LogicOpInfo* info = FindLogicOp(node.op);
+    return info != NULL && info->same_shape_out;
+}
+
+}  // namespace
+
+const NodeSpec* BoxSourceNode(const GraphSpec& spec, const std::string& id) {
+    const NodeSpec* node = spec.FindNode(id);
+    for (std::size_t hops = 0; node != NULL && hops <= spec.nodes.size(); ++hops) {
+        if (IsModelNode(*node)) return node;
+        if (!PassesShapeThrough(*node)) return NULL;
+        const EdgeSpec* in = ResultEdgeInto(spec, node->id);
+        node = in == NULL ? NULL : spec.FindNode(in->from);
+    }
+    return NULL;
+}
+
+Shape NodeOutputShape(const GraphSpec& spec, const IModelRegistry& registry,
+                      const std::string& id) {
+    const NodeSpec* node = spec.FindNode(id);
+    for (std::size_t hops = 0; node != NULL && hops <= spec.nodes.size(); ++hops) {
+        if (node->is_source) return Shape::kFrame;
+        if (node->is_cpu) return Shape::kRecords;
+        if (IsModelNode(*node)) {
+            const ModelInfo* info = registry.find(node->model);
+            return info == NULL ? Shape::kRecords : info->output_shape;
+        }
+        if (!PassesShapeThrough(*node)) return Shape::kRecords;
+        const EdgeSpec* in = ResultEdgeInto(spec, node->id);
+        node = in == NULL ? NULL : spec.FindNode(in->from);
+    }
+    return Shape::kRecords;
+}
+
+namespace {
+
+/// What one "carry": "result" edge brings a logic node, as validation sees it.
+struct LogicInputKind {
+    std::string from;
+    Shape shape;
+    bool per_crop;          ///< the producer runs once per crop (an ROI in-edge)
+    bool tracked;           ///< its boxes come from a model with "track"
+    std::string box_node;   ///< that model node's id; "" when there is none
+    const ModelInfo* model; ///< the producer's own model; NULL for a cpu or logic producer
+    std::vector<std::string> numbers;  ///< the records numbers it writes, when known
+    LogicInputKind() : shape(Shape::kRecords), per_crop(false), tracked(false), model(NULL) {}
+};
+
+std::string KindText(Shape shape, bool per_crop) {
+    return std::string(ToString(shape)) + (per_crop ? " per crop" : "");
+}
+
+/// "boxes, obboxes or instances".
+std::string AcceptsText(const LogicOpInfo& info) {
+    std::string text;
+    for (std::size_t i = 0; i < info.accepts.size(); ++i) {
+        if (i != 0) text += i + 1 == info.accepts.size() ? " or " : ", ";
+        text += KindText(info.accepts[i].shape, info.accepts[i].per_crop);
+    }
+    return text;
+}
+
+bool Accepts(const LogicOpInfo& info, const LogicInputKind& got) {
+    for (std::size_t i = 0; i < info.accepts.size(); ++i) {
+        if (info.accepts[i].shape == got.shape && info.accepts[i].per_crop == got.per_crop) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string RangeText(const LogicParamInfo& param) {
+    const bool no_low = param.low <= -kLogicUnbounded;
+    const bool no_high = param.high >= kLogicUnbounded;
+    const std::string low = AsWritten(param.low).dump();
+    const std::string high = AsWritten(param.high).dump();
+    if (no_low && no_high) return "a number";
+    if (no_low) return "a number of at most " + high;
+    if (no_high) return std::string("a number ") + (param.low_open ? "greater than " : "of at least ") + low;
+    if (param.low_open) return "a number greater than " + low + " and at most " + high;
+    return "a number from " + low + " to " + high;
+}
+
+void CheckPoints(const LogicParamInfo& param, const std::vector<double>& values, Violations* bad) {
+    const std::string name = Quote(param.name);
+    if (param.kind == LogicParamInfo::kPolygon && (values.size() < 6 || values.size() % 2 != 0)) {
+        bad->Add(name + " must hold at least 3 points as x, y pairs (an even count of 6 numbers "
+                        "or more), got " + std::to_string(values.size()) + " numbers",
+                 param.help);
+        return;
+    }
+    if (param.kind == LogicParamInfo::kLine && values.size() != 4) {
+        bad->Add(name + " must hold exactly 2 points as x0, y0, x1, y1, got " +
+                     std::to_string(values.size()) + " numbers",
+                 param.help);
+        return;
+    }
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        if (std::isfinite(values[i]) && values[i] >= 0.0 && values[i] <= 1.0) continue;
+        bad->Add(name + " values are fractions of the frame from 0 to 1, got " +
+                     AsWritten(values[i]).dump() + " at [" + std::to_string(i) + "]",
+                 "0.5 is the middle of the frame; pixels are not accepted, so one graph fits "
+                 "any resolution");
+        return;
+    }
+    if (param.kind == LogicParamInfo::kLine && values[0] == values[2] && values[1] == values[3]) {
+        bad->Add(name + " needs two different points", param.help);
+    }
+}
+
+bool EventName(const std::string& text) {
+    if (text.empty() || text.size() > 64) return false;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        if (!std::isalnum(c) && c != '_' && c != '.' && c != ':' && c != '-') return false;
+    }
+    return true;
+}
+
+bool Identifier(const std::string& text) {
+    if (text.empty() || text.size() > 64) return false;
+    if (std::isdigit(static_cast<unsigned char>(text[0]))) return false;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        if (!std::isalnum(c) && c != '_') return false;
+    }
+    return true;
+}
+
+/// Every params value of a logic node against its op's table.
+void CheckLogicParams(const NodeSpec& node, Violations* bad) {
+    const LogicOpInfo& info = *FindLogicOp(node.op);  // ParseGraphText checked the op
+    std::vector<std::string> names;
+    for (std::size_t p = 0; p < info.params.size(); ++p) names.push_back(info.params[p].name);
+    std::set<std::string> given;
+    for (std::map<std::string, double>::const_iterator it = node.params.numeric.begin();
+         it != node.params.numeric.end(); ++it) given.insert(it->first);
+    for (std::map<std::string, std::string>::const_iterator it = node.params.text.begin();
+         it != node.params.text.end(); ++it) given.insert(it->first);
+    for (std::map<std::string, std::vector<std::string> >::const_iterator it =
+             node.params.lists.begin(); it != node.params.lists.end(); ++it) given.insert(it->first);
+    for (std::map<std::string, std::vector<double> >::const_iterator it = node.arrays.begin();
+         it != node.arrays.end(); ++it) given.insert(it->first);
+    for (std::set<std::string>::const_iterator key = given.begin(); key != given.end(); ++key) {
+        if (std::find(names.begin(), names.end(), *key) != names.end()) continue;
+        const std::string nearest = NearestName(*key, names);
+        bad->Add("unknown param " + Quote(*key) + " for op " + Quote(node.op),
+                 (nearest.empty() ? std::string() : "did you mean " + Quote(nearest) + "? ") +
+                     (names.empty() ? node.op + " takes no params"
+                                    : node.op + " accepts: " + JoinList(names)));
+    }
+    for (std::size_t p = 0; p < info.params.size(); ++p) {
+        const LogicParamInfo& param = info.params[p];
+        const bool as_number = node.params.numeric.count(param.name) != 0;
+        const bool as_text = node.params.text.count(param.name) != 0;
+        const bool as_list = node.params.lists.count(param.name) != 0;
+        const bool as_array = node.arrays.count(param.name) != 0;
+        if (!as_number && !as_text && !as_list && !as_array) {
+            if (param.required) bad->Add("missing param " + Quote(param.name), param.help);
+            continue;
+        }
+        switch (param.kind) {
+            case LogicParamInfo::kNumber: {
+                if (!as_number) {
+                    bad->Add(Quote(param.name) + " must be " + RangeText(param), param.help);
+                    break;
+                }
+                const double value = node.params.numeric.at(param.name);
+                const bool above = param.low_open ? value > param.low : value >= param.low;
+                if (!std::isfinite(value) || !above || value > param.high) {
+                    bad->Add(Quote(param.name) + " must be " + RangeText(param) + ", got " +
+                                 AsWritten(value).dump(),
+                             param.help);
+                }
+                break;
+            }
+            case LogicParamInfo::kText:
+                if (!as_text) bad->Add(Quote(param.name) + " must be a string", param.help);
+                break;
+            case LogicParamInfo::kChoice: {
+                if (!as_text) {
+                    bad->Add(Quote(param.name) + " must be one of " + JoinList(param.choices),
+                             param.help);
+                    break;
+                }
+                const std::string& value = node.params.text.at(param.name);
+                if (std::find(param.choices.begin(), param.choices.end(), value) ==
+                    param.choices.end()) {
+                    bad->Add(Quote(param.name) + " must be one of " + JoinList(param.choices) +
+                                 ", got " + Quote(value),
+                             param.help);
+                }
+                break;
+            }
+            case LogicParamInfo::kTextList:
+                if (!as_list) bad->Add(Quote(param.name) + " must be an array of strings", param.help);
+                break;
+            case LogicParamInfo::kPolygon:
+            case LogicParamInfo::kLine:
+                if (as_array) {
+                    CheckPoints(param, node.arrays.at(param.name), bad);
+                } else if (as_list && node.params.lists.at(param.name).empty()) {
+                    CheckPoints(param, std::vector<double>(), bad);
+                } else {
+                    bad->Add(Quote(param.name) + " must be an array of numbers", param.help);
+                }
+                break;
+        }
+    }
+    // Names that end up in event lines and, in Phase 3, in exported code.
+    std::map<std::string, std::string>::const_iterator text = node.params.text.find("event");
+    if (node.op == "condition" && text != node.params.text.end() && !text->second.empty() &&
+        !EventName(text->second)) {
+        bad->Add("\"event\" may hold letters, digits, _ . : - (1 to 64), got " +
+                     Quote(text->second),
+                 "it names the event in [EVENT] lines and in --events");
+    }
+    text = node.params.text.find("name");
+    if (node.op == "user" && text != node.params.text.end() && !Identifier(text->second)) {
+        bad->Add("\"name\" must be a C identifier, got " + Quote(text->second),
+                 FindLogicOp("user")->params[0].help);
+    }
+}
+
+/// The records numbers `node` writes, when its op says: a logic op's (a
+/// count also writes one per listed class) or a cpu op's.
+std::vector<std::string> RecordNumbers(const NodeSpec& node) {
+    std::vector<std::string> numbers;
+    const LogicOpInfo* info = node.is_logic ? FindLogicOp(node.op)
+                              : node.is_cpu ? FindCpuOpInfo(node.op)
+                                            : NULL;
+    if (info == NULL) return numbers;
+    numbers = info->numbers;
+    std::map<std::string, std::vector<std::string> >::const_iterator classes =
+        node.params.lists.find("classes");
+    if (node.is_logic && node.op == "count" && classes != node.params.lists.end()) {
+        numbers.insert(numbers.end(), classes->second.begin(), classes->second.end());
+    }
+    return numbers;
+}
+
+void CheckConditionValue(const NodeSpec& node, const LogicInputKind& in) {
+    std::map<std::string, std::string>::const_iterator it = node.params.text.find("value");
+    const std::string value = it == node.params.text.end() ? "count" : it->second;
+    const std::string where = "node \"" + node.id + "\" \"params\"";
+    if ((ProducesRoi(in.shape) && !in.per_crop) || (in.per_crop && in.shape != Shape::kScores)) {
+        if (value == "count") return;
+        throw GraphError(GraphErrorCode::kGraphSchema, where,
+                         "\"value\" is " + Quote(value) + ", and " + KindText(in.shape, in.per_crop) +
+                             " from \"" + in.from + "\" gives only \"count\"",
+                         "write \"value\": \"count\"");
+    }
+    if (in.per_crop) {
+        if (value == "count") return;
+        const bool with = value.compare(0, 5, "with:") == 0 && value.size() > 5;
+        const bool without = value.compare(0, 8, "without:") == 0 && value.size() > 8;
+        if (with || without) return;
+        throw GraphError(GraphErrorCode::kGraphSchema, where,
+                         "\"value\" is " + Quote(value) + ", and scores per crop from \"" +
+                             in.from + "\" give \"count\", \"with:<label>\" or \"without:<label>\"",
+                         "for example \"without:Hat\": the crops whose scores do not name Hat");
+    }
+    if (in.numbers.empty()) return;  // records whose numbers are not known here
+    if (std::find(in.numbers.begin(), in.numbers.end(), value) != in.numbers.end()) return;
+    throw GraphError(GraphErrorCode::kGraphSchema, where,
+                     "\"value\" is " + Quote(value) + ", a number \"" + in.from +
+                         "\" does not write",
+                     "\"" + in.from + "\" writes: " + JoinList(in.numbers));
+}
+
+const char kGalleryHow[] =
+    "build one from an image folder: python3 scripts/build_gallery_database.py "
+    "--variant <model> --images <folder> --out <file>.bin";
+
+void CheckGalleryFile(const NodeSpec& node, const LogicInputKind& in) {
+    const std::string where = "node \"" + node.id + "\" \"params\"";
+    const RetrievalGallery gallery = loadRetrievalGallery(node.params.text.at("gallery"));
+    if (!gallery.loaded) {
+        throw GraphError(GraphErrorCode::kGraphSchema, where, gallery.error, kGalleryHow);
+    }
+    if (in.model != NULL && !gallery.model.empty() && gallery.model != in.model->model_name) {
+        throw GraphError(GraphErrorCode::kGraphSchema, where,
+                         "the gallery was built by \"" + gallery.model + "\", but \"" + in.from +
+                             "\" runs \"" + in.model->model_name + "\"",
+                         "rebuild it with --variant " + in.model->model_name +
+                             ", or feed this node from a node that runs " + gallery.model);
+    }
+}
+
+void CheckUserKinds(const NodeSpec& node, const LogicInputKind& in) {
+    const std::string where = "node \"" + node.id + "\" \"params\"";
+    const std::string& input = node.params.text.at("input");
+    const std::string& output = node.params.text.at("output");
+    if (input != ToString(in.shape)) {
+        throw GraphError(GraphErrorCode::kGraphSchema, where,
+                         "\"input\" is " + Quote(input) + ", but \"" + in.from + "\" gives " +
+                             ToString(in.shape),
+                         "write \"input\": " + Quote(ToString(in.shape)));
+    }
+    if (output != input) {
+        throw GraphError(GraphErrorCode::kGraphSchema, where,
+                         "\"output\" is " + Quote(output) +
+                             ", and a user node passes its input through in a run",
+                         "write \"output\": " + Quote(input) +
+                             "; an exported project may change it");
+    }
+}
+
+/// A logic node's inputs: how many, of what kind, tracked when its op
+/// needs track ids, and its op's own rules.
+void CheckLogicInputs(const NodeSpec& node, const std::vector<LogicInputKind>& got) {
+    const LogicOpInfo& info = *FindLogicOp(node.op);
+    const std::string where = "node \"" + node.id + "\"";
+    const std::string connect =
+        "connect " + AcceptsText(info) + " with \"carry\": \"result\"";
+    std::string listed;
+    for (std::size_t i = 0; i < got.size(); ++i) {
+        if (i != 0) listed += ", ";
+        listed += KindText(got[i].shape, got[i].per_crop) + " from \"" + got[i].from + "\"";
+    }
+    const int count = static_cast<int>(got.size());
+    if (count < info.min_inputs || count > info.max_inputs) {
+        std::ostringstream what;
+        what << node.op << " takes ";
+        if (info.min_inputs == info.max_inputs) {
+            what << info.min_inputs;
+        } else {
+            what << info.min_inputs << " to " << info.max_inputs;
+        }
+        what << (info.max_inputs == 1 ? " input" : " inputs") << ", got "
+             << (listed.empty() ? std::string("nothing") : listed);
+        throw GraphError(GraphErrorCode::kGraphEdge, where, what.str(), connect);
+    }
+    for (std::size_t i = 0; i < got.size(); ++i) {
+        if (!Accepts(info, got[i])) {
+            throw GraphError(GraphErrorCode::kGraphEdge,
+                             "edge \"" + got[i].from + "\"->\"" + node.id + "\"",
+                             node.op + " accepts " + AcceptsText(info) + ", got " +
+                                 KindText(got[i].shape, got[i].per_crop) + " from \"" +
+                                 got[i].from + "\"",
+                             connect);
+        }
+        if (info.needs_tracking && !got[i].tracked) {
+            throw GraphError(GraphErrorCode::kGraphEdge, where,
+                             node.op + " needs track ids, and the boxes from \"" + got[i].from +
+                                 "\" have none",
+                             got[i].box_node.empty()
+                                 ? std::string("feed it boxes from a detector with \"track\"")
+                                 : "add \"track\": {\"algo\": \"iou\"} to node \"" +
+                                       got[i].box_node + "\"");
+        }
+    }
+    if (node.op == "condition") CheckConditionValue(node, got[0]);
+    if (node.op == "gallery") CheckGalleryFile(node, got[0]);
+    if (node.op == "user") CheckUserKinds(node, got[0]);
+}
+
+}  // namespace
+
 std::map<std::string, std::string> SharedEngineOwners(const GraphSpec& spec,
                                                       const IModelRegistry& registry) {
     std::map<std::string, std::string> owner_of;
@@ -1256,7 +1629,7 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
         } else if (node.is_cpu) {
             entry.output_shape = Shape::kRecords;
         } else if (node.is_logic) {
-            entry.output_shape = Shape::kRecords;  // Task 4: from its input, after step 3
+            entry.output_shape = Shape::kRecords;  // step 3b: from its input
         } else {
             const ModelInfo* info = registry.find(node.model);
             if (info == NULL) {
@@ -1344,7 +1717,12 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
     for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
         const NodeSpec& node = spec.nodes[i];
         if (node.is_source) continue;
-        if (node.is_logic) continue;  // Task 4: CheckLogicParams
+        if (node.is_logic) {
+            Violations logic_bad;
+            CheckLogicParams(node, &logic_bad);
+            logic_bad.ThrowIfAny("node \"" + node.id + "\" \"params\"");
+            continue;
+        }
         if (node.is_cpu) {
             Violations cpu_bad;
             CheckCpuParams(node, &cpu_bad);
@@ -1426,6 +1804,16 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
                          "a graph must be acyclic");
     }
 
+    // 3b. A logic node's output shape: filter, zone and user hand on their
+    // input's (boxes stay boxes, instances stay instances), the others
+    // write records. Needs an acyclic graph, which step 3 just proved.
+    for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
+        if (spec.nodes[i].is_logic) {
+            resolved[spec.nodes[i].id].output_shape =
+                NodeOutputShape(spec, registry, spec.nodes[i].id);
+        }
+    }
+
     // has_roi_in/has_frame_in are needed both by the plain-edge branch below
     // (a per-crop node cannot hand off an image on a plain edge) and by step
     // 4b (a node fed both a frame and crops of that frame), so they are
@@ -1442,6 +1830,7 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
         }
     }
 
+    std::map<std::string, std::vector<LogicInputKind> > logic_inputs;
     // 4. Shape and input-contract compatibility.
     std::map<std::string, std::vector<Shape> > carried;
     for (std::size_t i = 0; i < spec.edges.size(); ++i) {
@@ -1503,7 +1892,19 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
                                  "\"" + edge.from + "\" is a source and produces a frame, not a result",
                                  "carry the result of a model node");
             }
-            if (consumer.spec->is_logic) continue;  // Task 4: its inputs are checked there
+            if (consumer.spec->is_logic) {
+                LogicInputKind kind;
+                kind.from = edge.from;
+                kind.shape = out_shape;
+                kind.per_crop = has_roi_in.count(edge.from) != 0;
+                const NodeSpec* box_source = BoxSourceNode(spec, edge.from);
+                kind.tracked = box_source != NULL && box_source->track.present;
+                kind.box_node = box_source != NULL ? box_source->id : std::string();
+                kind.model = producer.info;
+                kind.numbers = RecordNumbers(*producer.spec);
+                logic_inputs[edge.to].push_back(kind);
+                continue;
+            }
             carried[edge.to].push_back(out_shape);
             continue;
         }
@@ -1531,17 +1932,21 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
                         edge.port + "\" of \"" + edge.from + "\" carries none",
                     "remove \"align\", or crop from \"" + edge.from + "\"'s primary boxes");
             }
+            // A logic producer (filter, zone, user) hands on the boxes of the
+            // model behind it, landmarks included.
+            const NodeSpec* box_source = BoxSourceNode(spec, edge.from);
+            const ModelInfo* landmarks_from =
+                producer.info != NULL
+                    ? producer.info
+                    : (box_source != NULL ? registry.find(box_source->model) : NULL);
             if (!edge.roi.align.empty() &&
-                (producer.info == NULL || !producer.info->produces_landmarks)) {
-                // A source never gets here (ProducesRoi(kFrame) is false). A
-                // logic producer has no model entry: Task 4 looks through it
-                // to the model its boxes come from.
+                (landmarks_from == NULL || !landmarks_from->produces_landmarks)) {
                 throw GraphError(
                     GraphErrorCode::kGraphAlign, label,
                     "\"align\": \"face5\" needs five facial landmarks, and " +
-                        (producer.info == NULL
+                        (landmarks_from == NULL
                              ? "\"" + edge.from + "\" carries none"
-                             : "model \"" + producer.info->model_name +
+                             : "model \"" + landmarks_from->model_name +
                                    "\" produces no landmarks"),
                     "remove \"align\", or use a face detector as the source");
             }
@@ -1612,6 +2017,13 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
         const std::vector<Shape> none;
         std::map<std::string, std::vector<Shape> >::const_iterator got = carried.find(spec.nodes[i].id);
         CheckCpuInputs(spec.nodes[i], got == carried.end() ? none : got->second);
+    }
+    for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
+        if (!spec.nodes[i].is_logic) continue;
+        const std::vector<LogicInputKind> none;
+        std::map<std::string, std::vector<LogicInputKind> >::const_iterator got =
+            logic_inputs.find(spec.nodes[i].id);
+        CheckLogicInputs(spec.nodes[i], got == logic_inputs.end() ? none : got->second);
     }
 
     // 4a. One full-frame input image per node IN EACH STREAM (SP2). A stream
