@@ -316,6 +316,11 @@ namespace {
 
 /// A track not seen for this long (stream seconds) is forgotten.
 const double kForgetAfterS = 5.0;
+/// Slack for comparing stream times. A file's frame k is at k / fps, and
+/// the difference of two such times can miss a whole number of frame
+/// periods by a rounding error: 1 s at 30 fps would then hold one frame
+/// late. Every time threshold below is compared with this much slack.
+const double kTimeSlackS = 1e-6;
 
 double Number(const LogicConfig& c, const char* key) {
     std::map<std::string, double>::const_iterator it = c.numbers.find(key);
@@ -425,7 +430,7 @@ template <typename OnForget>
 void Forget(LogicState* s, const std::set<int>& seen, double now, double after,
             OnForget on_forget) {
     for (std::map<int, TrackMemo>::iterator it = s->tracks.begin(); it != s->tracks.end();) {
-        if (seen.count(it->first) == 0 && now - it->second.last_s > after) {
+        if (seen.count(it->first) == 0 && now - it->second.last_s > after + kTimeSlackS) {
             on_forget(it->first, it->second);
             it = s->tracks.erase(it);
         } else {
@@ -645,7 +650,7 @@ LogicOutput RunDwell(const LogicConfig& c, const std::vector<LogicInput>& inputs
             if (item.track_id < 0) continue;
             seen.insert(item.track_id);
             std::map<int, TrackMemo>::iterator found = s->tracks.find(item.track_id);
-            if (found == s->tracks.end() || at.time_s - found->second.last_s > grace) {
+            if (found == s->tracks.end() || at.time_s - found->second.last_s > grace + kTimeSlackS) {
                 TrackMemo stay;  // a new stay: first seen now
                 stay.first_s = at.time_s;
                 s->tracks[item.track_id] = stay;
@@ -659,7 +664,7 @@ LogicOutput RunDwell(const LogicConfig& c, const std::vector<LogicInput>& inputs
             AddNumber(&row, "track_id", static_cast<double>(item.track_id));
             AddNumber(&row, "seconds", seconds);
             records->items.push_back(row);
-            const bool over = seconds >= threshold;
+            const bool over = seconds >= threshold - kTimeSlackS;
             if (over && !memo.reported) {
                 memo.reported = true;
                 GraphEvent event = MakeEvent(c, "dwell", item.track_id, at);
@@ -768,7 +773,8 @@ LogicOutput RunCondition(const LogicConfig& c, const std::vector<LogicInput>& in
     // cooldown 0: once, when it becomes true; else at most every cooldown_s while true.
     const bool fire = active && (cooldown <= 0.0
                                      ? !s->was_true
-                                     : (!s->fired || at.time_s - s->last_fire_s >= cooldown));
+                                     : (!s->fired ||
+                                        at.time_s - s->last_fire_s >= cooldown - kTimeSlackS));
     s->was_true = active;
     const std::string name = Text(c, "event").empty() ? c.id : Text(c, "event");
     if (fire) {
@@ -810,7 +816,11 @@ std::string GalleryName(const RetrievalGallery& gallery, std::size_t row) {
     return stem.empty() ? "entry_" + std::to_string(row) : stem;
 }
 
-/// The nearest gallery row by cosine similarity. False when the widths differ.
+/// BestMatch's row for a query with no direction (all zeros).
+const std::size_t kNoMatch = static_cast<std::size_t>(-1);
+
+/// The nearest gallery row by cosine similarity. False when the widths
+/// differ. A zero vector matches no row (*row = kNoMatch, *score = 0).
 bool BestMatch(const RetrievalGallery& gallery, const std::vector<float>& vector,
                std::size_t* row, double* score) {
     if (gallery.count <= 0 || static_cast<int>(vector.size()) != gallery.dim) return false;
@@ -819,7 +829,7 @@ bool BestMatch(const RetrievalGallery& gallery, const std::vector<float>& vector
         norm += static_cast<double>(vector[d]) * vector[d];
     }
     norm = std::sqrt(norm);
-    *row = 0;
+    *row = kNoMatch;
     *score = 0.0;
     if (norm <= 1e-12) return true;
     double best = -2.0;
@@ -875,7 +885,7 @@ LogicOutput RunGallery(const LogicConfig& c, const std::vector<LogicInput>& inpu
             continue;
         }
         const RoiRef& origin = queries[q].second;
-        const bool known = score >= threshold;
+        const bool known = row != kNoMatch && score >= threshold;
         const std::string name = known ? GalleryName(*c.gallery, row) : "unknown";
         RecordItem item;
         AddNumber(&item, "track_id", static_cast<double>(origin.track_id));

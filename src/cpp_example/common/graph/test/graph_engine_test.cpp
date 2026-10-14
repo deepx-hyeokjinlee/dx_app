@@ -13658,6 +13658,333 @@ void TestOnlyLogicNodesThatDrawHaveAnOverlay() {
     GRAPH_CHECK(cv::countNonZero(RenderReport(black, filtered).reshape(1)) == 0);
 }
 
+namespace {
+
+/// A logic node's typed config, from its op and number params.
+LogicConfig ConfigOf(const std::string& op, const std::map<std::string, double>& numbers) {
+    NodeSpec node;
+    node.id = op.substr(0, 1);
+    node.is_logic = true;
+    node.op = op;
+    node.params.numeric = numbers;
+    if (op == "zone") {
+        const double half[] = {0.5, 0, 1, 0, 1, 1, 0.5, 1};
+        node.arrays["polygon"].assign(half, half + 8);
+    }
+    if (op == "line") {
+        const double middle[] = {0.5, 1, 0.5, 0};
+        node.arrays["line"].assign(middle, middle + 4);
+    }
+    return MakeLogicConfig(node);
+}
+
+/// One full-frame boxes input: a person at x (none for x < 0) with `track`.
+std::vector<LogicInput> PersonInput(float x, int track) {
+    std::shared_ptr<BoxesData> boxes = LogicPersonAt(x);
+    if (!boxes->items.empty()) boxes->items[0].track_id = track;
+    LogicInput input;
+    input.from = "od";
+    input.data = boxes;
+    return std::vector<LogicInput>(1, input);
+}
+
+/// Frame k of a 640x480 stream at `fps`: the time StageGraph::FrameTime gives.
+LogicFrame FrameAt(std::size_t k, double fps) {
+    LogicFrame at;
+    at.frame_size = cv::Size(640, 480);
+    at.time_s = static_cast<double>(k) / fps;
+    return at;
+}
+
+}  // namespace
+
+// Stream time is k / fps: a threshold that is a whole number of frames is
+// reached on that frame, never one later because of rounding.
+void TestTimeThresholdsHoldOnTheFrameTheyAreDue() {
+    const double kFps = 30.0;
+    const double cooldowns[] = {0.1, 1.0};
+    for (std::size_t c = 0; c < 2; ++c) {
+        std::map<std::string, double> numbers;
+        numbers["cooldown_s"] = cooldowns[c];
+        const LogicConfig condition = ConfigOf("condition", numbers);
+        const std::size_t period = static_cast<std::size_t>(std::lround(cooldowns[c] * kFps));
+        LogicState state;
+        std::size_t late = 0;
+        for (std::size_t k = 0; k < 3000; ++k) {
+            const LogicOutput out = RunLogic(condition, PersonInput(400.f, -1), FrameAt(k, kFps),
+                                             &state);
+            if (!out.events.empty() != (k % period == 0)) ++late;
+        }
+        GRAPH_CHECK(late == 0);
+    }
+    const double thresholds[] = {0.1, 1.0};
+    for (std::size_t t = 0; t < 2; ++t) {
+        std::map<std::string, double> numbers;
+        numbers["threshold_s"] = thresholds[t];
+        const LogicConfig dwell = ConfigOf("dwell", numbers);
+        const std::size_t due = static_cast<std::size_t>(std::lround(thresholds[t] * kFps));
+        std::size_t wrong = 0;
+        for (std::size_t start = 0; start < 300; ++start) {
+            LogicState state;
+            for (std::size_t k = start; k <= start + due; ++k) {
+                const LogicOutput out = RunLogic(dwell, PersonInput(400.f, 1), FrameAt(k, kFps),
+                                                 &state);
+                if (!out.events.empty() != (k == start + due)) ++wrong;
+            }
+        }
+        GRAPH_CHECK(wrong == 0);
+    }
+    // A gap of exactly grace_s keeps the stay.
+    std::map<std::string, double> numbers;
+    numbers["threshold_s"] = 100.0;
+    numbers["grace_s"] = 0.1;
+    const LogicConfig dwell = ConfigOf("dwell", numbers);
+    std::size_t restarted = 0;
+    for (std::size_t start = 0; start < 300; ++start) {
+        LogicState state;
+        RunLogic(dwell, PersonInput(400.f, 1), FrameAt(start, kFps), &state);
+        const LogicOutput back = RunLogic(dwell, PersonInput(400.f, 1), FrameAt(start + 3, kFps),
+                                          &state);
+        const RecordsData* rows = dynamic_cast<const RecordsData*>(back.result.data.get());
+        if (rows == NULL || rows->items.size() != 1 ||
+            NumberOf(rows->items[0], "seconds") <= 0.0) {
+            ++restarted;
+        }
+    }
+    GRAPH_CHECK(restarted == 0);
+}
+
+// Decision 11: a track unseen for more than 5 s is forgotten. A zone says
+// "exit" for one that was inside; a line and a dwell drop its memory.
+void TestLogicForgetsATrackAfterFiveSeconds() {
+    const double kFps = 30.0;
+    const LogicConfig zone = ConfigOf("zone", std::map<std::string, double>());
+    LogicState zone_state;
+    std::vector<std::size_t> exits;
+    for (std::size_t k = 0; k < 200; ++k) {
+        const LogicOutput out = RunLogic(zone, PersonInput(k < 10 ? 400.f : -1.f, 3),
+                                         FrameAt(k, kFps), &zone_state);
+        for (std::size_t e = 0; e < out.events.size(); ++e) {
+            if (out.events[e].event == "exit") exits.push_back(k);
+        }
+        if (k == 159) GRAPH_CHECK(zone_state.tracks.size() == 1);  // 150 frames: 5 s exactly
+    }
+    // Last seen at frame 9; frame 160 is the first more than 5 s later.
+    GRAPH_CHECK(exits.size() == 1 && exits[0] == 160);
+    GRAPH_CHECK(zone_state.tracks.empty());
+
+    // A line: left of the middle at frame 0, then gone. Back on the right
+    // within 5 s it crosses; after 5 s it is a new track and does not.
+    const LogicConfig line = ConfigOf("line", std::map<std::string, double>());
+    const std::size_t returns[] = {100, 200};
+    for (std::size_t r = 0; r < 2; ++r) {
+        LogicState state;
+        std::size_t crossings = 0;
+        for (std::size_t k = 0; k <= returns[r]; ++k) {
+            const float x = k == 0 ? 200.f : (k == returns[r] ? 400.f : -1.f);
+            crossings += RunLogic(line, PersonInput(x, 3), FrameAt(k, kFps), &state).events.size();
+            if (k + 1 == returns[r]) GRAPH_CHECK(state.tracks.size() == (r == 0 ? 1u : 0u));
+        }
+        GRAPH_CHECK(crossings == (r == 0 ? 1u : 0u));
+    }
+
+    // A dwell with grace 1 s forgets after max(5, 1) s.
+    std::map<std::string, double> numbers;
+    numbers["grace_s"] = 1.0;
+    const LogicConfig dwell = ConfigOf("dwell", numbers);
+    LogicState dwell_state;
+    for (std::size_t k = 0; k < 170; ++k) {
+        RunLogic(dwell, PersonInput(k == 0 ? 400.f : -1.f, 3), FrameAt(k, kFps), &dwell_state);
+        if (k == 150) GRAPH_CHECK(dwell_state.tracks.size() == 1);
+    }
+    GRAPH_CHECK(dwell_state.tracks.empty());
+}
+
+// Two streams through one zone, interleaved frame by frame: each keeps its
+// own tracks, in both executors.
+void TestTwoStreamsKeepTheirOwnLogicState() {
+    const std::string text =
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam1\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"cam2\",\"type\":\"source\",\"uri\":\"b.jpg\"},"
+        "{\"id\":\"od\",\"model\":\"det\",\"track\":{\"algo\":\"iou\"}}" + std::string(kZoneNode) +
+        "],\"edges\":[{\"from\":\"cam1\",\"to\":\"od\"},{\"from\":\"cam2\",\"to\":\"od\"}" +
+        std::string(kOdToZ) + "]}";
+    FakeModelRegistry registry = LogicRegistry();          // stream 0 walks keys 0..5
+    registry.SetScriptByFirstPixel("det", 10, LogicPersonAt(500.f));  // stream 1 stays inside
+    const GraphSpec spec = ParseGraphText(text, "two.json");
+    ValidateGraph(spec, registry);
+    std::vector<FrameReport> runs[2];
+    for (int async = 0; async < 2; ++async) {
+        FakeModelRegistry used = registry;
+        if (async) used.SetDeliveryOrder("det", FakeModelRegistry::kReverse);
+        StageGraph graph;
+        graph.Build(spec, used, "/models", false);
+        graph.SetStreamClock(0, 10.0, false);
+        graph.SetStreamClock(1, 10.0, false);
+        if (!async) {
+            SyncExecutor executor;
+            for (std::size_t i = 0; i < 6; ++i) {
+                runs[0].push_back(executor.RunFrame(graph, 0, FrameWithKey(static_cast<int>(i)), i));
+                runs[0].push_back(executor.RunFrame(graph, 1, FrameWithKey(10), i));
+            }
+        } else {
+            AsyncExecutor executor(Frames(4));
+            for (std::size_t i = 0; i < 6; ++i) {
+                executor.Submit(graph, 0, FrameWithKey(static_cast<int>(i)), i);
+                executor.Submit(graph, 1, FrameWithKey(10), i);
+            }
+            executor.Finish(graph);
+            FrameReport report;
+            while (executor.TryNext(&report)) runs[1].push_back(report);
+        }
+    }
+    GRAPH_CHECK(runs[0].size() == 12 && runs[1].size() == 12);
+    if (runs[0].size() != 12 || runs[1].size() != 12) return;
+    std::vector<std::string> first;   // stream cam1: "frame event"
+    std::vector<std::string> second;  // stream cam2
+    for (std::size_t i = 0; i < 12; ++i) {
+        GRAPH_CHECK(runs[0][i] == runs[1][i]);
+        const FrameReport& report = runs[0][i];
+        for (std::size_t e = 0; e < report.events.size(); ++e) {
+            const std::string row = std::to_string(report.frame_index) + " " + report.events[e].event;
+            (report.stream == "cam1" ? first : second).push_back(row);
+        }
+    }
+    GRAPH_CHECK(first.size() == 2 && first[0] == "2 enter" && first[1] == "5 exit");
+    GRAPH_CHECK(second.size() == 1 && second[0] == "0 enter");
+}
+
+// A condition on records: a line's "in", a count's "total" reduced over its
+// rows, a dwell's longest "seconds".
+void TestConditionReadsRecordsNumbers() {
+    const std::vector<FrameReport> lined = RunLogicFrames(LogicJson(
+        std::string(kLineNode) +
+            ConditionNode("{\"value\":\"in\",\"comparator\":\">\",\"threshold\":0}"),
+        std::string(kOdToL) + ",{\"from\":\"l\",\"to\":\"c\",\"carry\":\"result\"}"),
+        LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(lined.size() == 6);
+    if (lined.size() != 6) return;
+    for (std::size_t i = 0; i < 6; ++i) {
+        const RecordsData* records = RecordsOf(lined[i], "c");
+        GRAPH_CHECK(records != NULL && records->items.size() == 1 &&
+                    NumberOf(records->items[0], "value") == (i >= 2 ? 1.0 : 0.0));
+    }
+    std::vector<std::size_t> fired;
+    for (std::size_t i = 0; i < 6; ++i) {
+        for (std::size_t e = 0; e < lined[i].events.size(); ++e) {
+            if (lined[i].events[e].node == "c") fired.push_back(i);
+        }
+    }
+    GRAPH_CHECK(fired.size() == 1 && fired[0] == 2);
+
+    // count over the two halves: one person in all, so "sum" is 1 and "min" 0.
+    const std::string halves =
+        ",{\"id\":\"left\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":"
+        "[0,0,0.5,0,0.5,1,0,1]}}"
+        ",{\"id\":\"right\",\"type\":\"logic\",\"op\":\"zone\",\"params\":{\"polygon\":"
+        "[0.5,0,1,0,1,1,0.5,1]}}"
+        ",{\"id\":\"n\",\"type\":\"logic\",\"op\":\"count\"}";
+    const std::string half_edges =
+        ",{\"from\":\"od\",\"to\":\"left\",\"carry\":\"result\"},"
+        "{\"from\":\"od\",\"to\":\"right\",\"carry\":\"result\"},"
+        "{\"from\":\"left\",\"to\":\"n\",\"carry\":\"result\"},"
+        "{\"from\":\"right\",\"to\":\"n\",\"carry\":\"result\"},"
+        "{\"from\":\"n\",\"to\":\"c\",\"carry\":\"result\"}";
+    const char* reduces[] = {"sum", "min", "max"};
+    const double values[] = {1.0, 0.0, 1.0};
+    for (std::size_t r = 0; r < 3; ++r) {
+        const std::vector<FrameReport> counted = RunLogicFrames(LogicJson(
+            halves + ConditionNode(std::string("{\"value\":\"total\",\"reduce\":\"") + reduces[r] +
+                                   "\",\"comparator\":\"==\",\"threshold\":1}"),
+            half_edges), LogicRegistry(), Keys(6), false);
+        GRAPH_CHECK(counted.size() == 6);
+        for (std::size_t i = 0; i < counted.size(); ++i) {
+            const RecordsData* records = RecordsOf(counted[i], "c");
+            GRAPH_CHECK(records != NULL && records->items.size() == 1 &&
+                        NumberOf(records->items[0], "value") == values[r] &&
+                        NumberOf(records->items[0], "active") == (values[r] == 1.0 ? 1.0 : 0.0));
+        }
+    }
+
+    // dwell's longest stay in the zone reaches 0.15 s on frame 4.
+    const std::vector<FrameReport> dwelled = RunLogicFrames(LogicJson(
+        std::string(kZoneNode) +
+            ",{\"id\":\"d\",\"type\":\"logic\",\"op\":\"dwell\",\"params\":{\"threshold_s\":10}}" +
+            ConditionNode("{\"value\":\"seconds\",\"reduce\":\"max\",\"comparator\":\">=\","
+                          "\"threshold\":0.15,\"event\":\"loiter\"}"),
+        std::string(kOdToZ) + ",{\"from\":\"z\",\"to\":\"d\",\"carry\":\"result\"},"
+                              "{\"from\":\"d\",\"to\":\"c\",\"carry\":\"result\"}"),
+        LogicRegistry(), Keys(6), false);
+    std::vector<std::size_t> loiter;
+    for (std::size_t i = 0; i < dwelled.size(); ++i) {
+        for (std::size_t e = 0; e < dwelled[i].events.size(); ++e) {
+            if (dwelled[i].events[e].event == "loiter") loiter.push_back(i);
+        }
+    }
+    GRAPH_CHECK(loiter.size() == 1 && loiter[0] == 4);
+}
+
+namespace {
+
+LogicConfig GalleryConfig(const std::string& path, double threshold) {
+    NodeSpec node;
+    node.id = "g";
+    node.is_logic = true;
+    node.op = "gallery";
+    node.params.text["gallery"] = path;
+    node.params.numeric["threshold"] = threshold;
+    return MakeLogicConfig(node);
+}
+
+/// One per-crop input: a crop of track `track` with `vector`.
+std::vector<LogicInput> CropOf(const std::shared_ptr<VectorData>& vector, int track) {
+    StageResult crop;
+    crop.data = vector;
+    crop.origin.from_roi = true;
+    crop.origin.track_id = track;
+    crop.origin.src_box = cv::Rect2f(10.f, 10.f, 40.f, 60.f);
+    LogicInput input;
+    input.from = "e";
+    input.per_crop = true;
+    input.crops.push_back(crop);
+    return std::vector<LogicInput>(1, input);
+}
+
+}  // namespace
+
+void TestGalleryMatchesOnlyAVectorWithADirection() {
+    const std::string path =
+        WriteGallery("logic_gallery2.bin", "emb", AliceAndBob(), AliceAndBobLabels());
+    // A zero vector points nowhere: "unknown", even when any score would do.
+    const LogicConfig any = GalleryConfig(path, 0.0);
+    LogicState state;
+    const LogicOutput zero =
+        RunLogic(any, CropOf(Embedding(0.f, 0.f, 0.f, 0.f), 1), FrameAt(0, 10.0), &state);
+    const RecordsData* rows = dynamic_cast<const RecordsData*>(zero.result.data.get());
+    GRAPH_CHECK(zero.error.empty() && zero.events.empty());
+    GRAPH_CHECK(rows != NULL && rows->items.size() == 1 && TextOf(rows->items[0], "name") == "unknown");
+    // A track that turns from alice into bob is announced again, as bob.
+    const LogicConfig gallery = GalleryConfig(path, 0.5);
+    LogicState named;
+    std::vector<std::string> said;
+    for (std::size_t k = 0; k < 4; ++k) {
+        const std::shared_ptr<VectorData> who =
+            k < 2 ? Embedding(1.f, 0.f, 0.f, 0.f) : Embedding(0.f, 1.f, 0.f, 0.f);
+        const LogicOutput out = RunLogic(gallery, CropOf(who, 7), FrameAt(k, 10.0), &named);
+        for (std::size_t e = 0; e < out.events.size(); ++e) {
+            said.push_back(std::to_string(k) + " " + out.events[e].event + " " +
+                           TextOf(out.events[e].data, "name"));
+        }
+    }
+    GRAPH_CHECK(said.size() == 2 && said[0] == "0 match alice" && said[1] == "2 match bob");
+    // A vector of another width is an error that names both widths.
+    std::shared_ptr<VectorData> short_vector(new VectorData());
+    short_vector->values.assign(3, 1.f);
+    const LogicOutput wrong = RunLogic(gallery, CropOf(short_vector, 7), FrameAt(5, 10.0), &named);
+    GRAPH_CHECK(wrong.error == "a vector of 3 values, but the gallery holds 4");
+    std::remove(path.c_str());
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -14051,6 +14378,11 @@ int main() {
     TestABooleanOnALogicNodeGetsItsParamsHint();
     TestCountRejectsTotalAndRepeatedClasses();
     TestOnlyLogicNodesThatDrawHaveAnOverlay();
+    TestTimeThresholdsHoldOnTheFrameTheyAreDue();
+    TestLogicForgetsATrackAfterFiveSeconds();
+    TestTwoStreamsKeepTheirOwnLogicState();
+    TestConditionReadsRecordsNumbers();
+    TestGalleryMatchesOnlyAVectorWithADirection();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
