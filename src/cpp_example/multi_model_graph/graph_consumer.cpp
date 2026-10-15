@@ -14,6 +14,7 @@
 
 #include "common/graph/shape.hpp"
 #include "common/inputs/input_factory.hpp"
+#include "common/utility/repo_path.hpp"
 
 namespace dxapp {
 namespace graph {
@@ -21,7 +22,7 @@ namespace consumer {
 
 using nlohmann::json;
 
-std::string ProjectRoot() { return std::string(PROJECT_ROOT_DIR); }
+std::string ProjectRoot() { return ::dxapp::RuntimeRoot(); }
 
 bool FileExists(const std::string& path) {
     std::ifstream probe(path.c_str(), std::ios::binary);

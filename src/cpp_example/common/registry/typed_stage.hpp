@@ -137,7 +137,7 @@ inline std::string StageConfigPath(const ModelInfo& info) {
         throw std::runtime_error("ModelInfo for \"" + info.model_name +
                                  "\" has no family/variant: cannot locate its config.json");
     }
-    return std::string(PROJECT_ROOT_DIR) + "/src/cpp_example/" + info.task + "/" +
+    return ::dxapp::RuntimeRoot() + "/src/cpp_example/" + info.task + "/" +
            info.family + "/" + info.variant + "/config.json";
 }
 
@@ -418,7 +418,7 @@ using ::dxapp::IsAbsolutePath;  // common/utility/repo_path.hpp
 /**
  * @brief `params`, with a relative "gallery" read against `root`.
  *
- * --check looks a gallery up under the repository (PROJECT_ROOT_DIR), while
+ * --check looks a gallery up under the repository (RuntimeRoot()), while
  * the postprocessor opens whatever path it is given, relative to the
  * working directory. So a relative node param is made absolute here, and a
  * relative config.json value a node does not override is added as one, so
@@ -454,7 +454,7 @@ void ConfigureFactory(F* factory, const ModelInfo& info, const StageParams& para
     if (file_config.isLoaded()) factory->loadConfig(file_config);
 
     const std::string overlay = ParamsToJson(
-        GalleryAgainstRoot(params, file_config, PROJECT_ROOT_DIR), file_config.rawArrays());
+        GalleryAgainstRoot(params, file_config, ::dxapp::RuntimeRoot()), file_config.rawArrays());
     if (overlay.empty()) return;
     // loadConfig reads every key with the factory's CURRENT value as the
     // default, so a second call carrying only the overridden keys leaves

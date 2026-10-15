@@ -48,7 +48,9 @@ namespace dxapp {
 namespace graph {
 namespace consumer {
 
-/// The repository root this build was configured from (PROJECT_ROOT_DIR).
+/// The root repository-relative paths are read against: RuntimeRoot()
+/// (common/utility/repo_path.hpp), the build's repository unless $DXAPP_ROOT
+/// says otherwise or the program is an exported project.
 std::string ProjectRoot();
 
 /// True when `path` can be opened for reading.

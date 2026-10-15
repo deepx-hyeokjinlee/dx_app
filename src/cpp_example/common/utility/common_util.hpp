@@ -27,6 +27,7 @@
 #include "common/utility/interrupt_flag.hpp"
 #include "common/utility/display_pump.hpp"
 #include "common/utility/camera.hpp"
+#include "common/utility/repo_path.hpp"
 
 #if __cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
 #include <filesystem>
@@ -839,7 +840,7 @@ inline ExampleModelRef resolveExampleModel(const std::string& argv0) {
     ExampleModelRef ref;
     std::string key = exampleKeyFromArgv0(argv0);
     if (key.empty()) return ref;
-    fs::path reg = fs::path(PROJECT_ROOT_DIR) / "config" / "model_registry.json";
+    fs::path reg = fs::path(::dxapp::RuntimeRoot()) / "config" / "model_registry.json";
     std::ifstream registryFile(reg);
     if (!registryFile.is_open()) return ref;
     std::string content((std::istreambuf_iterator<char>(registryFile)),

@@ -32,6 +32,7 @@
 #define GALLERY_RETRIEVAL_POSTPROCESSOR_HPP
 
 #include "common/base/i_processor.hpp"
+#include "common/utility/repo_path.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -98,10 +99,8 @@ inline std::string resolveGalleryFile(const std::string& path) {
     if (path.empty()) return path;
     gallery_fs::path given(path);
     if (gallery_fs::exists(given)) return given.string();
-#if defined(PROJECT_ROOT_DIR)
-    gallery_fs::path rooted = gallery_fs::path(PROJECT_ROOT_DIR) / given;
+    gallery_fs::path rooted = gallery_fs::path(::dxapp::RuntimeRoot()) / given;
     if (gallery_fs::exists(rooted)) return rooted.string();
-#endif
     return path;
 }
 

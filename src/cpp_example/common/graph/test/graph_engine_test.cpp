@@ -14768,6 +14768,86 @@ void TestLayerFileNames() {
     GRAPH_CHECK(cli::LayersStem("", "g/fanout_od_seg_depth.json") == "fanout_od_seg_depth");
 }
 
+// ---------------------------------------------------------------------
+// Phase 3: the runtime root (common/utility/repo_path.hpp)
+// ---------------------------------------------------------------------
+
+namespace {
+
+/// Sets $DXAPP_ROOT for one scope (NULL: unset) and puts the old value back.
+class RootEnv {
+ public:
+    explicit RootEnv(const char* value) : had_(false) {
+        const char* old = std::getenv("DXAPP_ROOT");
+        if (old != NULL) {
+            had_ = true;
+            old_ = old;
+        }
+        if (value == NULL) {
+            ::unsetenv("DXAPP_ROOT");
+        } else {
+            ::setenv("DXAPP_ROOT", value, 1);
+        }
+    }
+    ~RootEnv() {
+        if (had_) {
+            ::setenv("DXAPP_ROOT", old_.c_str(), 1);
+        } else {
+            ::unsetenv("DXAPP_ROOT");
+        }
+    }
+
+ private:
+    bool had_;
+    std::string old_;
+};
+
+}  // namespace
+
+void TestRuntimeRootIsDxappRootElseTheBuildsRepository() {
+    {
+        RootEnv unset(NULL);
+        GRAPH_CHECK(::dxapp::RuntimeRoot() == std::string(PROJECT_ROOT_DIR));
+        GRAPH_CHECK(consumer::ProjectRoot() == std::string(PROJECT_ROOT_DIR));
+    }
+    {
+        RootEnv empty("");
+        GRAPH_CHECK(::dxapp::RuntimeRoot() == std::string(PROJECT_ROOT_DIR));
+    }
+    RootEnv moved("/opt/exported");
+    GRAPH_CHECK(::dxapp::RuntimeRoot() == "/opt/exported");
+    GRAPH_CHECK(::dxapp::ResolveRepoRelative("sample/img/a.jpg") == "/opt/exported/sample/img/a.jpg");
+    GRAPH_CHECK(::dxapp::ResolveRepoRelative("/abs/a.jpg") == "/abs/a.jpg");
+    GRAPH_CHECK(consumer::ProjectRoot() == "/opt/exported");
+    GRAPH_CHECK(consumer::DefaultModelDir() == "/opt/exported/assets/models");
+    ModelInfo info;
+    info.model_name = "yolov8-n_640x640";
+    info.variant = "yolov8-n_640x640";
+    info.family = "yolov8";
+    info.task = "object_detection";
+    GRAPH_CHECK(detail::StageConfigPath(info) ==
+                "/opt/exported/src/cpp_example/object_detection/yolov8/yolov8-n_640x640/config.json");
+}
+
+void TestFindMarkedRootWalksUpToTheMarker() {
+    const std::string base = ScratchPath("marked_root");
+    const std::string inner = base + "/project/build/bin";
+    GRAPH_CHECK(std::system(("mkdir -p '" + inner + "'").c_str()) == 0);
+    GRAPH_CHECK(::dxapp::FindMarkedRoot(inner).empty());
+    {
+        std::ofstream marker((base + "/project/" + ::dxapp::RootMarkerName()).c_str());
+        marker << "dx_app graph project\n";
+    }
+    GRAPH_CHECK(::dxapp::FindMarkedRoot(inner) == base + "/project");
+    GRAPH_CHECK(::dxapp::FindMarkedRoot(inner + "/") == base + "/project");
+    GRAPH_CHECK(::dxapp::FindMarkedRoot(base + "/project") == base + "/project");
+    GRAPH_CHECK(::dxapp::FindMarkedRoot(base).empty());
+    GRAPH_CHECK(::dxapp::FindMarkedRoot("").empty());
+    GRAPH_CHECK(!::dxapp::ExecutableDir().empty());
+    GRAPH_CHECK(!::dxapp::WorkingDir().empty());
+    GRAPH_CHECK(std::system(("rm -rf '" + base + "'").c_str()) == 0);
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -15179,6 +15259,8 @@ int main() {
     TestLayersStackBackToTheMergedImage();
     TestDisplayGridTilesTheStreams();
     TestLayerFileNames();
+    TestRuntimeRootIsDxappRootElseTheBuildsRepository();
+    TestFindMarkedRootWalksUpToTheMarker();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
