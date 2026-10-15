@@ -115,8 +115,9 @@ shipped scenarios. The hand cascade is a crop chain. Head pose and volume
 are cpu nodes. CLIP prompt scores are not a graph node (see *Not in this
 release*).
 
-The last nine are decision graphs (see *Logic nodes*). On their sample image
-they show one decision each; their scenes are videos, for example
+The last nine are decision graphs (see *Logic nodes*). On their sample
+images they show their decision (`driver_attention.json`'s driver looks
+ahead, so it raises no event); their scenes are videos, for example
 `--input assets/videos/person-pair-hallway.mp4` (two people walking a
 hallway) with `--loop` for a Live run.
 
@@ -1111,9 +1112,10 @@ of them.
 A graph may declare more than one source node
 (`multistream_od_two_sources.json` has two, `cam1` and `cam2`). **Each
 source is its own stream**: the source and every node reachable from it.
-`multistream_people_count.json` counts people per camera: its `count` and
-`condition` nodes keep their state per stream, so each camera has its own
-total and a `crowded` event names the stream it happened in.
+`multistream_people_count.json` counts people per camera: `count` counts
+each stream's own frame and `condition` keeps its state (the cooldown) per
+stream, so each camera has its own total and a `crowded` event names the
+stream it happened in.
 
 **Models are shared, frames are not.** A model node has one engine on the
 NPU, loaded once, and that engine carries the jobs of every stream that

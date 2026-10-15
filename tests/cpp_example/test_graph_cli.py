@@ -1868,7 +1868,9 @@ def test_driver_attention_conditions_read_the_head_pose_of_their_frame(tmp_path)
                  "--report", str(report))
     assert result.returncode == 0, result.stdout + result.stderr
     frame = json.loads(report.read_text(encoding="utf-8"))["frames"][0]
-    pose = frame["nodes"]["headpose"]["payload"]["items"][0]["numbers"]
+    poses = frame["nodes"]["headpose"]["payload"]["items"]
+    assert len(poses) == 1, "sample_driver_monitoring.png shows one face: {}".format(poses)
+    pose = poses[0]["numbers"]
     for node, name in (("yaw_high", "yaw"), ("yaw_low", "yaw"), ("head_down", "pitch")):
         numbers = frame["nodes"][node]["payload"]["items"][0]["numbers"]
         assert numbers["value"] == pytest.approx(pose[name]), node
@@ -1937,7 +1939,9 @@ def test_logistics_volume_alert_sums_the_packages_and_raises_load_high(tmp_path)
                  "--report", str(report), "--events", str(events))
     assert result.returncode == 0, result.stdout + result.stderr
     frame = json.loads(report.read_text(encoding="utf-8"))["frames"][0]
-    total = sum(r["numbers"].get("volume_proxy", 0.0) for r in frame["nodes"]["volume"]["payload"]["items"])
+    rows = frame["nodes"]["volume"]["payload"]["items"]
+    assert rows, "sample_baggage_cart_airport.jpg holds a suitcase"
+    total = sum(r["numbers"].get("volume_proxy", 0.0) for r in rows)
     value = frame["nodes"]["load"]["payload"]["items"][0]["numbers"]["value"]
     assert value == pytest.approx(total)
     lines = [json.loads(line) for line in events.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -3727,7 +3731,8 @@ def test_list_ops_is_a_mode_of_its_own():
 
 
 # What each logic sample decides on its own sample image (sample_people.jpg:
-# two people, a dog). Node ids and event names as in the sample files.
+# two people, a dog; the last three read their own images, see their own
+# tests). Node ids and event names as in the sample files.
 LOGIC_SAMPLE_EVENTS = {
     "zone_intrusion.json": [("zone", "enter"), ("alarm", "intrusion")],
     "line_counting.json": [],
@@ -3735,6 +3740,9 @@ LOGIC_SAMPLE_EVENTS = {
     "loitering_dwell.json": [("zone", "enter")],
     "zone_people_count.json": [("left", "enter"), ("right", "enter")],
     "gallery_known_person.json": [("known", "match"), ("known", "match")],
+    "driver_attention.json": [],
+    "multistream_people_count.json": [("crowded", "crowded")],
+    "logistics_volume_alert.json": [("load", "load_high")],
 }
 
 
