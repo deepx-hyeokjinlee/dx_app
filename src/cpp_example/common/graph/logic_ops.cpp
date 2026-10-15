@@ -1,4 +1,5 @@
 #include "common/graph/logic_ops.hpp"
+#include "common/graph/user_logic.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -980,7 +981,11 @@ LogicOutput RunGallery(const LogicConfig& c, const std::vector<LogicInput>& inpu
     return out;
 }
 
-LogicOutput RunUser(const std::vector<LogicInput>& inputs) {
+/// The input passed through, unless a class is registered under the node's
+/// "name" (user_logic.hpp): then that object's output, events and labels.
+/// Anything the object does wrong is a frame error and the input passes on.
+LogicOutput RunUser(const LogicConfig& config, const std::vector<LogicInput>& inputs,
+                    const LogicFrame& frame, LogicState* s) {
     LogicOutput out;
     const LogicInput* input = FirstFullFrame(inputs);
     if (input == NULL) {
@@ -989,11 +994,40 @@ LogicOutput RunUser(const std::vector<LogicInput>& inputs) {
         return out;
     }
     const std::shared_ptr<BoxesData> boxes = SourceBoxes(*input);
-    if (boxes) {
-        out.result.data = boxes;
-    } else {
-        out.result.data = input->data;
+    const StageDataPtr given = boxes ? StageDataPtr(boxes) : input->data;
+    out.result.data = given;
+    const std::string& name = config.text.at("name");
+    if (!s->user_looked_up) {
+        s->user_looked_up = true;
+        s->user = MakeUserLogic(name);  // unique_ptr -> shared_ptr; null: pass-through
     }
+    if (!s->user || !given) return out;
+    UserContext ctx(config.id, frame.time_s, frame.frame_size);
+    StageDataPtr produced;
+    try {
+        produced = s->user->Run(given, ctx);
+    } catch (const std::exception& e) {
+        out.error = "user logic \"" + name + "\" failed: " + e.what();
+        return out;
+    }
+    if (!produced || produced->shape() != given->shape()) {
+        out.error = "user logic \"" + name + "\" returned " +
+                    (produced ? std::string(ToString(produced->shape())) : std::string("nothing")) +
+                    "; it must return " + ToString(given->shape());
+        return out;
+    }
+    out.result.data = produced;
+    for (std::size_t i = 0; i < ctx.events().size(); ++i) {
+        if (!IsEventName(ctx.events()[i].event)) {
+            if (out.error.empty()) {
+                out.error = "user logic \"" + name + "\" raised \"" + ctx.events()[i].event +
+                            "\", which is not an event name (1 to 64 letters, digits, _ . : -)";
+            }
+            continue;
+        }
+        out.events.push_back(ctx.events()[i]);
+    }
+    out.overlay.texts = ctx.labels();
     return out;
 }
 
@@ -1007,7 +1041,7 @@ LogicOutput RunOp(const LogicConfig& config, const std::vector<LogicInput>& inpu
     if (config.op == "dwell") return RunDwell(config, inputs, frame, s);
     if (config.op == "condition") return RunCondition(config, inputs, frame, s);
     if (config.op == "gallery") return RunGallery(config, inputs, frame, s);
-    if (config.op == "user") return RunUser(inputs);
+    if (config.op == "user") return RunUser(config, inputs, frame, s);
     LogicOutput out;
     out.result.data.reset(new RecordsData());
     out.error = "unknown logic op \"" + config.op + "\"";

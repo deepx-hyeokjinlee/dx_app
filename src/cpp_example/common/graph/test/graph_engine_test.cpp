@@ -14966,6 +14966,139 @@ void TestUserLogicRegistryMakesOneObjectPerCall() {
     GRAPH_CHECK(RegisteredUserLogicNames().empty() && !MakeUserLogic("tag_boxes"));
 }
 
+namespace {
+
+/// Throws on its second frame.
+struct ThrowsOnFrameTwo {
+    int frames;
+    ThrowsOnFrameTwo() : frames(0) {}
+    BoxesData Run(const BoxesData& input, UserContext&) {
+        if (++frames == 2) throw std::runtime_error("bad frame");
+        return input;
+    }
+};
+
+/// Returns obboxes for boxes: another kind.
+struct ReturnsObBoxes {
+    BoxesData Run(const BoxesData& input, UserContext&) {
+        BoxesData out(Shape::kObBoxes);
+        out.items = input.items;
+        return out;
+    }
+};
+
+/// Raises an event whose name has a space.
+struct RaisesABadName {
+    BoxesData Run(const BoxesData& input, UserContext& ctx) {
+        ctx.Raise("two words");
+        return input;
+    }
+};
+
+/// od -> u (user "tag_boxes", boxes) -> z (zone), over LogicRegistry's walk.
+std::string UserGraph() {
+    return LogicJson(
+        ",{\"id\":\"u\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"tag_boxes\",\"input\":\"boxes\",\"output\":\"boxes\"}}" +
+            std::string(kZoneNode),
+        ",{\"from\":\"od\",\"to\":\"u\",\"carry\":\"result\"},"
+        "{\"from\":\"u\",\"to\":\"z\",\"carry\":\"result\"}");
+}
+
+std::vector<GraphEvent> EventsOf(const FrameReport& report, const std::string& node) {
+    std::vector<GraphEvent> out;
+    for (std::size_t i = 0; i < report.events.size(); ++i) {
+        if (report.events[i].node == node) out.push_back(report.events[i]);
+    }
+    return out;
+}
+
+}  // namespace
+
+void TestARegisteredUserClassRunsInPlaceOfThePassThrough() {
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, TagBoxes>("tag_boxes");
+    const std::vector<FrameReport> reports = RunLogicFrames(UserGraph(), LogicRegistry(), Keys(6), false);
+    GRAPH_CHECK(reports.size() == 6);
+    for (std::size_t i = 0; i < reports.size(); ++i) {
+        const BoxesData* user = BoxesOf(reports[i], "u");
+        GRAPH_CHECK(user != NULL && user->items.size() == 1 && user->items[0].class_name == "tagged");
+        const std::vector<GraphEvent> mine = EventsOf(reports[i], "u");
+        GRAPH_CHECK(mine.size() == 1 && mine[0].event == "seen" &&
+                    mine[0].time_s == reports[i].time_s);
+        if (!mine.empty()) GRAPH_CHECK(NumberOf(mine[0].data, "frames") == static_cast<double>(i + 1));
+        GRAPH_CHECK(reports[i].overlays.count("u") == 1 &&
+                    reports[i].overlays.at("u").texts.size() == 1 &&
+                    reports[i].overlays.at("u").texts[0].text == "frames " + std::to_string(i + 1));
+        GRAPH_CHECK(reports[i].error.empty());
+        if (!reports[i].events.empty()) GRAPH_CHECK(reports[i].events[0].node == "u");  // node order
+    }
+    if (reports.size() == 6) GRAPH_CHECK(EventsOf(reports[2], "z").size() == 1);  // the zone still runs
+    const std::vector<FrameReport> async =
+        RunLogicFrames(UserGraph(), ReversedLogicRegistry(), Keys(6), true);
+    GRAPH_CHECK(async.size() == 6);
+    for (std::size_t i = 0; i < 6 && i < async.size() && i < reports.size(); ++i) {
+        GRAPH_CHECK(reports[i] == async[i]);
+    }
+    ClearUserLogic();
+}
+
+void TestEachLogicStateHasItsOwnUserObject() {
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, TagBoxes>("tag_boxes");
+    const GraphSpec spec = ParseGraphText(UserGraph(), "u.json");
+    const LogicConfig config = MakeLogicConfig(spec.nodes[2]);  // cam, od, u, z
+    LogicInput input;
+    input.edge = 1;
+    input.from = "od";
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(10.f, 10.f, 20.f, 20.f, 0.9f, "person"));
+    input.data = boxes;
+    LogicFrame frame;
+    frame.frame_size = cv::Size(100, 100);
+    LogicState stream_a;
+    LogicState stream_b;
+    RunLogic(config, std::vector<LogicInput>(1, input), frame, &stream_a);
+    const LogicOutput again = RunLogic(config, std::vector<LogicInput>(1, input), frame, &stream_a);
+    const LogicOutput other = RunLogic(config, std::vector<LogicInput>(1, input), frame, &stream_b);
+    GRAPH_CHECK(again.events.size() == 1 && NumberOf(again.events[0].data, "frames") == 2.0);
+    GRAPH_CHECK(other.events.size() == 1 && NumberOf(other.events[0].data, "frames") == 1.0);
+    ClearUserLogic();
+    LogicState unregistered;
+    const LogicOutput through = RunLogic(config, std::vector<LogicInput>(1, input), frame, &unregistered);
+    const BoxesData* same = dynamic_cast<const BoxesData*>(through.result.data.get());
+    GRAPH_CHECK(through.events.empty() && same != NULL && same->items[0].class_name == "person");
+}
+
+void TestUserClassFailuresPassTheInputThroughAndSayWhy() {
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, ThrowsOnFrameTwo>("tag_boxes");
+    std::vector<FrameReport> reports = RunLogicFrames(UserGraph(), LogicRegistry(), Keys(3), false);
+    GRAPH_CHECK(reports.size() == 3);
+    if (reports.size() == 3) {
+        GRAPH_CHECK(reports[0].error.empty() && reports[2].error.empty());
+        GRAPH_CHECK(reports[1].error.find("node \"u\": user logic \"tag_boxes\" failed: bad frame") !=
+                    std::string::npos);
+        const BoxesData* user = BoxesOf(reports[1], "u");
+        GRAPH_CHECK(user != NULL && user->items.size() == 1 && user->items[0].class_name != "tagged");
+    }
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, ReturnsObBoxes>("tag_boxes");
+    reports = RunLogicFrames(UserGraph(), LogicRegistry(), Keys(1), false);
+    GRAPH_CHECK(reports.size() == 1 &&
+                reports[0].error.find("user logic \"tag_boxes\" returned obboxes; it must return "
+                                      "boxes") != std::string::npos);
+    if (reports.size() == 1) GRAPH_CHECK(BoxesOf(reports[0], "u")->shape() == Shape::kBoxes);
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, RaisesABadName>("tag_boxes");
+    reports = RunLogicFrames(UserGraph(), LogicRegistry(), Keys(1), false);
+    GRAPH_CHECK(reports.size() == 1 &&
+                reports[0].error.find("user logic \"tag_boxes\" raised \"two words\", which is not "
+                                      "an event name") != std::string::npos);
+    if (reports.size() == 1) GRAPH_CHECK(EventsOf(reports[0], "u").empty());
+    ClearUserLogic();
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -15382,6 +15515,9 @@ int main() {
     TestUserNodeNamesAreCppNamesThatAreNotKeywords();
     TestUserNodesSharingANameTakeOneKind();
     TestUserLogicRegistryMakesOneObjectPerCall();
+    TestARegisteredUserClassRunsInPlaceOfThePassThrough();
+    TestEachLogicStateHasItsOwnUserObject();
+    TestUserClassFailuresPassTheInputThroughAndSayWhy();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

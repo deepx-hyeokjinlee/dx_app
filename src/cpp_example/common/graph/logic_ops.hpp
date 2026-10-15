@@ -32,6 +32,8 @@ namespace dxapp {
 struct RetrievalGallery;  // common/processors/gallery_retrieval_postprocessor.hpp
 namespace graph {
 
+class UserLogic;  // common/graph/user_logic.hpp
+
 /// A number param with no bound on that side (--list-ops leaves the bound out).
 const double kLogicUnbounded = 1e9;
 
@@ -199,8 +201,13 @@ struct LogicState {
     bool was_true;        ///< condition: last frame's verdict
     bool fired;           ///< condition: has raised an event
     double last_fire_s;   ///< condition: when
+    /// user: the object registered under its "name" (user_logic.hpp), made
+    /// on its first frame; null when nothing is registered (pass-through).
+    std::shared_ptr<UserLogic> user;
+    bool user_looked_up;  ///< user: the registry was asked once
     LogicState()
-        : count_in(0), count_out(0), was_true(false), fired(false), last_fire_s(0.0) {}
+        : count_in(0), count_out(0), was_true(false), fired(false), last_fire_s(0.0),
+          user_looked_up(false) {}
 };
 
 /// The frame a logic node runs on.
