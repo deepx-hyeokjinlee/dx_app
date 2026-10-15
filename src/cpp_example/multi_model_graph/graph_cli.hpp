@@ -21,6 +21,9 @@
 #ifndef DXAPP_MULTI_MODEL_GRAPH_GRAPH_CLI_HPP
 #define DXAPP_MULTI_MODEL_GRAPH_GRAPH_CLI_HPP
 
+#include <string>
+#include <vector>
+
 namespace dxapp {
 namespace graph {
 namespace cli {
@@ -38,6 +41,38 @@ enum ExecutorKind { kSyncExecutor, kAsyncExecutor };
  *   2  a usage error: an unknown option, a missing value, no graph
  */
 int Main(int argc, char** argv, ExecutorKind kind);
+
+/// What an exported graph project's main() fixes
+/// (scripts/export_graph_project.py): the graph and the model folder used
+/// when the command line names none. Relative paths are read against
+/// RuntimeRoot() (common/utility/repo_path.hpp).
+struct ProjectDefaults {
+    std::string graph;      ///< "graph.json"
+    std::string model_dir;  ///< "models"
+};
+
+/// The executor and the arguments ProjectMain hands to Main.
+struct ProjectCall {
+    ExecutorKind kind;
+    std::vector<std::string> args;  ///< args[0] is the program
+    ProjectCall() : kind(kAsyncExecutor) {}
+};
+
+/**
+ * @brief An exported project's command line as Main reads it.
+ *
+ * `--sync` is taken out and picks the sync executor (async otherwise).
+ * `--model-dir <root>/<model_dir>` is added unless one is given;
+ * `--graph <root>/<graph>` too, unless a graph is given (`--graph`, or a
+ * value after `--check`) or the call only lists (`--list-models`,
+ * `--list-ops`, `--help`).
+ */
+ProjectCall ProjectArgs(const std::vector<std::string>& argv, const ProjectDefaults& defaults,
+                        const std::string& root);
+
+/// main() of an exported project: ProjectArgs against RuntimeRoot(), then
+/// Main. Exit codes as Main.
+int ProjectMain(int argc, char** argv, const ProjectDefaults& defaults);
 
 }  // namespace cli
 }  // namespace graph

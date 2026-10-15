@@ -58,6 +58,7 @@
 #include "multi_model_graph/graph_consumer.hpp"
 #include "multi_model_graph/graph_report_writer.hpp"
 #include "common/graph/user_logic.hpp"
+#include "multi_model_graph/graph_cli.hpp"
 
 namespace {
 
@@ -15099,6 +15100,65 @@ void TestUserClassFailuresPassTheInputThroughAndSayWhy() {
     ClearUserLogic();
 }
 
+// ---------------------------------------------------------------------
+// Phase 3: an exported project's command line (cli::ProjectArgs)
+// ---------------------------------------------------------------------
+
+namespace {
+
+std::vector<std::string> Words(const char* const* words, std::size_t count) {
+    return std::vector<std::string>(words, words + count);
+}
+
+}  // namespace
+
+void TestProjectArgsFillInTheProjectsGraphAndModels() {
+    cli::ProjectDefaults defaults;
+    defaults.graph = "graph.json";
+    defaults.model_dir = "models";
+
+    const char* bare[] = {"app"};
+    cli::ProjectCall call = cli::ProjectArgs(Words(bare, 1), defaults, "/p");
+    const char* bare_out[] = {"app", "--model-dir", "/p/models", "--graph", "/p/graph.json"};
+    GRAPH_CHECK(call.kind == cli::kAsyncExecutor && call.args == Words(bare_out, 5));
+
+    const char* sync[] = {"app", "--sync", "--output", "r.jpg"};
+    call = cli::ProjectArgs(Words(sync, 4), defaults, "/p");
+    const char* sync_out[] = {"app", "--output", "r.jpg", "--model-dir", "/p/models", "--graph",
+                              "/p/graph.json"};
+    GRAPH_CHECK(call.kind == cli::kSyncExecutor && call.args == Words(sync_out, 7));
+
+    const char* check[] = {"app", "--check", "--json"};
+    call = cli::ProjectArgs(Words(check, 3), defaults, "/p");
+    const char* check_out[] = {"app", "--check", "--json", "--model-dir", "/p/models", "--graph",
+                               "/p/graph.json"};
+    GRAPH_CHECK(call.args == Words(check_out, 7));
+
+    const char* given[] = {"app", "--check", "other.json", "--model-dir", "/m"};
+    call = cli::ProjectArgs(Words(given, 5), defaults, "/p");
+    GRAPH_CHECK(call.args == Words(given, 5));
+
+    const char* graph[] = {"app", "--graph", "g2.json"};
+    call = cli::ProjectArgs(Words(graph, 3), defaults, "/p");
+    const char* graph_out[] = {"app", "--graph", "g2.json", "--model-dir", "/p/models"};
+    GRAPH_CHECK(call.args == Words(graph_out, 5));
+
+    const char* ops[] = {"app", "--list-ops", "--json"};
+    call = cli::ProjectArgs(Words(ops, 3), defaults, "/p");
+    const char* ops_out[] = {"app", "--list-ops", "--json", "--model-dir", "/p/models"};
+    GRAPH_CHECK(call.args == Words(ops_out, 5));
+
+    const char* help[] = {"app", "--help"};
+    GRAPH_CHECK(cli::ProjectArgs(Words(help, 2), defaults, "/p").args.size() == 4);  // no --graph
+
+    const char* absolute[] = {"app"};
+    cli::ProjectDefaults fixed;
+    fixed.graph = "/abs/g.json";
+    fixed.model_dir = "/abs/models";
+    const char* absolute_out[] = {"app", "--model-dir", "/abs/models", "--graph", "/abs/g.json"};
+    GRAPH_CHECK(cli::ProjectArgs(Words(absolute, 1), fixed, "/p").args == Words(absolute_out, 5));
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -15518,6 +15578,7 @@ int main() {
     TestARegisteredUserClassRunsInPlaceOfThePassThrough();
     TestEachLogicStateHasItsOwnUserObject();
     TestUserClassFailuresPassTheInputThroughAndSayWhy();
+    TestProjectArgsFillInTheProjectsGraphAndModels();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

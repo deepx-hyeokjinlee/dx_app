@@ -2056,6 +2056,55 @@ int Main(int argc, char** argv, ExecutorKind kind) {
     }
 }
 
+ProjectCall ProjectArgs(const std::vector<std::string>& argv, const ProjectDefaults& defaults,
+                        const std::string& root) {
+    ProjectCall call;
+    bool graph_given = false;
+    bool model_dir_given = false;
+    bool listing = false;
+    for (std::size_t i = 0; i < argv.size(); ++i) {
+        const std::string& word = argv[i];
+        if (i > 0 && word == "--sync") {
+            call.kind = kSyncExecutor;
+            continue;
+        }
+        call.args.push_back(word);
+        if (i == 0) continue;
+        if (word == "--graph") {
+            graph_given = true;
+        } else if (word == "--model-dir") {
+            model_dir_given = true;
+        } else if (word == "--check") {
+            // "--check g.json" names the graph; "--check --json" does not.
+            graph_given = graph_given || (i + 1 < argv.size() && !argv[i + 1].empty() &&
+                                          argv[i + 1].compare(0, 2, "--") != 0);
+        } else if (word == "--list-models" || word == "--list-ops" || word == "--help" ||
+                   word == "-h") {
+            listing = true;
+        }
+    }
+    if (call.args.empty()) call.args.push_back("graph_project");
+    if (!model_dir_given && !defaults.model_dir.empty()) {
+        call.args.push_back("--model-dir");
+        call.args.push_back(::dxapp::ResolveAgainstRoot(root, defaults.model_dir));
+    }
+    if (!graph_given && !listing && !defaults.graph.empty()) {
+        call.args.push_back("--graph");
+        call.args.push_back(::dxapp::ResolveAgainstRoot(root, defaults.graph));
+    }
+    return call;
+}
+
+int ProjectMain(int argc, char** argv, const ProjectDefaults& defaults) {
+    const ProjectCall call =
+        ProjectArgs(std::vector<std::string>(argv, argv + argc), defaults, ::dxapp::RuntimeRoot());
+    std::vector<std::string> args = call.args;  // owns the text the pointers below point at
+    std::vector<char*> pointers;
+    for (std::size_t i = 0; i < args.size(); ++i) pointers.push_back(&args[i][0]);
+    pointers.push_back(NULL);
+    return Main(static_cast<int>(args.size()), pointers.data(), call.kind);
+}
+
 }  // namespace cli
 }  // namespace graph
 }  // namespace dxapp

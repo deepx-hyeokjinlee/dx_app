@@ -305,7 +305,8 @@ if(DXAPP_BUILD_GRAPH_TESTS)
     # superpoint, dope, yolopv2) that the generated
     # registry's factories reference. dxapp_graph_consumer_obj carries
     # ReportToJson, which the report tests pin.
-    target_link_libraries(graph_engine_test dxapp_graph_consumer_obj
+    # dxapp_graph_cli_obj: cli::ProjectArgs, an exported project's command line.
+    target_link_libraries(graph_engine_test dxapp_graph_cli_obj dxapp_graph_consumer_obj
         dxapp_graph_obj dxapp_graph_models_obj dxapp_common_obj ${COMMON_LIBS})
     if(NOT MSVC)
         target_link_libraries(graph_engine_test pthread)
