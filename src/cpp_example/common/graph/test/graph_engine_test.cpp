@@ -12732,6 +12732,48 @@ void TestValidateChecksTheGalleryFile() {
     std::remove(theirs.c_str());
 }
 
+/// A gallery whose header promises more rows than the file holds fails as a
+/// load error, before anything the size of the header's claim is allocated: a
+/// truncated or crafted .bin must not end the run with std::bad_alloc.
+void TestAGalleryLargerThanItsFileIsRefusedBeforeAllocating() {
+    const std::string path = ScratchPath("crafted.bin");
+    const auto write = [&path](std::uint32_t n, std::uint32_t dim, std::size_t floats,
+                               std::uint32_t blob) {
+        std::ofstream out(path.c_str(), std::ios::binary | std::ios::trunc);
+        out.write("DXGAL1\0\0", 8);
+        const std::uint32_t words[2] = {n, dim};
+        out.write(reinterpret_cast<const char*>(words), sizeof(words));   // little-endian hosts
+        const std::vector<float> rows(floats, 0.5f);
+        out.write(reinterpret_cast<const char*>(rows.data()),
+                  static_cast<std::streamsize>(rows.size() * sizeof(float)));
+        out.write(reinterpret_cast<const char*>(&blob), sizeof(blob));
+    };
+    write(0xFFFFFFFFu, 0xFFFFFFFFu, 4, 0);
+    RetrievalGallery g;
+    bool threw = false;
+    try {
+        g = loadRetrievalGallery(path);
+    } catch (...) {
+        threw = true;
+    }
+    GRAPH_CHECK(!threw);
+    GRAPH_CHECK(!g.loaded);
+    GRAPH_CHECK(g.error.find("truncated embeddings") != std::string::npos);
+
+    // the rows fit, but a metadata blob claims 256 MB the file does not have
+    write(1, 4, 4, 0x10000000u);
+    threw = false;
+    try {
+        g = loadRetrievalGallery(path);
+    } catch (...) {
+        threw = true;
+    }
+    GRAPH_CHECK(!threw);
+    GRAPH_CHECK(!g.loaded);
+    GRAPH_CHECK(g.error.find("truncated metadata") != std::string::npos);
+    std::remove(path.c_str());
+}
+
 void TestNodeOutputShapeFollowsFilterZoneAndUser() {
     const GraphSpec spec = ParseGraphText(LogicJson(
         ",{\"id\":\"f\",\"type\":\"logic\",\"op\":\"filter\"}" + std::string(kZoneNode) +
@@ -15093,6 +15135,7 @@ int main() {
     TestValidateChecksLogicParams();
     TestValidateChecksLogicInputs();
     TestValidateChecksTheGalleryFile();
+    TestAGalleryLargerThanItsFileIsRefusedBeforeAllocating();
     TestNodeOutputShapeFollowsFilterZoneAndUser();
     TestFrameTimeCountsFramesOrWallSeconds();
     TestReportsCarryTheFrameTime();

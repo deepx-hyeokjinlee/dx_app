@@ -105,9 +105,20 @@ inline std::string resolveGalleryFile(const std::string& path) {
     return path;
 }
 
+/// Bytes left in `fh` from its read position; 0 when it cannot tell.
+inline std::uint64_t bytesLeft(std::ifstream& fh) {
+    const std::streampos here = fh.tellg();
+    if (here < 0) return 0;
+    fh.seekg(0, std::ios::end);
+    const std::streampos end = fh.tellg();
+    fh.seekg(here);
+    return end > here ? static_cast<std::uint64_t>(end - here) : 0;
+}
+
 inline bool readBlob(std::ifstream& fh, std::string& out) {
     std::uint32_t length = 0;
     if (!readU32(fh, length)) return false;
+    if (length > bytesLeft(fh)) return false;   // a crafted length must not allocate past the file
     out.assign(length, '\0');
     return length == 0 || static_cast<bool>(fh.read(&out[0], length));
 }
@@ -137,6 +148,12 @@ inline RetrievalGallery loadRetrievalGallery(const std::string& path) {
         return g;
     }
 
+    // The header's n x dim against the file before anything that size is
+    // allocated: a truncated or crafted file fails here, not in resize().
+    if (static_cast<std::uint64_t>(n) * dim > gallery_detail::bytesLeft(fh) / sizeof(float)) {
+        g.error = "truncated embeddings: " + path;
+        return g;
+    }
     g.vectors.resize(static_cast<std::size_t>(n) * dim);
     if (!fh.read(reinterpret_cast<char*>(g.vectors.data()),
                  static_cast<std::streamsize>(g.vectors.size() * sizeof(float)))) {
