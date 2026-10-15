@@ -62,7 +62,7 @@ from common.processors import YOLOv5Postprocessor
 from common.visualizers import DetectionVisualizer
 
 class Yolov9sFactory(IFactory):
-    def create_processor(self):
+    def create_postprocessor(self):
         return YOLOv5Postprocessor(self.config)
     def create_visualizer(self):
         return DetectionVisualizer(self.config)
@@ -246,7 +246,7 @@ python src/python_example/object_detection/yolov7/yolov7_640x640/yolov7_640x640_
 
 **Numerical Verification** (`DXAPP_VERIFY`)  
 
-Set `DXAPP_VERIFY=1` to serialize post-processing results. Each run writes `logs/verify/{model}.json` (override the directory with `DXAPP_VERIFY_DIR`) holding the last frame, and `{model}.frames.jsonl` with one record per frame (`"frame": 0, 1, …` in input order). Writes are serialized and the JSON is replaced atomically, so a reader never sees a half-written file. Every runner dumps its real results, including tiled super-resolution (statistics of the stitched output), 3D detection and YOLOPv2 (boxes plus drivable/lane mask statistics); SuperPoint records carry each frame's keypoints and the descriptor size. The `*_cpp_postprocess` scripts dump too (raw arrays as `output_stats` / `output_stats_list`, for the scripts whose post-processing returns arrays). `{model}.json` holds the last frame (it used to hold the first).  
+Set `DXAPP_VERIFY=1` to serialize post-processing results. Each run writes `logs/verify/{model}.json` (override the directory with `DXAPP_VERIFY_DIR`) holding the last frame, and `{model}.frames.jsonl` with one record per frame (`"frame": 0, 1, …` in input order). Writes are serialized and the JSON is replaced atomically, so a reader never sees a half-written file. Every runner dumps its real results, including tiled super-resolution (statistics of the stitched output), 3D detection and YOLOPv2 (boxes plus drivable/lane mask statistics); SuperPoint records carry each frame's keypoints and the descriptor size. The `*_cpp_postprocess` scripts dump too (raw arrays as `output_stats` / `output_stats_list`, for the scripts whose post-processing returns arrays). `{model}.json` holds the last frame.  
 
 Frame numbers count per process, so with `--loop N` on a video the records of later loops continue the numbering.  
 

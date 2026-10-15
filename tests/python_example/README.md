@@ -8,5 +8,5 @@
 
 ```bash
 # from dx_app/: example subprocesses use $DXAPP_TEST_PYTHON, else ../venv-dx-runtime, else sys.executable
-../venv-dx-runtime/bin/python -m pytest tests/python_example
+python -m pytest tests/python_example
 ```

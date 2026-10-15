@@ -76,7 +76,7 @@ is not a second model.
 | `task_legacy` | The `add_model_task` value from before the task/family/variant layout, kept verbatim |
 | `csv_task` | Short task **label** for CSV export / model-zoo bookkeeping (e.g., `OD`, `IC`, `SEG`). **Metadata only** — not read by any example code or runtime script |
 | `image_only` | `true` for a model whose examples take only `--image` (no video, camera or RTSP input) |
-| `zoo_canonical` | `true` when the variant is in the dx-modelzoo snapshot (`tests/data/modelzoo_cv_tree.json`) |
+| `zoo_canonical` | `true` when the variant is in the DX Model Zoo release tree (`tests/data/modelzoo_cv_tree.json`) |
 | `source` | Origin of the row: `csv`, `inferred`, `manifest`, `auto_classify`, or `manual` |
 | `supported` | Set to `false` to skip this model during validation (add `failure_reason` to note why) |
 
@@ -155,4 +155,4 @@ manual steps until it supports the per-variant layout are in
 - The `variant` column of `test_models.conf` is the registry's `variant`; regenerate the file with `python3 scripts/regen_test_models_conf.py` after a registry change instead of editing it.
 - When adding a new model, register it in the registry first (`variant`, `family`, `task`, `dxnn_file`), put its example under `src/{cpp,python}_example/<task>/<family>/<variant>/`, then regenerate `test_models.conf`; `python3 scripts/check_model_registry.py` checks that the rows and the factory tree agree.
 - `input_width`/`input_height` should match the **compiled `.dxnn` input tensor** (as reported by `dxrt-cli` model parsing / the model-zoo "Input Resolution"), not the nominal paper resolution — e.g. `RegNetY16GF` compiles at `384×384`, `ulfgfd-RFB-640` at `640×480`. For non-square models the order is **W×H** (`input_width` first).
-- `csv_task` / `add_model_task` / (`category` in the Model Zoo manifest) should agree. If they disagree, trust the **example directory** + `test_models.conf` (what actually runs); the manifest can be wrong (e.g. a hand *detector* mislabeled as *hand landmark*).
+- `csv_task` / `add_model_task` / (`category` in the Model Zoo manifest) should agree. If they disagree, trust the **example directory** + `test_models.conf` (what actually runs); the manifest category may be less precise.

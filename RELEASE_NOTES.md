@@ -12,7 +12,7 @@
     - `image_enhancement` → `low_light_enhancement`,
     - `face_alignment` → `face_landmark`.
     - and now PPU models live under `object_detection/yolo_ppu`
-- `extract_model_package.sh` now prunes `common/` to the files the extracted model actually depends on instead of copying the whole framework (yolov7: 121→29 C++, 103→54 Python); use `--no-prune` for the previous full copy
+- `scripts/extract_model_package.sh` now prunes `common/` to the files the extracted model actually depends on instead of copying the whole framework (yolov7: 121→29 C++, 103→54 Python); use `--no-prune` for the previous full copy
 
 ### 2. Fixed
 - Fixed async runners calling the shared postprocessor from several dxrt callback threads at once. DXAPP_VERIFY records follow input order
@@ -100,11 +100,11 @@ Generate standalone Python/C++ inference apps from plain language: an AI agent b
 - Native C++ post-processing for the example model zoo (YOLO families, semantic seg, Face3D, embedding/classification/attribute, restoration, YOLO-PPU), replacing Python fallbacks
 - Opt-in `--fast-postprocess` path for object detection and instance segmentation
 - YOLO Customizing Guide documentation
-- Added Windows standalone Visual Studio solution package extraction workflow for DX-APP C++ examples, including automatic  OpenCV/DXRT CMake dependency configuration.
- -  Added `--demo-models` setup/download option to download only models used by `run_demo.sh` / `run_demo.bat`
+- Added Windows standalone Visual Studio solution package extraction workflow for DX-APP C++ examples, including automatic OpenCV/DXRT CMake dependency configuration.
+- Added `--demo-models` setup/download option to download only models used by `run_demo.sh` / `run_demo.bat`
 - Added DX-APP build selection options for minimal and category-based builds, plus Windows build selection TUI(Text User Interface).
-- Added knowledge base (`.deepx/`) : specialized agents, app-building/SWE skills, and multi-platform agent-instruction generation
-  (CLAUDE/AGENTS/copilot/cursor) via `dx-agent-gen`
+- Added the agent knowledge base (`.deepx/`): specialized agents, app-building/SWE skills, and generated
+  instruction files for Claude Code, GitHub Copilot, Cursor, OpenCode, and Codex CLI
 - Support for 69 net-new .dxnn models (86 added / 17 removed) and 5 new AI task categories
   
   - **Model registry**: 280 → 347 models across 22 AI task categories

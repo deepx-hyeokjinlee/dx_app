@@ -7,7 +7,7 @@
 **Key Features & Objectives**  
 
 - **Rapid Deployment:** Ready-to-run examples across multiple AI task categories — Classification, Object Detection, Face Detection, Pose Estimation, Semantic/Instance Segmentation, Depth Estimation, OBB Detection, Embedding, and more.
--	**Dual-Language Flexibility:** High-performance **C++** for production and **Python** for rapid prototyping, each with their own shared runtime layer (`src/cpp_example/common/` for C++, `src/python_example/common/` for Python).  
+- **Dual-Language Flexibility:** High-performance **C++** for production and **Python** for rapid prototyping, each with their own shared runtime layer (`src/cpp_example/common/` for C++, `src/python_example/common/` for Python).  
 - **Hardware Acceleration:** Native support for **PPU-enabled models** and **Async templates** that overlap pipeline stages to maximize FPS.  
 - **Modular Design:** Clean, task-oriented templates that serve as reusable blueprints for custom commercial applications.  
 
@@ -204,7 +204,7 @@ dx_app/
 │   │       ├── inputs/         #   Image/Video/Camera/RTSP input sources
 │   │       ├── visualizers/    #   Task-specific visualizers
 │   │       ├── config/         #   ModelConfig loader
-│   │       ├── utility/        #   Labels, preprocessing, profiling, run_dir, signal_handler, verify_serialize
+│   │       ├── utility/        #   Labels, preprocessing, profiling, run_dir, interrupt handling, verify_serialize
 │   │       └── third_party/    #   Header-only third-party libraries (nlohmann_json)
 │   ├── python_example/         # Python end-to-end examples (organized across 28 tasks)
 │   │   └── common/             # ← Shared Python runtime layer
@@ -226,7 +226,7 @@ dx_app/
 │   └── README.md               # Config directory documentation
 ├── scripts/                    # Developer tools, validation, and helper scripts
 ├── tests/                      # pytest-based test suites
-│   ├── common/                 #   Shared test constants & utilities
+│   ├── test_helpers/           #   Shared test constants & utilities
 │   ├── cpp_example/            #   C++ tests (CLI, E2E, visualization, features)
 │   └── python_example/         #   Python tests (unit, integration, CLI, E2E, visualization)
 ├── assets/                     # Downloaded models/videos (via setup.sh)
@@ -329,12 +329,12 @@ All C++ and Python examples share a consistent set of command-line arguments.
 
 To help developers optimize for specific hardware targets, templates are provided in two execution patterns  
 
-- **Synchronous (`xx_sync.cpp`):
+- **Synchronous (`xx_sync.cpp`):**
 
     : **Logic:** A single-threaded, sequential loop (**Input → Inference → Output**).  
     : **Use Case:** Best for single-image processing and simplified debugging.  
 
-- **Asynchronous (`xx_async.cpp`):
+- **Asynchronous (`xx_async.cpp`):**
 
     : **Logic:** Uses multi-threading and the `RunAsync()` API to overlap stages. While the NPU performs inference on Frame **N**, the CPU simultaneously handles pre-processing for Frame **N+1** and post-processing for Frame **N-1**.  
     : **Use Case:** Essential for maximizing **FPS** on live video streams and ensuring high NPU utilization.  
@@ -349,8 +349,8 @@ To eliminate post-inference bottlenecks, DX-APP provides optimized C++ logic exp
 
 - **Key Capabilities:** Handles CPU-intensive tasks such as NMS (Non-Maximum Suppression), tensor decoding, and mask generation at native speeds.  
 - **Unified Logic:** Shares the exact same decoding logic as the C++ examples, ensuring consistent inference results across all platforms.  
-- **Installation:** -Automatically compiled during `./build.sh`.  
-    : **Manual install:** `cd src/bindings/python/dx_postprocess && pip install`.  
+- **Installation:** Automatically compiled during `./build.sh`.  
+    : **Manual install:** `cd src/bindings/python/dx_postprocess && python3 -m pip install .`  
 
 For detailed usage examples and API references, please refer to the documentation in 
 [**Section. DX-APP Python Post-processing**](08_DX-APP_Pybind_PostProcess_Overview.md)

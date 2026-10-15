@@ -76,7 +76,7 @@ You can quickly evaluate inference capabilities without modifying the source cod
 **Segmentation (DeepLabV3+)**  
 
 - Input: image/video/camera  
-- Output: boxes + masks rendered, results saved  
+- Output: segmentation masks rendered, results saved  
 - Example run  
 ```bash
 ./bin/deeplabv3plus_mobilenetv1_512x512_async -m ./assets/models/deeplabv3plus_mobilenetv1_512x512.dxnn -i ./sample/img/sample_parking.jpg --no-display -l 1

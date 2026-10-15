@@ -285,7 +285,7 @@ A registry entry should identify:
 - support status,
 - any required config metadata.
 
-Do not add registry entries for local experiments or customer-only artifacts unless the release explicitly includes them.
+Do not add registry entries for local experiments or project-specific artifacts unless the release explicitly includes them.
 
 ---
 

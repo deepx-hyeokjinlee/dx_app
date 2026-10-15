@@ -178,7 +178,7 @@ This runs code generation + NPU inference for all supported models.
 
 ### Execution & Benchmarking
 
-- **Selective Run**: The `run` command abstracts the complexity of finding specific binaries. It uses filters to execute subsets of the 130+ models instantly.  
+- **Selective Run**: The `run` command abstracts the complexity of finding specific binaries. It uses filters to execute subsets of the 497 registered models instantly.  
 
 - **Performance Benchmarking**: The `bench` command runs models in a loop, calculating average latency and throughput (FPS) while minimizing system noise.  
 
@@ -212,19 +212,19 @@ The add flow is intended for contributors creating a new example under the curre
 - post-processing selection  
 - sync-only or multi-variant generation choice  
 
-You can also invoke `add_model.sh` directly for non-interactive usage:  
-
 For YOLO-family model onboarding and postprocessor selection details, refer to [DX-APP YOLO Customizing Guide](12_DX-APP_YOLO_Customizing_Guide.md).
+
+You can also invoke `add_model.sh` directly for non-interactive usage:  
 
 ```bash
 # Create from a postprocessor template
-./scripts/add_model.sh yolo_custom detection --postprocessor yolov8
+./scripts/add_model.sh yolo_custom object_detection --postprocessor yolov8
 
 # Copy from an existing model directory (useful for same-family variants)
-./scripts/add_model.sh yolov7_w6 detection --base-model yolov7 --postprocessor yolov7
+./scripts/add_model.sh yolov7_w6 object_detection --base-model yolov7 --postprocessor yolov7
 
 # Generate, verify, and push in one step
-./scripts/add_model.sh yolo_custom detection --postprocessor yolov8 --verify --model assets/models/yolo_custom.dxnn --git-push
+./scripts/add_model.sh yolo_custom object_detection --postprocessor yolov8 --verify --model assets/models/yolo_custom.dxnn --git-push
 ```
 
 > **Known issue (this release).** `add_model.sh` still targets the old flat `<task>/<model>/` layout, and it copies the reference model's C++ factory with its `namespace v_<reference variant>` unchanged, so `python3 scripts/generate_cpp_family_layout.py --variant-scope src/cpp_example --check` refuses the new example. Rename by hand the factory's namespace to `v_<new variant>` (every character other than a letter or digit becomes `_`) and the `dxapp::v_<...>::` qualifier in the new `<variant>_sync.cpp` / `<variant>_async.cpp`. Per-variant support in `add_model.sh` is a follow-up.
@@ -314,13 +314,13 @@ out_resnet50\sln\image_classification\resnet50_224x224\
 If CMake and the Visual Studio 2022 generator are available, the extractor also configures the package immediately and generates a solution file:
 
 ```text
-out_resnet50\sln\classification\resnet50\build\dxapp_resnet50_sln_package.sln
+out_resnet50\sln\image_classification\resnet50_224x224\build\dxapp_resnet50_224x224_sln_package.sln
 ```
 
 The package includes the selected model sources, shared C++ example helpers, `CMakeLists.txt`, `build.bat`, and generated dependency defaults. To build it directly:
 
 ```powershell
-cd .\out_resnet50\sln\classification\resnet50
+cd .\out_resnet50\sln\image_classification\resnet50_224x224
 .\build.bat
 ```
 
@@ -456,6 +456,6 @@ scripts/run_examples.sh
 - `scripts/run_examples.sh`
 - `scripts/bench_models.sh`
 - `config/model_registry.json`
-- `docs/11_DX-APP_Example_Source_Structure.md`
+- [DX-APP Example Source Structure](11_DX-APP_Example_Source_Structure.md)
 
 ---

@@ -78,14 +78,14 @@ This section guides you through the environment setup and the initial build proc
 
 ## Repository Layout
 
-> **On the counts below.** The registry lists **497 variants** (498 rows, one alias)
-> across 28 AI tasks, and **all 497 have a downloadable `.dxnn`**.
+> The registry lists **497 variants** (498 rows, one alias) across 28 AI tasks,
+> and **all 497 have a downloadable `.dxnn`**.
 
 > **2_5_0 needs DX-RT 3.5.0.** Those `.dxnn` files are container **format version 9**,
 > which DX-RT 3.4.2 refuses (`Model file format version 9 is not supported`) while
 > 3.5.0 parses it. `scripts/sweep_npu_inference.py` probes the runtime once per
-> container version and reports `UNSUPPORTED_FORMAT` rather than a failure of the
-> example code, so the same tree is honest on either runtime.
+> container version and reports `UNSUPPORTED_FORMAT` on an older runtime rather
+> than a failure of the example code.
 
 The project is structured to separate core logic from language-specific implementations.  
 ```text
@@ -96,21 +96,21 @@ dx_app/
 │   │                           #   bin/<variant>_sync is the built executable (.dxnn stem)
 │   │   └── common/             # ← Shared C++ runtime layer
 │   │       ├── base/           #   Abstract interfaces (IFactory, IProcessor, ...)
-│   │       ├── processors/     #   40 shared post-processors
-│   │       ├── runner/         #   24 task-specific sync/async runner pairs
+│   │       ├── processors/     #   Shared post-processors
+│   │       ├── runner/         #   Task-specific sync/async runner pairs
 │   │       ├── inputs/         #   Image/Video/Camera/RTSP input sources
-│   │       ├── visualizers/    #   12 task-specific visualizers
+│   │       ├── visualizers/    #   Task-specific visualizers
 │   │       ├── config/         #   ModelConfig loader
-│   │       └── utility/        #   Labels, preprocessing, profiling, run_dir, signal_handler, verify_serialize
+│   │       └── utility/        #   Labels, preprocessing, profiling, run_dir, interrupt handling, verify_serialize
 │   ├── python_example/         # Python end-to-end examples (497 registered variants / 28 tasks, all downloadable)
 │   │                           #   <task>/<family>/<variant>/ holds factory, config.json, and thin entries
 │   │                           #   <variant>_sync.py fixes that variant
 │   │   └── common/             # ← Shared Python runtime layer
 │   │       ├── base/           #   Abstract interfaces (IFactory, IProcessor, ...)
-│   │       ├── processors/     #   35 shared post-processors
+│   │       ├── processors/     #   Shared post-processors
 │   │       ├── runner/         #   SyncRunner, AsyncRunner, run_dir, verify_serialize, args
 │   │       ├── inputs/         #   Image/Video/Camera/RTSP input sources
-│   │       ├── visualizers/    #   10 task-specific visualizers
+│   │       ├── visualizers/    #   Task-specific visualizers
 │   │       ├── config/         #   ModelConfig loader
 │   │       └── utility/        #   Labels, preprocessing, profiling
 │   ├── postprocess/            # C++ post-processing (consumed by pybind11 bindings)
@@ -125,7 +125,7 @@ dx_app/
 │   └── README.md               # Config directory documentation
 ├── scripts/                    # Developer tools, validation, and helper scripts
 ├── tests/                      # pytest-based test suites
-│   ├── common/                 #   Shared test constants & utilities
+│   ├── test_helpers/           #   Shared test constants & utilities
 │   ├── cpp_example/            #   C++ tests (CLI, E2E, visualization, features)
 │   └── python_example/         #   Python tests (unit, integration, CLI, E2E, visualization)
 ├── assets/                     # Downloaded models/videos (via setup.sh)
@@ -154,11 +154,11 @@ To utilize NPU acceleration, you **must** install the kernel-mode drivers and th
 Versions this release needs:
 
 - **DX-RT ≥ 3.5.0.** `./setup.sh` downloads DX Model Zoo 2_5_0, whose `.dxnn` files are container **v9**; DX-RT 3.5.0 is the first runtime that loads them.
-- **NPU driver ≥ 2.7.0** (RT and PCIe driver, as installed and tested here). The runtime's own minimum driver, firmware and `.dxnn` versions are printed by `dxrt-cli --version`.
+- **NPU driver ≥ 2.7.0** (RT and PCIe driver). The runtime's own minimum driver, firmware and `.dxnn` versions are printed by `dxrt-cli --version`.
 - **`dx_engine` 3.5.x**, the Python package of the same DX-RT: `import dx_engine` (3.5.0) raises `dx_engine and DX-RT versions do not match` when its major.minor differs from the runtime's.
 - The C++ examples check the floor when they start: a runtime older than 3.5.0 stops with `DXRT library version is too low. (required: >= 3.5.0, current: <version>)`. The check runs after the engine is created, so an older runtime may report its own error on the `.dxnn` first.
 
-Tested with DX-RT 3.5.0 (build 1.6fdc543), NPU driver 2.7.0 (RT and PCIe) and firmware 2.7.4 on a DX-M1 M.2 card (x86_64).
+Tested with DX-RT 3.5.0, NPU driver 2.7.0 (RT and PCIe) and firmware 2.7.4 on a DX-M1 M.2 card (x86_64).
 
 **B. Development Toolchain and Libraries**  
 
@@ -300,7 +300,7 @@ Python runners detect the absence of `DISPLAY`/`WAYLAND_DISPLAY` and skip `cv2.i
 
 These templates provide high-performance, production-ready references for building applications using the DX-RT C++ API.  
 
-The refactored C++ tree is organized by **task → model family → variant**, with a shared `common/` layer providing base interfaces, 45 processors, 24 task-specific runners, 12 visualizers, and input abstraction. Each model directory delegates to `common/` via the factory pattern. For details, refer to [DX-APP C++ Usage Guide](./docs/source/docs/03_DX-APP_CPP_Example_Usage_Guide.md) and [DX-APP Example Source Structure](./docs/source/docs/11_DX-APP_Example_Source_Structure.md).
+The refactored C++ tree is organized by **task → model family → variant**, with a shared `common/` layer providing base interfaces, shared processors, task-specific runners, visualizers, and input abstraction. Each model directory delegates to `common/` via the factory pattern. For details, refer to [DX-APP C++ Usage Guide](./docs/source/docs/03_DX-APP_CPP_Example_Usage_Guide.md) and [DX-APP Example Source Structure](./docs/source/docs/11_DX-APP_Example_Source_Structure.md).
 
 **Pipeline Architecture**  
 
@@ -316,10 +316,12 @@ Each template follows a self-contained pipeline designed for modularity
 
 To help developers optimize for specific hardware targets, templates are provided in two execution patterns  
 
-- **Synchronous (`*_sync.cpp`): * Logic:** A single-threaded, sequential loop (**Input → Inference → Output**).  
+- **Synchronous (`*_sync.cpp`):**  
+      : **Logic:** A single-threaded, sequential loop (**Input → Inference → Output**).  
       : **Use Case:** Best for single-image processing and simplified debugging.  
 
-- **Asynchronous (`*_async.cpp`): * Logic:** Uses multi-threading and the `RunAsync()` API to overlap stages. While the NPU performs inference on Frame **N**, the CPU simultaneously handles pre-processing for Frame **N+1** and post-processing for Frame **N-1**.  
+- **Asynchronous (`*_async.cpp`):**  
+      : **Logic:** Uses multi-threading and the `RunAsync()` API to overlap stages. While the NPU performs inference on Frame **N**, the CPU simultaneously handles pre-processing for Frame **N+1** and post-processing for Frame **N-1**.  
       : **Use Case:** Essential for maximizing **FPS** on live video streams and ensuring high NPU utilization.  
 
 ---
@@ -364,8 +366,8 @@ To eliminate post-inference bottlenecks, DX-APP provides optimized C++ logic exp
 
 - **Key Capabilities:** Handles CPU-intensive tasks such as NMS (Non-Maximum Suppression), tensor decoding, and mask generation at native speeds.  
 - **Unified Logic:** Shares the exact same decoding logic as the C++ examples, ensuring consistent inference results across all platforms.  
-- **Installation:** -Automatically compiled during `./build.sh`.  
-    - **Manual install:** `cd src/bindings/python/dx_postprocess && pip install`.  
+- **Installation:** Automatically compiled during `./build.sh`.  
+    - **Manual install:** `cd src/bindings/python/dx_postprocess && python3 -m pip install .`  
 
 For detailed usage examples and API references, please refer to the documentation in 
 [**Section. DX-APP Python Post-processing**](./src/bindings/python/dx_postprocess/README.md)
@@ -374,7 +376,7 @@ For detailed usage examples and API references, please refer to the documentatio
 
 These templates utilize `dx_engine` (for inference) and `dx_postprocess` (for acceleration). Users can choose from four variants depending on their performance requirements.  
 
-The refactored Python tree is organized by **task → model family → variant**, with a shared `common/` layer providing base interfaces, 41 processors, generic sync/async runners, 10 visualizers, and input abstraction — the same factory-based architecture as the C++ side. For structure and contributor-facing rules, refer to [DX-APP Python Usage Guide](./docs/source/docs/05_DX-APP_Python_Example_Usage_Guide.md) and [DX-APP Example Source Structure](./docs/source/docs/11_DX-APP_Example_Source_Structure.md).
+The refactored Python tree is organized by **task → model family → variant**, with a shared `common/` layer providing base interfaces, shared processors, generic sync/async runners, visualizers, and input abstraction — the same factory-based architecture as the C++ side. For structure and contributor-facing rules, refer to [DX-APP Python Usage Guide](./docs/source/docs/05_DX-APP_Python_Example_Usage_Guide.md) and [DX-APP Example Source Structure](./docs/source/docs/11_DX-APP_Example_Source_Structure.md).
 
 **Task-Based Structure**  
 
@@ -435,8 +437,8 @@ Download the required models and sample media files.
 # Preview what would be downloaded (no actual download)
 ./setup.sh --dry-run
 
-# Download only a specific category
-./setup.sh --category=object_detection
+# Download only a specific category (name as shown by --list)
+./setup.sh --category "Object Detection"
 
 # Download specific models by name
 ./setup.sh --models yolov8n yolov9s efficientnet_lite0
@@ -484,7 +486,7 @@ Build the C++ binaries and the Python dx_postprocess bindings simultaneously.
 
 **Step 4. Execution Examples**  
 
-The quickest way to explore all 24 AI task categories (26 demo tasks) is the unified interactive demo script:
+The quickest way to explore the AI task categories (26 demo tasks) is the unified interactive demo script:
 
 ```bash
 # Interactive — select task, mode, and input type from menus
@@ -498,7 +500,7 @@ The quickest way to explore all 24 AI task categories (26 demo tasks) is the uni
 
 | Option | Description |
 |--------|-------------|
-| `--task NUM` | Pre-select task (0–17) |
+| `--task NUM` | Pre-select task (0–25) |
 | `--mode NUM` | Pre-select mode (1=cpp_sync, 2=cpp_async, 3=py_sync, …) |
 | `--input NUM` | Pre-select input (1=video, 2=image) |
 | `--show-log` | Enable verbose log output (default: quiet) |
@@ -630,13 +632,13 @@ When running on platforms with limited storage (e.g., Raspberry Pi 5, embedded b
 
 | Asset | Count | Size |
 |-------|------:|-----:|
-| Demo models (23 files) | 23 | ~500 MB |
-| All registered models | 347 | several GB |
+| Demo models | 26 | varies by Model Zoo release (`./setup.sh --demo-models --dry-run` lists them) |
+| All registered models | 497 | several GB |
 | Sample videos | 20 | ~1.1 GB |
 | Sample images (bundled) | — | ~5 MB |
 
 **Strategy 1 — Let `run_demo.sh` handle it**  
-Just run `./run_demo.sh`. It automatically downloads **only the 23 demo models** on first run. No need to run `setup.sh --all`.
+Just run `./run_demo.sh`. It automatically downloads **only the 26 demo models** on first run. No need to run `setup.sh --all`.
 
 **Strategy 2 — Download only what you need**  
 ```bash
