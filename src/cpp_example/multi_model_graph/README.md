@@ -1264,6 +1264,8 @@ front end can add up `parse_model` figures itself.
 | `--input [<source>=]<uri>` | each source node's `uri` | image, video, `camera:<N>`, `rtsp://...`. Repeatable, once per source: `<source>=` names the source node it replaces, and a graph with several sources needs it (see *Several sources: one stream each*) |
 | `--output <file>` | none | the rendered result. `.mp4`, `.avi` or `.mkv` (any letter case): one video (codec `mp4v` for `.mp4`/`.mkv`, `MJPG` for `.avi`; the source's fps when it is between 1 and 240, else 30). Any other extension, or none: images, exactly `<file>` for a single image, `<stem>_<index><ext>` for each frame of a multi-frame source. Images from a live source (`camera:`, `rtsp://`, from `--input` or the graph's `uri`) never end, so they need `--frames N`; without it the run is refused (exit 2) before any model loads. A directory that does not exist fails before any model loads too (`could not write <file>: directory <dir> does not exist`, exit 1). With several sources, one file set per stream: one video `<stem>_<source_id><ext>` each, or images `<stem>_<source_id>_<index><ext>`, always numbered; both checks apply to each stream |
 | `--display` | off | show each rendered frame in a window. `q` or ESC stops the run gracefully, as Ctrl-C does; closing the window does not stop it (the next frame reopens it). Needs a window system: with none of `DISPLAY`, `WAYLAND_DISPLAY`, `QT_QPA_PLATFORM` set it is refused (exit 2). One that is set but does not answer (`DISPLAY=:99` with no server there, `QT_QPA_PLATFORM=xcb` without `DISPLAY`) is refused the same way, before any model loads: a window is opened once in a child process first, because Qt aborts the process that cannot connect. With several sources, one window per stream, `multi_model_graph: <source_id>`; `q` or ESC in any of them stops the run |
+| `--draw <id[,id...]>` | every node | draw only these nodes, in the window, `--output` and `--output-layers`; every node still runs, prints and reports. A logic node's id draws its overlay (a zone's polygon, a line's arrow, its labels): `--draw zone` draws the zone but not its detector's boxes, `--draw od,zone` both. The events panel lists only the drawn nodes' events, so it shows when a drawn node raises one. Repeatable; ids are comma-separated. An id that is not a node of the graph, or is a source, is a usage error (exit 2) naming the graph's other nodes: `--draw: "nope" is not a node of this graph that draws; its nodes: od, seg, depth`. With `--check` or a listing it is a usage error too |
+| `--output-layers <dir>` | none | per frame, the clean source frame and each drawn node's drawing alone on a transparent RGBA PNG the size of the frame, plus `<dir>/layers.json` listing them in stacking order (see *Results for front ends*). `<dir>` is made when it does not exist (its parent must; otherwise exit 1, before any model loads). A video, camera or RTSP source needs `--frames N` (exit 2 otherwise): it writes every frame. With `--check` or a listing it is a usage error (exit 2) |
 | `--report <file>` | none | every `FrameReport` as JSON, ordered by `(node, parent_index, roi_index)`. Written frame by frame and finalized on every exit short of a kill (see *`--report`* below) |
 | `--report-timing` | off | with `--report`: each frame also gets `"node_ms": {"<node>": ms}`, the time per node (see *`--report`*). Without `--report` it is a usage error (exit 2) |
 | `--events <file>` | none | every event of the graph's logic nodes, one JSON object per line (see *Events*). Written as each frame finishes; each line is one write. With `--check`, `--list-models` or `--list-ops` it is a usage error (exit 2) |
@@ -1328,6 +1330,59 @@ OpenCV and most players cannot open it at all, while an `.mkv` or `.avi`
 still plays up to about the last frames written. So after the first stop
 request, let the run finish; if you may have to kill it, write `.mkv` or
 `.avi`.
+
+### Results for front ends
+
+Two options turn one run into what a page needs to show it.
+
+- **`--draw od,zone`** keeps the picture to the nodes chosen before a Live
+  run starts. The other nodes still run, print their `frame N:` lines and
+  fill `--report`; they only draw nothing.
+- **`--output-layers <dir>`** splits each frame's picture into layers a page
+  stacks and toggles itself, for one image or for `--frames N` of a video
+  (a paused video: run that frame again as an image). For each frame:
+
+  | File | What it holds |
+  |---|---|
+  | `<stem>[_<source>]_<frame>_base.png` | the clean source frame, as read (3 channels) |
+  | `<stem>[_<source>]_<frame>_<node>.png` | one node's drawing alone, RGBA, transparent where it drew nothing; a node that drew nothing on the frame has no file |
+  | `<stem>[_<source>]_<frame>_events.png` | the recent-events panel, RGBA, when it has lines |
+  | `layers.json` | every frame written so far, rewritten after each frame |
+
+  `<stem>` is `--output`'s file name without its extension, else the graph
+  file's; `_<source>` appears with several sources only; `<frame>` is the
+  frame index in 6 digits. `layers.json` lists each frame's layers bottom
+  first, a model node with its `model`, a logic or cpu node with its `op`:
+
+  ```json
+  {
+    "frames": [
+      {
+        "stream": "cam",
+        "frame": 0,
+        "base": "result_000000_base.png",
+        "layers": [
+          { "node": "seg", "model": "bisenetv2_1024x2048", "file": "result_000000_seg.png" },
+          { "node": "depth", "model": "fastdepth_224x224", "file": "result_000000_depth.png" },
+          { "node": "od", "model": "yolov8-n_640x640", "file": "result_000000_od.png" },
+          { "node": "zone", "op": "zone", "file": "result_000000_zone.png" },
+          { "panel": "events", "file": "result_000000_events.png" }
+        ]
+      }
+    ]
+  }
+  ```
+
+  The order is the drawing order of `--output`: each node at the first pass
+  it draws in (images, label maps, dense maps, instance masks, boxes,
+  oriented boxes, keypoints, scores and vectors), logic nodes after them in
+  id order, the events panel last. So the base with every layer blended
+  over it in that order (`out = layer * a + out * (1 - a)`) is the
+  `--output` image, within a few levels of rounding; the one case it is not
+  exact is a node that draws in two passes (an instance segmenter's masks,
+  then its boxes) over a pixel another node drew in between. Labels are
+  laid out as in the merged image, so toggling a layer off never moves the
+  others. The run prints `layers: <dir>/layers.json` at its end.
 
 ### `--report`
 

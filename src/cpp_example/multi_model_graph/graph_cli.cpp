@@ -17,6 +17,10 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include <direct.h>
+#endif
+
 #include <dxrt/dxrt_api.h>
 #include <opencv2/imgcodecs.hpp>
 
@@ -95,6 +99,8 @@ struct GraphCliArgs {
     std::string output;     ///< rendered result: one video, or images
     std::string report;     ///< FrameReport as JSON
     std::string events;     ///< --events: one JSON line per event
+    std::vector<std::string> draw;  ///< --draw: the only nodes drawn (empty: all)
+    std::string output_layers;  ///< --output-layers: per-node RGBA layers + layers.json
     std::string model_dir;
     std::string consumes;   ///< --list-models filter
     std::string produces;   ///< --list-models filter
@@ -110,6 +116,7 @@ struct GraphCliArgs {
     bool json;            ///< --check / --list-models: JSON on stdout
     bool loop;            ///< --loop: a video starts again at its end
     bool list_ops;        ///< --list-ops: the logic and cpu op catalog
+    bool draw_given;      ///< --draw was passed (with no id it is a usage error)
 
     GraphCliArgs()
         : model_dir(DefaultModelDir()),
@@ -124,7 +131,8 @@ struct GraphCliArgs {
           report_timing(false),
           json(false),
           loop(false),
-          list_ops(false) {}
+          list_ops(false),
+          draw_given(false) {}
 };
 
 /// The usage text, on `out`: stdout for --help and for a usage error,
@@ -167,6 +175,22 @@ void PrintUsage(std::FILE* out, const char* program) {
         "  --display             show each rendered frame in a window; q or"
         " ESC stops\n"
         "                        the run as Ctrl-C does\n"
+        "  --draw <id[,id...]>   draw only these nodes (a logic node's id draws its\n"
+        "                        overlay) in the window, --output and"
+        " --output-layers;\n"
+        "                        every node still runs and reports. The events"
+        " panel\n"
+        "                        lists only these nodes' events\n"
+        "  --output-layers <dir> per frame, write the clean frame\n"
+        "                        (<stem>[_<source>]_<frame>_base.png), each drawn\n"
+        "                        node's drawing alone on a transparent RGBA PNG\n"
+        "                        (..._<frame>_<node>.png; ..._events.png for the"
+        " events\n"
+        "                        panel) and <dir>/layers.json, listing them in"
+        " stacking\n"
+        "                        order. <stem>: --output's, else the graph file's."
+        " A\n"
+        "                        video or live source needs --frames N\n"
         "  --report <file>       write every FrameReport as JSON, ordered by\n"
         "                        (node, parent_index, roi_index)\n"
         "  --report-timing       with --report: add each frame's \"node_ms\", the\n"
@@ -294,11 +318,30 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
             continue;
         }
 
+        // Repeatable: every value adds its comma-separated node ids.
+        if (option == "--draw") {
+            if (!has_value || value_is_option) {
+                *error = option + " needs a value";
+                return false;
+            }
+            args->draw_given = true;
+            std::stringstream ids(argv[++i]);
+            std::string id;
+            while (std::getline(ids, id, ',')) {
+                const std::size_t first = id.find_first_not_of(" \t");
+                if (first == std::string::npos) continue;
+                const std::size_t last = id.find_last_not_of(" \t");
+                args->draw.push_back(id.substr(first, last - first + 1));
+            }
+            continue;
+        }
+
         std::string* text = NULL;
         if (option == "--graph") text = &args->graph_path;
         else if (option == "--output") text = &args->output;
         else if (option == "--report") text = &args->report;
         else if (option == "--events") text = &args->events;
+        else if (option == "--output-layers") text = &args->output_layers;
         else if (option == "--model-dir") text = &args->model_dir;
         else if (option == "--consumes") text = &args->consumes;
         else if (option == "--produces") text = &args->produces;
@@ -395,6 +438,19 @@ bool ParseArgs(int argc, char** argv, ExecutorKind kind, GraphCliArgs* args,
     }
     if (args->loop && (args->check_only || args->list_models || args->list_ops)) {
         *error = "--loop applies to a run (--graph), not to a listing or --check";
+        return false;
+    }
+    if (args->draw_given && (args->check_only || args->list_models || args->list_ops)) {
+        *error = "--draw applies to a run (--graph), not to a listing or --check";
+        return false;
+    }
+    if (!args->output_layers.empty() &&
+        (args->check_only || args->list_models || args->list_ops)) {
+        *error = "--output-layers applies to a run (--graph), not to a listing or --check";
+        return false;
+    }
+    if (args->draw_given && args->draw.empty()) {
+        *error = "--draw needs node ids, separated by commas: --draw od,seg";
         return false;
     }
     return true;
@@ -1404,6 +1460,153 @@ std::string EventPanelLine(const GraphEvent& event) {
     return line;
 }
 
+// ---------------------------------------------------------------------
+// Results for front ends: --draw, --output-layers
+// ---------------------------------------------------------------------
+
+/// "" when every --draw id names a node of `spec` that can draw (any node
+/// but a source); otherwise the usage error, listing those nodes.
+std::string DrawProblem(const GraphSpec& spec, const std::vector<std::string>& ids) {
+    std::string listed;
+    for (std::size_t n = 0; n < spec.nodes.size(); ++n) {
+        if (spec.nodes[n].is_source) continue;
+        listed += (listed.empty() ? "" : ", ") + spec.nodes[n].id;
+    }
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        const NodeSpec* node = spec.FindNode(ids[i]);
+        if (node == NULL || node->is_source) {
+            return "--draw: \"" + ids[i] + "\" is not a node of this graph that draws; "
+                   "its nodes: " + listed;
+        }
+    }
+    return std::string();
+}
+
+/// "" when --output-layers can go with this stream: a still image, or any
+/// source when --frames bounds it. Otherwise the usage error.
+std::string LayersSourceProblem(const std::string& uri, std::size_t frames) {
+    if (frames != 0) return std::string();
+    const bool live = IsLiveUri(uri);
+    if (!live && InputFactory::detectFileType(uri) == InputType::IMAGE) return std::string();
+    return "--output-layers writes a base image and one layer per node for every frame, "
+           "and \"" + uri + "\" is " +
+           (live ? "a live source that never ends" : "not a still image") +
+           ": stop after N frames (--frames N)";
+}
+
+/// "" when `dir` is a directory, made here when it does not exist yet (its
+/// parent must); otherwise the error (exit 1, as an unwritable --report).
+std::string LayersDirectoryProblem(const std::string& dir) {
+    struct stat info;
+    if (::stat(dir.c_str(), &info) == 0) {
+        if ((info.st_mode & S_IFMT) == S_IFDIR) return std::string();
+        return "could not write " + dir + ": it is not a directory";
+    }
+#ifdef _WIN32
+    const int made = ::_mkdir(dir.c_str());
+#else
+    const int made = ::mkdir(dir.c_str(), 0777);
+#endif
+    if (made != 0) return "could not write " + dir + ": " + std::strerror(errno);
+    return std::string();
+}
+
+/// --output-layers: per frame the clean frame, each drawn node's RGBA layer
+/// (RenderLayers, in stacking order), the events panel's layer when it has
+/// lines, and layers.json - rewritten after every frame (through a
+/// temporary file), so a run stopped part way leaves a complete manifest.
+class LayersWriter {
+ public:
+    LayersWriter(const std::string& dir, const std::string& stem, const GraphSpec& spec)
+        : dir_(dir), stem_(stem), spec_(spec), frames_(OrderedJson::array()) {
+        while (dir_.size() > 1 && (dir_.back() == '/' || dir_.back() == '\\')) dir_.pop_back();
+    }
+
+    std::string manifest_path() const { return Join("layers.json"); }
+
+    /// False (with *problem set) when a file cannot be written.
+    bool Write(const FrameReport& report, const cv::Mat& frame, const RenderOptions& options,
+               const std::vector<std::string>& panel, const std::vector<cv::Rect>& labels,
+               bool several, std::string* problem) {
+        OrderedJson entry = OrderedJson::object();
+        entry["stream"] = report.stream;
+        entry["frame"] = report.frame_index;
+        const std::string base = Name(report, several, "base");
+        if (!Save(base, frame, problem)) return false;
+        entry["base"] = base;
+        OrderedJson layers = OrderedJson::array();
+        const std::vector<RenderLayer> drawn = RenderLayers(frame.size(), report, options);
+        for (std::size_t i = 0; i < drawn.size(); ++i) {
+            const std::string file = Name(report, several, drawn[i].node);
+            if (!Save(file, drawn[i].rgba, problem)) return false;
+            OrderedJson layer = OrderedJson::object();
+            layer["node"] = drawn[i].node;
+            const NodeSpec* node = spec_.FindNode(drawn[i].node);
+            if (node != NULL && IsModelNode(*node)) layer["model"] = node->model;
+            else if (node != NULL) layer["op"] = node->op;
+            layer["file"] = file;
+            layers.push_back(layer);
+        }
+        if (!panel.empty()) {
+            cv::Mat on_black = cv::Mat::zeros(frame.size(), CV_8UC3);
+            cv::Mat on_white(frame.size(), CV_8UC3, cv::Scalar(255, 255, 255));
+            DrawEventLog(&on_black, panel, labels);
+            DrawEventLog(&on_white, panel, labels);
+            const std::string file = Name(report, several, "events");
+            if (!Save(file, LayerFromBackdrops(on_black, on_white), problem)) return false;
+            OrderedJson layer = OrderedJson::object();
+            layer["panel"] = "events";
+            layer["file"] = file;
+            layers.push_back(layer);
+        }
+        entry["layers"] = layers;
+        frames_.push_back(entry);
+        return WriteManifest(problem);
+    }
+
+ private:
+    std::string Join(const std::string& name) const { return dir_ + "/" + name; }
+
+    std::string Name(const FrameReport& report, bool several, const std::string& part) const {
+        return LayerFileName(stem_, report.stream, several, report.frame_index, part);
+    }
+
+    bool Save(const std::string& name, const cv::Mat& image, std::string* problem) const {
+        bool written = false;
+        try {
+            written = cv::imwrite(Join(name), image);
+        } catch (const cv::Exception&) {
+        }
+        if (!written) *problem = "could not write " + Join(name);
+        return written;
+    }
+
+    bool WriteManifest(std::string* problem) const {
+        OrderedJson manifest = OrderedJson::object();
+        manifest["frames"] = frames_;
+        const std::string path = manifest_path();
+        const std::string partial = path + ".part";
+        {
+            std::ofstream out(partial.c_str(), std::ios::out | std::ios::trunc);
+            out << manifest.dump(2) << "\n";
+            if (!out) {
+                *problem = "could not write " + path;
+                return false;
+            }
+        }
+        if (std::rename(partial.c_str(), path.c_str()) != 0) {
+            *problem = "could not write " + path;
+            return false;
+        }
+        return true;
+    }
+
+    std::string dir_;
+    std::string stem_;
+    const GraphSpec& spec_;
+    OrderedJson frames_;
+};
+
 int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& spec,
                  const GraphCliArgs& args, const std::vector<StreamUri>& uris) {
     // Every stream is opened before the report file: a uri that will not
@@ -1454,6 +1657,11 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
     std::fflush(stdout);
 
     const OutputKind output_kind = ClassifyOutput(args.output);
+    std::unique_ptr<LayersWriter> layers;
+    if (!args.output_layers.empty()) {
+        layers.reset(new LayersWriter(args.output_layers,
+                                      LayersStem(args.output, args.graph_path), spec));
+    }
     std::vector<StreamSink> sinks(reader.size());
     std::vector<std::deque<std::string> > recent(reader.size());  // the event panel, per stream
     for (std::size_t s = 0; s < reader.size(); ++s) {
@@ -1469,7 +1677,8 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
     }
     int failed_frames = 0;
     std::set<std::size_t> warned_edges;
-    const RenderOptions render_options = RenderOptionsFor(spec);
+    RenderOptions render_options = RenderOptionsFor(spec);
+    render_options.draw.insert(args.draw.begin(), args.draw.end());
 
     // Under pipelining the report that comes out is not necessarily for the
     // frame just read, so every report is rendered onto ITS OWN frame, which
@@ -1498,6 +1707,8 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
                 std::fprintf(stderr, "%s\n", problem.c_str());
                 return false;
             }
+            // --draw: the panel lists the drawn nodes' events only.
+            if (!render_options.Draws(report.events[e].node)) continue;
             std::deque<std::string>& panel = recent.at(stream_index);
             panel.push_back(EventPanelLine(report.events[e]));
             if (panel.size() > kRecentEvents) panel.pop_front();
@@ -1510,13 +1721,17 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
             std::fprintf(stderr, "%s\n", problem.c_str());
             return false;
         }
-        if (output_kind != OutputKind::kNone || sink.window) {
+        if (output_kind != OutputKind::kNone || sink.window || layers) {
             std::vector<cv::Rect> labels;
             cv::Mat rendered = RenderReport(shown, report, render_options, &labels);
-            DrawEventLog(&rendered,
-                         std::vector<std::string>(recent.at(stream_index).begin(),
-                                                  recent.at(stream_index).end()),
-                         labels);
+            const std::vector<std::string> panel(recent.at(stream_index).begin(),
+                                                 recent.at(stream_index).end());
+            DrawEventLog(&rendered, panel, labels);
+            if (layers && !layers->Write(report, shown, render_options, panel, labels, several,
+                                         &problem)) {
+                std::fprintf(stderr, "%s\n", problem.c_str());
+                return false;
+            }
             if (sink.video) {
                 if (!sink.video->Write(rendered, &problem)) {
                     std::fprintf(stderr, "%s\n", problem.c_str());
@@ -1604,6 +1819,7 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
         }
         std::printf("report: %s\n", args.report.c_str());
     }
+    if (layers) std::printf("layers: %s\n", layers->manifest_path().c_str());
 
     if (several) {
         for (std::size_t s = 0; s < reader.size(); ++s) {
@@ -1707,6 +1923,22 @@ int Main(int argc, char** argv, ExecutorKind kind) {
             PrintUsage(stdout, argv[0]);
             return 2;
         }
+        const std::string undrawable = DrawProblem(early, args.draw);
+        if (!undrawable.empty()) {
+            std::fprintf(stderr, "%s\n\n", undrawable.c_str());
+            PrintUsage(stdout, argv[0]);
+            return 2;
+        }
+        if (!args.output_layers.empty()) {
+            for (std::size_t s = 0; s < streams.size(); ++s) {
+                const std::string problem = LayersSourceProblem(streams[s].uri, args.frames);
+                if (!problem.empty()) {
+                    std::fprintf(stderr, "%s\n\n", problem.c_str());
+                    PrintUsage(stdout, argv[0]);
+                    return 2;
+                }
+            }
+        }
         if (!args.output.empty()) {
             // SP1's live-source refusal, for each stream's own uri.
             for (std::size_t s = 0; s < streams.size(); ++s) {
@@ -1750,6 +1982,14 @@ int Main(int argc, char** argv, ExecutorKind kind) {
                     std::fprintf(stderr, "%s\n", directory.c_str());
                     return 1;
                 }
+            }
+        }
+
+        if (!args.output_layers.empty()) {
+            const std::string directory = LayersDirectoryProblem(args.output_layers);
+            if (!directory.empty()) {
+                std::fprintf(stderr, "%s\n", directory.c_str());
+                return 1;
             }
         }
 

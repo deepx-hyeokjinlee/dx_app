@@ -3618,3 +3618,207 @@ def test_readme_documents_logic_nodes_and_events():
     assert '| logic | `{ "id": "zone", "type": "logic"' in text
     py = DX_GRAPH_README.read_text(encoding="utf-8")
     assert '"events"' in py and "--loop" in py
+
+
+# ---------------------------------------------------------------------
+# Results for front ends (spec 16): --draw, --output-layers, the grid.
+# ---------------------------------------------------------------------
+
+FANOUT = "fanout_od_seg_depth.json"
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("binary", BINARIES)
+def test_help_names_the_results_options(binary):
+    result = run(binary, "--help")
+    assert result.returncode == 0
+    assert "--draw <id[,id...]>" in result.stdout
+    assert "--output-layers <dir>" in result.stdout
+    assert "layers.json" in result.stdout
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("value, needle", [
+    ("od,nope", '--draw: "nope" is not a node of this graph that draws; '
+                "its nodes: od, seg, depth"),
+    ("cam", '--draw: "cam" is not a node of this graph that draws; '
+            "its nodes: od, seg, depth"),
+    (",", "--draw needs node ids, separated by commas"),
+])
+def test_draw_names_nodes_of_the_graph(value, needle):
+    result = run("multi_model_graph_async", "--graph", "{}/{}".format(GRAPHS, FANOUT),
+                 "--draw", value)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert needle in result.stderr
+    assert "graph:" not in result.stdout  # nothing was built
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("option", [("--draw", "od"), ("--output-layers", "layers")])
+def test_results_options_apply_to_a_run(tmp_path, option):
+    result = run(BINARIES[0], "--check", "{}/{}".format(GRAPHS, FANOUT), option[0],
+                 str(tmp_path / option[1]) if option[0] == "--output-layers" else option[1])
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "{} applies to a run (--graph), not to a listing or --check".format(option[0]) \
+        in result.stderr
+
+
+@pytest.mark.graph
+@pytest.mark.parametrize("uri", ["video", "camera:0", "rtsp://127.0.0.1:1/none"])
+def test_layers_of_a_video_or_a_live_source_need_frames(tmp_path, uri):
+    if uri == "video":
+        uri = str(tmp_path / "clip.avi")  # only its extension is read before the refusal
+    layers = tmp_path / "layers"
+    result = run("multi_model_graph_async", "--graph", "{}/{}".format(GRAPHS, FANOUT),
+                 "--input", uri, "--output-layers", str(layers))
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "--output-layers writes" in result.stderr
+    assert "stop after N frames (--frames N)" in result.stderr
+    assert "graph:" not in result.stdout
+    assert not layers.exists()
+
+
+@pytest.mark.graph
+def test_layers_into_a_file_fails_before_models_load(tmp_path):
+    taken = tmp_path / "file"
+    taken.write_text("x")
+    result = run("multi_model_graph_async", "--graph", "{}/{}".format(GRAPHS, FANOUT),
+                 "--output-layers", str(taken))
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "could not write {}: it is not a directory".format(taken) in result.stderr
+    assert "graph:" not in result.stdout
+
+
+def _read_rgba(path):
+    import cv2
+    image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    assert image is not None, path
+    return image
+
+
+def _stack(base, layers):
+    """What a front end does: every RGBA layer over the base, in order."""
+    import numpy as np
+    out = base.astype(np.float64)
+    for layer in layers:
+        alpha = layer[:, :, 3:4].astype(np.float64) / 255.0
+        out = layer[:, :, :3] * alpha + out * (1.0 - alpha)
+    return np.rint(out).astype(np.uint8)
+
+
+@pytest.mark.graph_e2e
+@pytest.mark.parametrize("binary", BINARIES)
+def test_output_layers_stack_back_to_the_output(tmp_path, binary):
+    import cv2
+    import numpy as np
+    absent = missing_artifacts(FANOUT)
+    if absent:
+        pytest.skip(absent)
+    output, layers = tmp_path / "result.png", tmp_path / "layers"
+    result = run(binary, "--graph", "{}/{}".format(GRAPHS, FANOUT), "--output", str(output),
+                 "--output-layers", str(layers))
+    assert result.returncode == 0, result.stdout + result.stderr
+    manifest = json.loads((layers / "layers.json").read_text())
+    assert list(manifest) == ["frames"] and len(manifest["frames"]) == 1
+    frame = manifest["frames"][0]
+    assert list(frame) == ["stream", "frame", "base", "layers"]
+    assert (frame["stream"], frame["frame"]) == ("cam", 0)
+    assert frame["base"] == "result_000000_base.png"
+    # RenderReport's pass order: seg's labelmap, depth's densemap, od's boxes.
+    assert frame["layers"] == [
+        {"node": "seg", "model": "bisenetv2_1024x2048", "file": "result_000000_seg.png"},
+        {"node": "depth", "model": "fastdepth_224x224", "file": "result_000000_depth.png"},
+        {"node": "od", "model": "yolov8-n_640x640", "file": "result_000000_od.png"},
+    ]
+    assert sorted(p.name for p in layers.iterdir()) == sorted(
+        ["layers.json", frame["base"]] + [entry["file"] for entry in frame["layers"]])
+    assert "layers: {}".format(layers / "layers.json") in result.stdout
+    base = cv2.imread(str(layers / frame["base"]))
+    source = cv2.imread(str(PROJECT_ROOT / "sample" / "img" / "sample_street.jpg"))
+    assert base.shape == source.shape and np.array_equal(base, source)
+    rgba = [_read_rgba(layers / entry["file"]) for entry in frame["layers"]]
+    assert all(layer.shape == source.shape[:2] + (4,) for layer in rgba)
+    od_alpha = rgba[2][:, :, 3]
+    assert 0 < np.count_nonzero(od_alpha) < od_alpha.size // 2  # boxes, not the whole frame
+    merged = cv2.imread(str(output))
+    diff = np.abs(_stack(base, rgba).astype(int) - merged.astype(int))
+    assert diff.max() <= 3, diff.max()
+
+
+@pytest.mark.graph_e2e
+def test_draw_draws_only_the_named_nodes(tmp_path):
+    import cv2
+    import numpy as np
+    absent = missing_artifacts(FANOUT)
+    if absent:
+        pytest.skip(absent)
+    everything, layers = tmp_path / "all.png", tmp_path / "layers"
+    a = run("multi_model_graph_async", "--graph", "{}/{}".format(GRAPHS, FANOUT),
+            "--output", str(everything), "--output-layers", str(layers))
+    od, od_layers, report = tmp_path / "od.png", tmp_path / "od_layers", tmp_path / "r.json"
+    b = run("multi_model_graph_async", "--graph", "{}/{}".format(GRAPHS, FANOUT),
+            "--draw", "od", "--output", str(od), "--output-layers", str(od_layers),
+            "--report", str(report))
+    assert a.returncode == 0, a.stdout + a.stderr
+    assert b.returncode == 0, b.stdout + b.stderr
+    # Every node still ran and reported.
+    assert sorted(json.loads(report.read_text())["frames"][0]["nodes"]) == ["cam", "depth", "od", "seg"]
+    frame = json.loads((od_layers / "layers.json").read_text())["frames"][0]
+    assert [entry["node"] for entry in frame["layers"]] == ["od"]
+    # The image is the clean frame with od's layer alone over it.
+    base = cv2.imread(str(layers / "all_000000_base.png"))
+    od_layer = _read_rgba(layers / "all_000000_od.png")
+    diff = np.abs(_stack(base, [od_layer]).astype(int) - cv2.imread(str(od)).astype(int))
+    assert diff.max() <= 3, diff.max()
+
+
+@pytest.mark.graph_e2e
+def test_layers_of_an_event_frame_end_with_the_event_panel(tmp_path):
+    _needs_model("yolov8-n_640x640")
+    graph = tmp_path / "intrusion.json"
+    graph.write_text(json.dumps(INTRUSION_GRAPH))
+    output, layers = tmp_path / "out.png", tmp_path / "layers"
+    result = run("multi_model_graph_async", "--graph", str(graph), "--output", str(output),
+                 "--output-layers", str(layers))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frame = json.loads((layers / "layers.json").read_text())["frames"][0]
+    assert frame["layers"][0] == {"node": "od", "model": "yolov8-n_640x640",
+                                  "file": "out_000000_od.png"}
+    assert {"node": "zone", "op": "zone", "file": "out_000000_zone.png"} in frame["layers"]
+    assert frame["layers"][-1] == {"panel": "events", "file": "out_000000_events.png"}
+    import cv2
+    import numpy as np
+    base = cv2.imread(str(layers / frame["base"]))
+    rgba = [_read_rgba(layers / entry["file"]) for entry in frame["layers"]]
+    diff = np.abs(_stack(base, rgba).astype(int) - cv2.imread(str(output)).astype(int))
+    assert diff.max() <= 3, diff.max()
+    # --draw od: the zone's events are not od's, so no panel either.
+    drawn = tmp_path / "drawn"
+    result = run("multi_model_graph_async", "--graph", str(graph), "--draw", "od",
+                 "--output-layers", str(drawn))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frame = json.loads((drawn / "layers.json").read_text())["frames"][0]
+    assert frame["base"] == "intrusion_000000_base.png"  # no --output: the graph's stem
+    assert [entry.get("node", entry.get("panel")) for entry in frame["layers"]] == ["od"]
+
+
+@pytest.mark.graph_e2e
+def test_layers_of_several_streams_name_their_source(tmp_path):
+    absent = missing_artifacts(MULTISTREAM)
+    if absent:
+        pytest.skip(absent)
+    cam1, cam2 = write_two_stream_videos(tmp_path)
+    layers = tmp_path / "layers"
+    result = run("multi_model_graph_async", "--graph", "{}/{}".format(GRAPHS, MULTISTREAM),
+                 "--input", "cam1={}".format(cam1), "--input", "cam2={}".format(cam2),
+                 "--frames", "2", "--output-layers", str(layers))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frames = json.loads((layers / "layers.json").read_text())["frames"]
+    assert sorted((f["stream"], f["frame"]) for f in frames) == [
+        ("cam1", 0), ("cam1", 1), ("cam2", 0), ("cam2", 1)]
+    for frame in frames:
+        assert frame["base"] == "multistream_od_two_sources_{}_{:06d}_base.png".format(
+            frame["stream"], frame["frame"])
+        assert (layers / frame["base"]).is_file()
+        for entry in frame["layers"]:
+            assert (layers / entry["file"]).is_file()
