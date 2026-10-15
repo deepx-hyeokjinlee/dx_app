@@ -409,7 +409,7 @@ The `add_model.sh` script reads an entry from the registry and auto-generates:
 - 4 entry-point scripts under the variant directory (sync/async × python/cpp_postprocess)
 - C++ `<variant>_sync.cpp` and `<variant>_async.cpp` under `src/cpp_example/<task>/<family>/<variant>/`
 
-This enables onboarding a new model with little manual code in most cases; see the *Known issue* note in the [DX Tool Guide](10_DX-APP_DX-Tool_Guide.md) for the per-variant layout steps that are still manual.
+This enables onboarding a new model with zero manual code in most cases; see the [DX Tool Guide](10_DX-APP_DX-Tool_Guide.md) for the options.
 
 ### Contributor Rules
 

@@ -466,26 +466,32 @@ do_add_model() {
     local POSTPROCESSOR="${pp_array[$((pp_choice-1))]}"
     _info "Postprocessor: ${BOLD}${POSTPROCESSOR}${NC}"
 
-    # Model name input (validation + retry)
+    # Variant name input (validation + retry): the .dxnn stem is the directory name
     local MODEL_NAME=""
     while true; do
         echo "" >&2
-        read -rp "New model name (e.g. yolov30, my_detector): " MODEL_NAME
-        MODEL_NAME=$(echo "$MODEL_NAME" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
+        read -rp "New variant name, the .dxnn stem (e.g. yolov30-n_640x640, my-detector_512x512): " MODEL_NAME
+        MODEL_NAME=$(echo "$MODEL_NAME" | tr '[:upper:]' '[:lower:]')
         if [[ -z "$MODEL_NAME" ]]; then
-            _err "Model name is empty"; continue
+            _err "Variant name is empty"; continue
         fi
-        if [[ ! "$MODEL_NAME" =~ ^[a-z][a-z0-9_]*$ ]]; then
-            _err "Model name must start with lowercase letter and only contain [a-z0-9_]"; continue
+        if [[ ! "$MODEL_NAME" =~ ^[a-z0-9][a-z0-9._-]*$ ]]; then
+            _err "Variant name may only contain [a-z0-9._-]"; continue
         fi
-        # Duplicate check
-        if [[ -d "$CPP_DIR/$CATEGORY/$MODEL_NAME" ]] || [[ -d "$PY_DIR/$CATEGORY/$MODEL_NAME" ]]; then
-            _warn "Model already exists: ${CATEGORY}/${MODEL_NAME}"
-            confirm_prompt "Overwrite?" || continue
+        # Duplicate check: the variant directory sits under <task>/<family>/
+        if find "$CPP_DIR" "$PY_DIR" -mindepth 3 -maxdepth 3 -type d -name "$MODEL_NAME" -not -path "*/common/*" 2>/dev/null | grep -q .; then
+            _err "Variant already exists: ${MODEL_NAME} (add_model.sh does not overwrite)"; continue
         fi
         break
     done
-    _info "Model name: ${BOLD}${MODEL_NAME}${NC}"
+    _info "Variant name: ${BOLD}${MODEL_NAME}${NC}"
+
+    # Family (optional): default is the reference's family
+    local FAMILY=""
+    echo "" >&2
+    read -rp "Family directory (empty = the reference family): " FAMILY
+    local FAMILY_OPT=()
+    [[ -n "$FAMILY" ]] && FAMILY_OPT=(--family "$FAMILY")
 
     # Sync/Async selection
     local mode_choice
@@ -496,9 +502,9 @@ do_add_model() {
     # Final confirmation
     echo ""
     echo -e "${BOLD}┌─── Summary ───────────────────────────────┐${NC}"
-    echo -e "${BOLD}│${NC}  Model:          ${CYAN}${MODEL_NAME}${NC}"
+    echo -e "${BOLD}│${NC}  Variant:        ${CYAN}${MODEL_NAME}${NC}"
     echo -e "${BOLD}│${NC}  Task:           ${CYAN}${TASK_TYPE}${NC}"
-    echo -e "${BOLD}│${NC}  Category:       ${CYAN}${CATEGORY}${NC}"
+    echo -e "${BOLD}│${NC}  Family:         ${CYAN}${FAMILY:-(reference family)}${NC}"
     echo -e "${BOLD}│${NC}  Postprocessor:  ${CYAN}${POSTPROCESSOR}${NC}"
     echo -e "${BOLD}│${NC}  Language:       ${CYAN}${LANG_MODE}${NC}"
     [[ -n "$SYNC_ONLY" ]] && echo -e "${BOLD}│${NC}  Mode:           ${YELLOW}Sync only${NC}"
@@ -510,19 +516,17 @@ do_add_model() {
     if [[ "$LANG_MODE" == "cpp" || "$LANG_MODE" == "both" ]]; then
         echo -e "\n${GREEN}[C++]${NC} Generating model..."
         bash "$SCRIPT_DIR/add_model.sh" "$MODEL_NAME" "$TASK_TYPE" --lang cpp \
-            --category "$CATEGORY" --postprocessor "$POSTPROCESSOR" $SYNC_ONLY
-        echo -e "${GREEN}[C++]${NC} Done: ${CYAN}src/cpp_example/${CATEGORY}/${MODEL_NAME}/${NC}"
+            "${FAMILY_OPT[@]}" --postprocessor "$POSTPROCESSOR" $SYNC_ONLY
     fi
 
     if [[ "$LANG_MODE" == "python" || "$LANG_MODE" == "both" ]]; then
         echo -e "\n${GREEN}[Python]${NC} Generating model..."
         bash "$SCRIPT_DIR/add_model.sh" "$MODEL_NAME" "$TASK_TYPE" --lang py \
-            --category "$CATEGORY" --postprocessor "$POSTPROCESSOR" $SYNC_ONLY
-        echo -e "${GREEN}[Python]${NC} Done: ${CYAN}src/python_example/${CATEGORY}/${MODEL_NAME}/${NC}"
+            "${FAMILY_OPT[@]}" --postprocessor "$POSTPROCESSOR" $SYNC_ONLY
     fi
 
     echo -e "\n${GREEN}✓ Model added successfully!${NC}"
-    echo -e "  Build: ${YELLOW}cd src/cpp_example/build && cmake .. && make ${MODEL_NAME}_sync${NC}"
+    echo -e "  Build: ${YELLOW}./build.sh --target ${MODEL_NAME}_sync ${MODEL_NAME}_async${NC}"
 }
 
 # =============================================================================

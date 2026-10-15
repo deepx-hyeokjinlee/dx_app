@@ -204,7 +204,7 @@ Use this first to avoid creating duplicate or inconsistent example names.
 ./scripts/dx_tool.sh add
 ```
 
-The add flow is intended for contributors creating a new example under the current task/model layout. Typical information includes:  
+The add flow is intended for contributors creating a new example under the `<task>/<family>/<variant>/` layout. Typical information includes:  
 
 - target language (`cpp`, `py`, or both)  
 - task category  
@@ -217,17 +217,20 @@ For YOLO-family model onboarding and postprocessor selection details, refer to [
 You can also invoke `add_model.sh` directly for non-interactive usage:  
 
 ```bash
-# Create from a postprocessor template
-./scripts/add_model.sh yolo_custom object_detection --postprocessor yolov8
+# Create from a postprocessor family (the reference is the first registered example that uses it)
+./scripts/add_model.sh yolo-custom_640x640 object_detection --postprocessor yolov8
 
-# Copy from an existing model directory (useful for same-family variants)
-./scripts/add_model.sh yolov7_w6 object_detection --base-model yolov7 --postprocessor yolov7
+# Copy from an existing variant (useful for same-family variants)
+./scripts/add_model.sh yolov7-w6_1280x1280 object_detection --base-model yolov7_640x640 --input-size 1280x1280
+
+# Open a new family for the variant
+./scripts/add_model.sh my-det_640x640 object_detection --family my_det --postprocessor yolov5
 
 # Generate, verify, and push in one step
-./scripts/add_model.sh yolo_custom object_detection --postprocessor yolov8 --verify --model assets/models/yolo_custom.dxnn --git-push
+./scripts/add_model.sh yolo-custom_640x640 object_detection --postprocessor yolov8 --verify --model assets/models/yolo-custom_640x640.dxnn --git-push
 ```
 
-> **Known issue (this release).** `add_model.sh` still targets the old flat `<task>/<model>/` layout, and it copies the reference model's C++ factory with its `namespace v_<reference variant>` unchanged, so `python3 scripts/generate_cpp_family_layout.py --variant-scope src/cpp_example --check` refuses the new example. Rename by hand the factory's namespace to `v_<new variant>` (every character other than a letter or digit becomes `_`) and the `dxapp::v_<...>::` qualifier in the new `<variant>_sync.cpp` / `<variant>_async.cpp`. Per-variant support in `add_model.sh` is a follow-up.
+The first argument is the variant: the `.dxnn` stem, which is also the directory name. The example lands in `src/{cpp,python}_example/<task>/<family>/<variant>/` with the C++ factory scoped in `dxapp::v_<variant>`, `config.json` names the variant, and `config/model_registry.json` and `config/test_models.conf` gain the variant unless `--no-register` is given (a variant that is already registered takes its family, model file and input size from its row). The generator is `scripts/add_model_variant.py`; `add_model.sh` adds `--verify`, `--git-push` and `--auto-add` around it.
 
 Common `--postprocessor` values include:
 
@@ -246,13 +249,17 @@ Key `add_model.sh` options
 | Option | Description |
 |--------|-------------|
 | `--postprocessor <type>` | Select the post-processing family to use as template |
-| `--base-model <name>` | Copy from a specific existing model directory instead of the default reference |
+| `--base-model <variant>` | Copy from a specific existing variant instead of the default reference |
+| `--family <name>` | Family directory (default: the registry row's family, else the reference's) |
+| `--input-size <WxH>` | Model input size (default: the registry row's, else the reference's) |
+| `--dxnn <file>` | Model file name (default: `<variant>.dxnn`) |
+| `--no-register` | Do not add the variant to `model_registry.json` / `test_models.conf` |
 | `--lang <cpp\|py\|both>` | Target language (default: `both`) |
 | `--verify` | Build and run inference verification after generation |
 | `--model <path>` | `.dxnn` model file for `--verify` |
 | `--no-video` | Skip video verification (image only) |
 | `--git-push` | After successful `--verify`, commit and push |
-| `--auto-add` | Batch-generate source packages for all unregistered models |
+| `--auto-add` | Generate the example of every registry row that has none |
 
 After generation, review the resulting files under `src/cpp_example/` and/or `src/python_example/`.
 

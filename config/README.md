@@ -143,9 +143,10 @@ model_registry.json
   run_examples.sh / bench_models.sh  (run / benchmark)
 ```
 
-`add_model.sh` still writes the old flat `<task>/<model>/` layout; the
-manual steps until it supports the per-variant layout are in
-`docs/source/docs/10_DX-APP_DX-Tool_Guide.md` (*Known issue*).
+`add_model.sh --auto-add` generates the example of every registry row that has
+none, under `src/{cpp,python}_example/<task>/<family>/<variant>/`; a single
+`add_model.sh <variant> <task>` also adds the row and the `test_models.conf`
+line for a variant that is not registered yet.
 
 ---
 
