@@ -12632,7 +12632,7 @@ void TestValidateChecksLogicParams() {
         ",{\"id\":\"u\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
         "{\"name\":\"2nd\",\"input\":\"boxes\",\"output\":\"boxes\"}}",
         ",{\"from\":\"od\",\"to\":\"u\",\"carry\":\"result\"}"));
-    GRAPH_CHECK(m.find("\"name\" must be a C identifier, got \"2nd\"") != std::string::npos);
+    GRAPH_CHECK(m.find("\"name\" must be a C identifier that is not a C++ keyword, got \"2nd\"") != std::string::npos);
 }
 
 void TestValidateChecksLogicInputs() {
@@ -14848,6 +14848,50 @@ void TestFindMarkedRootWalksUpToTheMarker() {
     GRAPH_CHECK(std::system(("rm -rf '" + base + "'").c_str()) == 0);
 }
 
+// ---------------------------------------------------------------------
+// Phase 3: a user node's name becomes a class name in an exported project
+// ---------------------------------------------------------------------
+
+void TestUserNodeNamesAreCppNamesThatAreNotKeywords() {
+    GRAPH_CHECK(IsUserLogicName("tag_people") && IsUserLogicName("_count2") && IsUserLogicName("Rule"));
+    GRAPH_CHECK(!IsUserLogicName("class") && !IsUserLogicName("register") && !IsUserLogicName("and"));
+    GRAPH_CHECK(!IsUserLogicName("2fast") && !IsUserLogicName("a-b") && !IsUserLogicName(""));
+    GRAPH_CHECK(!IsUserLogicName("a__b") && !IsUserLogicName("_Upper"));
+    GRAPH_CHECK(!IsUserLogicName(std::string(65, 'a')) && IsUserLogicName(std::string(64, 'a')));
+    GRAPH_CHECK(IsEventName("seen") && IsEventName("zone.enter:2-b"));
+    GRAPH_CHECK(!IsEventName("two words") && !IsEventName("") && !IsEventName(std::string(65, 'e')));
+    const std::string keyword = LogicError(LogicJson(
+        ",{\"id\":\"u\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"class\",\"input\":\"boxes\",\"output\":\"boxes\"}}",
+        ",{\"from\":\"od\",\"to\":\"u\",\"carry\":\"result\"}"));
+    GRAPH_CHECK(keyword.find("\"name\" must be a C identifier that is not a C++ keyword, got \"class\"") !=
+                std::string::npos);
+}
+
+void TestUserNodesSharingANameTakeOneKind() {
+    const std::string two_kinds = LogicJson(
+        ",{\"id\":\"u1\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"rule\",\"input\":\"boxes\",\"output\":\"boxes\"}}"
+        ",{\"id\":\"c\",\"type\":\"logic\",\"op\":\"count\"}"
+        ",{\"id\":\"u2\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"rule\",\"input\":\"records\",\"output\":\"records\"}}",
+        ",{\"from\":\"od\",\"to\":\"u1\",\"carry\":\"result\"}"
+        ",{\"from\":\"od\",\"to\":\"c\",\"carry\":\"result\"}"
+        ",{\"from\":\"c\",\"to\":\"u2\",\"carry\":\"result\"}");
+    const std::string error = LogicError(two_kinds);
+    GRAPH_CHECK(error.find("node \"u2\"") != std::string::npos);
+    GRAPH_CHECK(error.find("\"name\" \"rule\" is also the name of node \"u1\", which takes boxes, "
+                           "not records") != std::string::npos);
+    const std::string one_kind = LogicJson(
+        ",{\"id\":\"u1\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"rule\",\"input\":\"boxes\",\"output\":\"boxes\"}}"
+        ",{\"id\":\"u2\",\"type\":\"logic\",\"op\":\"user\",\"params\":"
+        "{\"name\":\"rule\",\"input\":\"boxes\",\"output\":\"boxes\"}}",
+        ",{\"from\":\"od\",\"to\":\"u1\",\"carry\":\"result\"}"
+        ",{\"from\":\"od\",\"to\":\"u2\",\"carry\":\"result\"}");
+    GRAPH_CHECK(LogicError(one_kind).empty());
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -15261,6 +15305,8 @@ int main() {
     TestLayerFileNames();
     TestRuntimeRootIsDxappRootElseTheBuildsRepository();
     TestFindMarkedRootWalksUpToTheMarker();
+    TestUserNodeNamesAreCppNamesThatAreNotKeywords();
+    TestUserNodesSharingANameTakeOneKind();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

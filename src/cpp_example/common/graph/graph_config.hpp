@@ -139,6 +139,16 @@ GraphSpec ParseGraphFile(const std::string& path);
 /// Semantics. Throws GraphError. Implemented in Task 7.
 void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry);
 
+/// An event name: 1 to 64 letters, digits, _ . : - (a condition's "event",
+/// an event a user node's code raises).
+bool IsEventName(const std::string& text);
+
+/// A "user" node's "name": a C identifier of at most 64 characters that is
+/// not a C++ keyword and not reserved ("__" anywhere, "_" then a capital).
+/// An exported project (scripts/export_graph_project.py) makes it a class
+/// name; CppKeyword's list there is CPP_KEYWORDS in that script.
+bool IsUserLogicName(const std::string& text);
+
 }  // namespace graph
 }  // namespace dxapp
 

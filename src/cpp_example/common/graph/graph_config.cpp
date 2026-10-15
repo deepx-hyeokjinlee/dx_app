@@ -1392,6 +1392,36 @@ bool Identifier(const std::string& text) {
     return true;
 }
 
+/// The C++ keywords and alternative tokens. The same list is CPP_KEYWORDS in
+/// scripts/export_graph_project.py (tests/scripts/test_export_graph_project.py
+/// compares them).
+bool CppKeyword(const std::string& text) {
+    static const char* const kWords[] = {
+        "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool", "break",
+        "case", "catch", "char", "char8_t", "char16_t", "char32_t", "class", "compl", "concept",
+        "const", "consteval", "constexpr", "constinit", "const_cast", "continue", "co_await",
+        "co_return", "co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast",
+        "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend", "goto",
+        "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept", "not", "not_eq",
+        "nullptr", "operator", "or", "or_eq", "private", "protected", "public", "register",
+        "reinterpret_cast", "requires", "return", "short", "signed", "sizeof", "static",
+        "static_assert", "static_cast", "struct", "switch", "template", "this", "thread_local",
+        "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using",
+        "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"};
+    for (std::size_t i = 0; i < sizeof(kWords) / sizeof(kWords[0]); ++i) {
+        if (text == kWords[i]) return true;
+    }
+    return false;
+}
+
+/// A name a class can take: Identifier, not CppKeyword, not reserved.
+bool UserLogicName(const std::string& text) {
+    if (!Identifier(text) || CppKeyword(text)) return false;
+    if (text.find("__") != std::string::npos) return false;
+    return !(text.size() > 1 && text[0] == '_' &&
+             std::isupper(static_cast<unsigned char>(text[1])));
+}
+
 /// Every params value of a logic node against its op's table.
 void CheckLogicParams(const NodeSpec& node, Violations* bad) {
     const LogicOpInfo& info = *FindLogicOp(node.op);  // ParseGraphText checked the op
@@ -1500,8 +1530,9 @@ void CheckLogicParams(const NodeSpec& node, Violations* bad) {
                  "it names the event in [EVENT] lines and in --events");
     }
     text = node.params.text.find("name");
-    if (node.op == "user" && text != node.params.text.end() && !Identifier(text->second)) {
-        bad->Add("\"name\" must be a C identifier, got " + Quote(text->second),
+    if (node.op == "user" && text != node.params.text.end() && !UserLogicName(text->second)) {
+        bad->Add("\"name\" must be a C identifier that is not a C++ keyword, got " +
+                     Quote(text->second),
                  FindLogicOp("user")->params[0].help);
     }
 }
@@ -1646,6 +1677,10 @@ void CheckLogicInputs(const NodeSpec& node, const std::vector<LogicInputKind>& g
 }
 
 }  // namespace
+
+bool IsEventName(const std::string& text) { return EventName(text); }
+
+bool IsUserLogicName(const std::string& text) { return UserLogicName(text); }
 
 std::map<std::string, std::string> SharedEngineOwners(const GraphSpec& spec,
                                                       const IModelRegistry& registry) {
@@ -1798,6 +1833,29 @@ void ValidateGraph(const GraphSpec& spec, const IModelRegistry& registry) {
         Violations bad;
         CheckParams(node.params, info, &bad);
         bad.ThrowIfAny("node \"" + node.id + "\" \"params\"");
+    }
+
+    // 1c. "user" nodes that share a name share one class in an exported
+    // project (scripts/export_graph_project.py), so they take one kind.
+    std::map<std::string, const NodeSpec*> user_names;
+    for (std::size_t i = 0; i < spec.nodes.size(); ++i) {
+        const NodeSpec& node = spec.nodes[i];
+        if (!node.is_logic || node.op != "user") continue;
+        const std::string& name = node.params.text.at("name");  // required: 1b checked it
+        std::map<std::string, const NodeSpec*>::const_iterator first = user_names.find(name);
+        if (first == user_names.end()) {
+            user_names[name] = &node;
+            continue;
+        }
+        const std::string& had = first->second->params.text.at("input");
+        const std::string& has = node.params.text.at("input");
+        if (had != has) {
+            throw GraphError(GraphErrorCode::kGraphSchema, "node \"" + node.id + "\" \"params\"",
+                             "\"name\" " + Quote(name) + " is also the name of node \"" +
+                                 first->second->id + "\", which takes " + had + ", not " + has,
+                             "give one of them another name: an exported project makes one "
+                             "class per name");
+        }
     }
 
     // 2. Edge endpoints, duplicates, and source in-degree.

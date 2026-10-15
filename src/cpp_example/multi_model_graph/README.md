@@ -515,7 +515,7 @@ frame on the CPU after the nodes it reads, and reads them only on
 | `dwell` | tracked boxes (usually a zone's) | `threshold_s` (> 0, default 10), `grace_s` (default 1) | records per track: `track_id`, `seconds` | `dwell` (`seconds`), once per stay |
 | `condition` | boxes, records, or a per-crop node's scores or vectors | `value`, `comparator`, `threshold`, `reduce` `max`/`min`/`sum`, `cooldown_s`, `event` | records: `value`, `active` | its `event` (default: the node id), with `value`, `threshold`, `track_ids` |
 | `gallery` | vectors, per crop or full frame | `gallery` (required), `threshold` (0 to 1, default 0.5), `events` `known`/`all`/`none` | records per crop: `track_id`, `score`, `parent_index`, text `name` | `match` (`name`, `score`), `unknown` |
-| `user` | any one full-frame input | `name` (a C identifier), `input`, `output` (shape names, equal) | its input, unchanged | - |
+| `user` | any one full-frame input | `name` (a C identifier, not a C++ keyword; nodes sharing a name take one kind), `input`, `output` (shape names, equal) | its input, unchanged | - |
 
 * **Coordinates are fractions 0 to 1 of the source frame**, flat arrays:
   `"polygon": [x0, y0, x1, y1, ...]` (at least 3 points), `"line": [x0, y0,
