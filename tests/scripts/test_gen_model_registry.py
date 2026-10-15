@@ -1035,3 +1035,17 @@ def test_subset_entries_keeps_registry_order_and_the_aliases_of_kept_rows():
     assert [r["variant"] for r in kept] == ["a", "c"] and kept_aliases == [("old_a", "a", "legacy")]
     with pytest.raises(gen.GenError, match="not in the registry: z"):
         gen.subset_entries(rows, aliases, ["z"])
+
+
+@pytest.mark.parametrize("extra", [["--docs-only"], ["--check-docs"]])
+def test_only_is_refused_with_the_tracked_doc(tmp_path, extra):
+    """A registry of a few variants is an exported project's; it must never become the tracked table."""
+    r = subprocess.run([sys.executable, str(GENERATOR), "--out-dir", str(tmp_path), "--only", "yolov8-n_640x640"]
+                       + extra, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 2 and "--only" in r.stderr
+
+
+def test_only_refuses_an_empty_list(tmp_path):
+    r = subprocess.run([sys.executable, str(GENERATOR), "--out-dir", str(tmp_path), "--only", ","],
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 2 and "--only" in r.stderr

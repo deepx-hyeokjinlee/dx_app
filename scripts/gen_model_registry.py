@@ -875,6 +875,12 @@ def main():
                         help="comma-separated variants: emit a registry of only these "
                              "(an exported graph project, scripts/export_graph_project.py)")
     args = parser.parse_args()
+    if args.only is not None:
+        if args.docs_only or args.check_docs:
+            parser.error("--only makes an exported project's registry; it never writes or checks the "
+                         "tracked docs (--docs-only, --check-docs)")
+        if not [v for v in args.only.split(",") if v]:
+            parser.error("--only names no variant")
     if args.docs is None:
         tracked = args.docs_only or args.check_docs
         args.docs = str((ROOT / "docs" if tracked else Path(args.out_dir)) / "graph_models.md")
