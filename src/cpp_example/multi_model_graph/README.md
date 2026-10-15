@@ -649,6 +649,51 @@ input, the values allowed: `["count"]` for boxes,
 
 ---
 
+## Take a graph away: a standalone project
+
+`scripts/export_graph_project.py` writes a graph as a CMake project that
+builds and runs anywhere the DEEPX runtime is installed. It is this CLI with
+only the factories of the graph's models, so it gives the same events and
+the same overlay as `multi_model_graph_async`:
+
+```bash
+python3 scripts/export_graph_project.py --graph my_graph.json --out ~/my_graph
+cd ~/my_graph && ./setup.sh && ./run.sh      # results/result.jpg, results/events.jsonl
+```
+
+| Option | Meaning |
+|---|---|
+| `--name <name>` | the project and program name (default: from the graph's `name`) |
+| `--no-models` | leave the `.dxnn` files out; `setup.sh` downloads them (`models/models.tsv`) or copies them (`--models-from <dir>`) |
+| `--model-dir <dir>` | where the `.dxnn` files are (default `assets/models`) |
+| `--dry-run` | write nothing; with `--json`, print what would be exported and its size |
+| `--json` | one JSON summary on stdout (`ok`, `models`, `user_logic`, `inputs`, `bytes`; on failure `error`, `error_key`) |
+
+The project holds `graph.json` (its inputs and galleries copied into
+`inputs/` and `data/`), `main.cpp`, `CMakeLists.txt`, the engine and the
+used factories under `src/` at their dx_app paths, `models/`, `setup.sh`,
+`run.sh` and a README. The program is this CLI: `./run.sh --help`,
+`./run.sh --check`, `./run.sh --sync`, `--input`, `--display`, `--loop`.
+
+**`user` nodes.** In a run of this CLI a `user` node passes its input
+through. In an export it becomes a class `user_logic/<name>.{hpp,cpp}` with
+`Data Run(const Data& input, UserContext& ctx)`; the stub returns `input`
+and its comment lists the input's fields. Edit it and rebuild
+(`cmake --build build`): `ctx.Raise("event", track_id, data)` raises an
+event (stdout `[EVENT]`, `--events`, `--report`), `ctx.Label("text")`
+writes in the overlay's top-left panel, members keep state per stream. A
+class that throws, returns another kind or raises an invalid event name
+records a frame error and its input passes through.
+
+**Where a program finds its files.** Repository-relative paths
+(`src/cpp_example/<task>/<family>/<variant>/config.json`, `sample/...`,
+galleries) are read against `$DXAPP_ROOT` when it is set, else against the
+repository the program was built from, else, for an exported project, the
+nearest folder holding `.dxapp-root` (from the program's directory up, then
+from the working directory up). `run.sh` sets `DXAPP_ROOT`.
+
+---
+
 ## Error messages
 
 Every failure names **where** (the node or edge), **what** (the fact) and

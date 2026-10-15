@@ -233,6 +233,13 @@ Dumps raw input/output tensors as `.bin` files. On exception, tensors and a `rea
 | `DXAPP_VERIFY` | When `1`, dump JSON verification data |
 | `DXAPP_VERIFY_DIR` | Directory for `DXAPP_VERIFY` output (default `logs/verify`) |
 | `DXAPP_PROGRESS` | When `1`, print `[PROGRESS] frames=N fps=F avg_fps=A read_ms=… pre_ms=… infer_ms=… post_ms=…` once a second and at exit (front ends); multi_model_graph prints `node_ms=<id>:<ms>,…` instead of the stage fields |
+| `DXAPP_ROOT` | The root that repository-relative paths (`sample/...`, a model's `config.json`, galleries) are read against. Default: the repository the program was built from; an exported graph project uses the folder holding its `.dxapp-root` (its `run.sh` sets this variable) |
+
+---
+
+## Exporting a graph as a standalone project
+
+`python3 scripts/export_graph_project.py --graph <graph.json> --out <dir>` writes a multi-model graph as a CMake project that needs only the DEEPX runtime, CMake, a C++17 compiler and OpenCV 4: `./setup.sh` builds it, `./run.sh` runs it and writes `results/`. Each "User logic" node becomes a C++ class stub in `user_logic/` that passes data through until you edit it. See `src/cpp_example/multi_model_graph/README.md`, "Take a graph away".
 
 ---
 
