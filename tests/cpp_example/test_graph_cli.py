@@ -69,6 +69,7 @@ SAMPLE_GRAPHS = [
     "loitering_dwell.json",
     "zone_people_count.json",
     "gallery_known_person.json",
+    "driver_attention.json",
 ]
 # DX-M1 cannot load these together: realesrgan-x2 plus yolov8-n plus a third model.
 NPU_WEIGHT_EXCLUDED = (
@@ -1687,7 +1688,8 @@ def test_readmes_document_several_sources():
     assert "multistream_od_two_sources.json" in text
     # The parity claim counts what SAMPLE_GRAPHS compares against what ships.
     words = {11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
-             16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen"}
+             16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen", 20: "twenty",
+             21: "twenty-one", 22: "twenty-two"}
     shipped = len(list(GRAPH_DIR.glob("*.json")))
     if len(SAMPLE_GRAPHS) == shipped:
         claim = "all {} shipped sample graphs".format(words[shipped])
@@ -1700,6 +1702,30 @@ def test_readmes_document_several_sources():
     for needle in ("sources=", "run(frame, stream=None)", "| `stream` |", "g.streams",
                    "(source_id, frame)"):
         assert needle in py, needle
+
+
+@pytest.mark.graph
+def test_readme_lists_every_shipped_sample_graph():
+    """The samples table names exactly the graph files that ship next to it."""
+    text = README.read_text(encoding="utf-8")
+    table = text.split("Shipped samples, next to the CLI sources", 1)[1].split("\n\n", 2)[1]
+    listed = set(re.findall(r"^\| `([^`]+\.json)` \|", table, re.M))
+    assert listed == {p.name for p in GRAPH_DIR.glob("*.json")}
+
+
+@pytest.mark.graph
+def test_driver_attention_decides_on_head_pose_numbers():
+    """A condition reads a cpu node's records: the head pose's yaw and pitch."""
+    code, out = _check_json(GRAPH_DIR / "driver_attention.json")
+    assert code == 0 and out["ok"] is True and out["errors"] == [], out
+    with open(str(GRAPH_DIR / "driver_attention.json"), encoding="utf-8") as handle:
+        spec = json.load(handle)
+    conditions = {n["id"]: n["params"] for n in spec["nodes"] if n.get("op") == "condition"}
+    assert sorted(conditions) == ["head_down", "yaw_high", "yaw_low"]
+    assert {(p["value"], p["event"]) for p in conditions.values()} == {("yaw", "looking_away"),
+                                                                        ("pitch", "head_down")}
+    fed = {e["to"] for e in spec["edges"] if e["from"] == "headpose" and e.get("carry") == "result"}
+    assert fed == set(conditions)
 
 
 @pytest.mark.graph
@@ -1804,6 +1830,28 @@ def test_a_model_the_npu_cannot_hold_is_model_load(tmp_path):
     assert 'realesrgan_x2" failed to open' not in result.stderr
     assert "device memory may be full" in result.stderr
     assert "ERROR: model" not in result.stderr  # no longer the untyped fallback
+
+
+@pytest.mark.graph_e2e
+def test_driver_attention_conditions_read_the_head_pose_of_their_frame(tmp_path):
+    graph = "driver_attention.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    report = tmp_path / "report.json"
+    result = run("multi_model_graph_sync", "--graph", "{}/{}".format(GRAPHS, graph),
+                 "--report", str(report))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frame = json.loads(report.read_text(encoding="utf-8"))["frames"][0]
+    pose = frame["nodes"]["headpose"]["payload"]["items"][0]["numbers"]
+    for node, name in (("yaw_high", "yaw"), ("yaw_low", "yaw"), ("head_down", "pitch")):
+        numbers = frame["nodes"][node]["payload"]["items"][0]["numbers"]
+        assert numbers["value"] == pytest.approx(pose[name]), node
+    # The sample driver looks ahead (yaw about 14, pitch about -6 degrees): no condition holds.
+    assert -30 < pose["yaw"] < 30 and pose["pitch"] > -20, pose
+    assert not any(frame["nodes"][n]["payload"]["items"][0]["numbers"]["active"]
+                   for n in ("yaw_high", "yaw_low", "head_down"))
+    assert "events" not in frame
 
 
 # ---------------------------------------------------------------- tier 3

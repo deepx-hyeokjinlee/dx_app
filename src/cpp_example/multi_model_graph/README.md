@@ -75,7 +75,7 @@ Two binaries are built from one engine and differ in exactly one value:
 
 Both produce the same `FrameReport` for the same input — `--report` writes
 it as JSON, and `tests/cpp_example/test_graph_cli.py` compares the two files
-byte for byte on real hardware for **all nineteen shipped sample graphs**
+byte for byte on real hardware for **all twenty shipped sample graphs**
 (a graph whose model file is missing is skipped), covering
 every payload shape they produce — `frame`, `boxes`, `obboxes`,
 `keypoints`, `labelmap`, `densemap`, `image`, `scores`, `vector` and
@@ -106,13 +106,14 @@ Shipped samples, next to the CLI sources in `src/cpp_example/multi_model_graph/`
 | `loitering_dwell.json` | how long each tracked person stays in a zone; a `dwell` event after 5 s | `yolov8-n_640x640` → logic |
 | `zone_people_count.json` | people counted in two zones | `yolov8-n_640x640` → logic |
 | `gallery_known_person.json` | each person's ReID embedding named after the nearest gallery entry, or `unknown` | `yolov8-n_640x640` → `repvgg-a0-reid_256x128` → logic |
+| `driver_attention.json` | the driver's head pose decides: `looking_away` when the yaw passes ±30°, `head_down` when the pitch drops below −20° (conditions on a cpu node's numbers, cooldown 3 s) | `scrfd-500m_640x640` → `headpose` → logic |
 
 `hand_cascade.json`, `dms_headpose.json` and `logistics_volume.json` are
 shipped scenarios. The hand cascade is a crop chain. Head pose and volume
 are cpu nodes. CLIP prompt scores are not a graph node (see *Not in this
 release*).
 
-The last six are decision graphs (see *Logic nodes*). On their sample image
+The last seven are decision graphs (see *Logic nodes*). On their sample image
 they show one decision each; their scenes are videos, for example
 `--input assets/videos/person-pair-hallway.mp4` (two people walking a
 hallway) with `--loop` for a Live run.
