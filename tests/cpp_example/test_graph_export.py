@@ -180,3 +180,69 @@ def test_the_program_is_the_graph_cli(built):
 @pytest.mark.graph_export
 def test_an_edited_stub_builds(edited):
     assert _program(edited).is_file()
+
+
+# ---------------------------------------------------------------------------
+# graph_e2e: the same results as the suite, on the NPU
+# ---------------------------------------------------------------------------
+
+def _suite_run(*args):
+    r = subprocess.run([str(PROJECT_ROOT / "bin" / "multi_model_graph_async"), "--graph", str(USER_ZONE)] +
+                       [str(a) for a in args], cwd=str(PROJECT_ROOT), capture_output=True, text=True,
+                       timeout=600)
+    assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-3000:]
+    return r
+
+
+def _export_run(out, *args):
+    r = subprocess.run(["./run.sh"] + [str(a) for a in args], cwd=str(out), env=CLEAN_ENV, capture_output=True,
+                       text=True, timeout=600)
+    assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-3000:]
+    return r
+
+
+def _lines(path):
+    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _image_difference(a, b):
+    import cv2
+    import numpy as np
+    x, y = cv2.imread(str(a)), cv2.imread(str(b))
+    assert x is not None and y is not None and x.shape == y.shape
+    diff = np.abs(x.astype(np.int16) - y.astype(np.int16))
+    return float(diff.mean()), int(diff.max())
+
+
+@pytest.mark.graph_e2e
+def test_the_export_matches_the_suite_on_an_image(built, tmp_path):
+    _export_run(built)                                            # run.sh's defaults: results/
+    _suite_run("--output", tmp_path / "suite.jpg", "--events", tmp_path / "suite.jsonl")
+    ours, theirs = _lines(built / "results" / "events.jsonl"), _lines(tmp_path / "suite.jsonl")
+    assert ours == theirs and [e["event"] for e in ours][-1] == "intrusion"
+    mean, worst = _image_difference(built / "results" / "result.jpg", tmp_path / "suite.jpg")
+    assert mean < 0.5 and worst <= 8, (mean, worst)               # planning: identical bytes
+    assert json.loads((built / "results" / "report.json").read_text())
+
+
+@pytest.mark.graph_e2e
+def test_the_export_matches_the_suite_on_a_video(built, tmp_path):
+    from test_graph_cli import write_moving_video
+    video = write_moving_video(tmp_path / "walk.avi", count=12)
+    _export_run(built, "--input", "cam={}".format(video), "--output", tmp_path / "ours.mp4",
+                "--events", tmp_path / "ours.jsonl")
+    _suite_run("--input", "cam={}".format(video), "--output", tmp_path / "suite.mp4",
+               "--events", tmp_path / "suite.jsonl")
+    ours, theirs = _lines(tmp_path / "ours.jsonl"), _lines(tmp_path / "suite.jsonl")
+    assert ours and ours == theirs
+    assert (tmp_path / "ours.mp4").stat().st_size > 0
+
+
+@pytest.mark.graph_e2e
+def test_an_edited_stub_raises_its_own_events(edited, tmp_path):
+    r = _export_run(edited, "--output", tmp_path / "r.jpg", "--events", tmp_path / "e.jsonl")
+    events = _lines(tmp_path / "e.jsonl")
+    seen = [e for e in events if e["node"] == "tag"]
+    assert len(seen) == 1 and seen[0]["event"] == "seen" and seen[0]["data"]["people"] >= 1
+    assert seen[0]["track_id"] == -1 and '"node":"tag","event":"seen"' in r.stdout
+    assert [e["node"] for e in events].index("tag") < [e["node"] for e in events].index("zone")
