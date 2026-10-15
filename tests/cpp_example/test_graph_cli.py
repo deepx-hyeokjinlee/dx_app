@@ -1679,7 +1679,9 @@ def test_readmes_document_several_sources():
     section = text.split("## Several sources: one stream each", 1)[1].split("\n---", 1)[0]
     for needle in ("--input <source_id>=<uri>", "<stem>_<source_id><ext>",
                    "<stem>_<source_id>_<index><ext>", '"stream"', "in turn",
-                   "--frames", "--max-inflight", "--check", "multi_model_graph: <source_id>",
+                   "--frames", "--max-inflight", "--check",
+                   "one window, `multi_model_graph`, holding every stream",
+                   "labelled with its source id",
                    "one tracker per stream"):
         assert needle in section, needle
     assert "multistream_od_two_sources.json" in text
@@ -2109,7 +2111,9 @@ def test_output_is_written_per_stream(tmp_path, ext):
 
 
 @pytest.mark.graph_e2e
-def test_display_opens_a_window_per_stream_and_leaves_the_report_alone(tmp_path):
+def test_display_shows_every_stream_and_leaves_the_report_alone(tmp_path):
+    """One window holds every stream, a grid of labelled cells (its geometry:
+    graph_engine_test's TestDisplayGridTilesTheStreams)."""
     absent = missing_artifacts(MULTISTREAM)
     if absent:
         pytest.skip(absent)

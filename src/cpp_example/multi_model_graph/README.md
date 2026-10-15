@@ -1150,9 +1150,11 @@ The live-source refusal (image output from `camera:` or `rtsp://` without
 `--frames`) is checked for each stream's own uri, and the missing-directory
 check names the first file a stream would write:
 `could not write out/run_cam1.mkv: directory out does not exist` (exit 1).
-`--display` opens one window per stream, titled
-`multi_model_graph: <source_id>`; `q` or ESC in any of them stops the whole
-run, as Ctrl-C does. A stop request stops
+`--display` opens one window, `multi_model_graph`, holding every stream: a
+grid with one cell per source (2 side by side, 3-4 in 2x2, more in
+ceil(sqrt(N)) columns), each cell labelled with its source id at the top
+left and showing that stream's latest frame (see *Results for front ends*);
+`q` or ESC stops the whole run, as Ctrl-C does. A stop request stops
 reading every stream, finishes the frames in flight in every stream, and
 finalizes `--report` and every output file.
 
@@ -1263,7 +1265,7 @@ front end can add up `parse_model` figures itself.
 | `--graph <file>` | — | the graph to run |
 | `--input [<source>=]<uri>` | each source node's `uri` | image, video, `camera:<N>`, `rtsp://...`. Repeatable, once per source: `<source>=` names the source node it replaces, and a graph with several sources needs it (see *Several sources: one stream each*) |
 | `--output <file>` | none | the rendered result. `.mp4`, `.avi` or `.mkv` (any letter case): one video (codec `mp4v` for `.mp4`/`.mkv`, `MJPG` for `.avi`; the source's fps when it is between 1 and 240, else 30). Any other extension, or none: images, exactly `<file>` for a single image, `<stem>_<index><ext>` for each frame of a multi-frame source. Images from a live source (`camera:`, `rtsp://`, from `--input` or the graph's `uri`) never end, so they need `--frames N`; without it the run is refused (exit 2) before any model loads. A directory that does not exist fails before any model loads too (`could not write <file>: directory <dir> does not exist`, exit 1). With several sources, one file set per stream: one video `<stem>_<source_id><ext>` each, or images `<stem>_<source_id>_<index><ext>`, always numbered; both checks apply to each stream |
-| `--display` | off | show each rendered frame in a window. `q` or ESC stops the run gracefully, as Ctrl-C does; closing the window does not stop it (the next frame reopens it). Needs a window system: with none of `DISPLAY`, `WAYLAND_DISPLAY`, `QT_QPA_PLATFORM` set it is refused (exit 2). One that is set but does not answer (`DISPLAY=:99` with no server there, `QT_QPA_PLATFORM=xcb` without `DISPLAY`) is refused the same way, before any model loads: a window is opened once in a child process first, because Qt aborts the process that cannot connect. With several sources, one window per stream, `multi_model_graph: <source_id>`; `q` or ESC in any of them stops the run |
+| `--display` | off | show each rendered frame in a window. `q` or ESC stops the run gracefully, as Ctrl-C does; closing the window does not stop it (the next frame reopens it). Needs a window system: with none of `DISPLAY`, `WAYLAND_DISPLAY`, `QT_QPA_PLATFORM` set it is refused (exit 2). One that is set but does not answer (`DISPLAY=:99` with no server there, `QT_QPA_PLATFORM=xcb` without `DISPLAY`) is refused the same way, before any model loads: a window is opened once in a child process first, because Qt aborts the process that cannot connect. With several sources, one window, `multi_model_graph`, a grid of the streams with each cell labelled with its source id (see *Results for front ends*); `q` or ESC stops the run |
 | `--draw <id[,id...]>` | every node | draw only these nodes, in the window, `--output` and `--output-layers`; every node still runs, prints and reports. A logic node's id draws its overlay (a zone's polygon, a line's arrow, its labels): `--draw zone` draws the zone but not its detector's boxes, `--draw od,zone` both. The events panel lists only the drawn nodes' events, so it shows when a drawn node raises one. Repeatable; ids are comma-separated. An id that is not a node of the graph, or is a source, is a usage error (exit 2) naming the graph's other nodes: `--draw: "nope" is not a node of this graph that draws; its nodes: od, seg, depth`. With `--check` or a listing it is a usage error too |
 | `--output-layers <dir>` | none | per frame, the clean source frame and each drawn node's drawing alone on a transparent RGBA PNG the size of the frame, plus `<dir>/layers.json` listing them in stacking order (see *Results for front ends*). `<dir>` is made when it does not exist (its parent must; otherwise exit 1, before any model loads). A video, camera or RTSP source needs `--frames N` (exit 2 otherwise): it writes every frame. With `--check` or a listing it is a usage error (exit 2) |
 | `--report <file>` | none | every `FrameReport` as JSON, ordered by `(node, parent_index, roi_index)`. Written frame by frame and finalized on every exit short of a kill (see *`--report`* below) |
@@ -1333,7 +1335,7 @@ request, let the run finish; if you may have to kill it, write `.mkv` or
 
 ### Results for front ends
 
-Two options turn one run into what a page needs to show it.
+Three options turn one run into what a page needs to show it.
 
 - **`--draw od,zone`** keeps the picture to the nodes chosen before a Live
   run starts. The other nodes still run, print their `frame N:` lines and
@@ -1383,6 +1385,13 @@ Two options turn one run into what a page needs to show it.
   then its boxes) over a pixel another node drew in between. Labels are
   laid out as in the merged image, so toggling a layer off never moves the
   others. The run prints `layers: <dir>/layers.json` at its end.
+- **`--display` with several sources** shows one window, a grid of the
+  streams (2 side by side, 3-4 in 2x2, more in ceil(sqrt(N)) columns), each
+  cell labelled with its source id and showing that stream's latest frame,
+  letterboxed when the streams' sizes differ. The cells are the size of the
+  first frame rendered, the whole grid scaled down to fit 1920x1080; so one
+  capture of the window (Studio's Live on Xvfb) shows every stream. With
+  one source the window is the frame itself, as before.
 
 ### `--report`
 

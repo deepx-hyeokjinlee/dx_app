@@ -159,7 +159,10 @@ inline std::string StreamImagePath(const std::string& output, const std::string&
     return single_frame ? output : NumberedPath(output, index);
 }
 
-/// "multi_model_graph" with one source; "multi_model_graph: <source>" with several.
+/// "multi_model_graph" with one source; "multi_model_graph: <source>" with
+/// several. The CLI no longer opens a window per stream: with several
+/// sources it shows one window, "multi_model_graph", holding TileFrames'
+/// grid, so one capture of it shows every stream.
 inline std::string WindowName(const std::string& source, bool several) {
     return several ? "multi_model_graph: " + source : std::string("multi_model_graph");
 }
@@ -230,14 +233,17 @@ inline cv::Mat TileFrames(const std::vector<cv::Mat>& frames,
                                            fitted.height)));
         }
         if (i < names.size()) {
+            // Readable once a window scales the grid down: larger in larger cells.
+            const double font = std::max(0.6, box.height / 500.0);
+            const int thickness = font >= 1.0 ? 2 : 1;
             int baseline = 0;
-            const cv::Size text =
-                cv::getTextSize(names[i], cv::FONT_HERSHEY_SIMPLEX, 0.6, 1, &baseline);
+            const cv::Size text = cv::getTextSize(names[i], cv::FONT_HERSHEY_SIMPLEX, font,
+                                                  thickness, &baseline);
             cv::rectangle(target, cv::Rect(0, 0, std::min(box.width, text.width + 12),
                                            std::min(box.height, text.height + baseline + 10)),
                           cv::Scalar(0, 0, 0), cv::FILLED);
             cv::putText(target, names[i], cv::Point(6, text.height + 5), cv::FONT_HERSHEY_SIMPLEX,
-                        0.6, cv::Scalar(255, 255, 255), 1);
+                        font, cv::Scalar(255, 255, 255), thickness);
         }
     }
     return canvas;

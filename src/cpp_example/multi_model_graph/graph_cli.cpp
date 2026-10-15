@@ -174,7 +174,11 @@ void PrintUsage(std::FILE* out, const char* program) {
         "                        <stem>_<source_id>_<index><ext>\n"
         "  --display             show each rendered frame in a window; q or"
         " ESC stops\n"
-        "                        the run as Ctrl-C does\n"
+        "                        the run as Ctrl-C does. With several sources,"
+        " one\n"
+        "                        window: a grid of the streams, each cell"
+        " labelled\n"
+        "                        with its source id\n"
         "  --draw <id[,id...]>   draw only these nodes (a logic node's id draws its\n"
         "                        overlay) in the window, --output and"
         " --output-layers;\n"
@@ -1662,6 +1666,18 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
         layers.reset(new LayersWriter(args.output_layers,
                                       LayersStem(args.output, args.graph_path), spec));
     }
+    // --display with several sources: one window, a grid of every stream's
+    // latest frame; its cells are the size of the first frame rendered.
+    std::unique_ptr<DisplayWindow> grid_window;
+    std::vector<cv::Mat> latest(reader.size());
+    std::vector<std::string> stream_names;
+    cv::Size grid_cell;
+    if (args.display && several) {
+        grid_window.reset(new DisplayWindow(WindowName(std::string(), false)));
+        for (std::size_t s = 0; s < reader.size(); ++s) {
+            stream_names.push_back(reader.input(s).source);
+        }
+    }
     std::vector<StreamSink> sinks(reader.size());
     std::vector<std::deque<std::string> > recent(reader.size());  // the event panel, per stream
     for (std::size_t s = 0; s < reader.size(); ++s) {
@@ -1671,7 +1687,7 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
             sinks[s].video.reset(new VideoOutput(
                 StreamVideoPath(args.output, input.source, several), input.input->getFPS()));
         }
-        if (args.display) {
+        if (args.display && !several) {
             sinks[s].window.reset(new DisplayWindow(WindowName(input.source, several)));
         }
     }
@@ -1721,7 +1737,7 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
             std::fprintf(stderr, "%s\n", problem.c_str());
             return false;
         }
-        if (output_kind != OutputKind::kNone || sink.window || layers) {
+        if (output_kind != OutputKind::kNone || sink.window || grid_window || layers) {
             std::vector<cv::Rect> labels;
             cv::Mat rendered = RenderReport(shown, report, render_options, &labels);
             const std::vector<std::string> panel(recent.at(stream_index).begin(),
@@ -1747,6 +1763,13 @@ int RunInputLoop(StageGraph& graph, FrameExecutor& executor, const GraphSpec& sp
                 std::printf("output: %s\n", path.c_str());
             }
             if (sink.window && sink.window->Show(rendered)) RequestStop();  // q / ESC
+            if (grid_window) {
+                if (grid_cell.area() == 0) grid_cell = rendered.size();
+                latest.at(stream_index) = rendered;
+                if (grid_window->Show(TileFrames(latest, stream_names, grid_cell))) {
+                    RequestStop();
+                }
+            }
         }
         return true;
     };
