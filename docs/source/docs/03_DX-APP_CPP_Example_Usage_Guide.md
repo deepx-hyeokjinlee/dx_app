@@ -107,7 +107,7 @@ Use this variant when you want:
 - easier step-by-step debugging  
 - single-image or low-complexity usage examples  
 
- **Asynchronous Flow (`xx_async.cpp`)**  
+**Asynchronous Flow (`xx_async.cpp`)**  
 
 Use this variant when you want:
 
@@ -193,9 +193,9 @@ If no input source is provided, the runner automatically selects a default sampl
 
 All C++ binaries - every single-model runner (`installSignalHandlers()`) and `multi_model_graph_sync`/`multi_model_graph_async` - install SIGINT/SIGTERM handlers. Pressing Ctrl+C triggers a graceful shutdown with clean resource release (the graph CLI finishes the frames in flight in every stream and finalizes `--report`/`--output`/`--events`). A later Ctrl+C, more than 200 ms after the first, terminates the process at once (for a shutdown that is itself stuck); repeats within 200 ms count as the same request. SIGTERM is always graceful, however often it arrives.
 
-**Output order (async runners)**  
+**Preview window.** The window opens at half the screen size with the frame's aspect ratio kept (`DXAPP_SCREEN_W`/`DXAPP_SCREEN_H`, else `xdpyinfo`, else 1920x1080), the same rule as the Python runners' `show_image()`. Every frame is shown by default: a window slower than the NPU paces the pipeline, so measure throughput with `--no-display`. `--drop-frames` selects a depth-1 preview that discards stale frames (the sync preview is then capped at 10 fps, the async one at 60 fps, and the summary prints `dropped (stale)`).
 
-**Preview window.** The window opens at half the screen size with the frame's aspect ratio kept (`DXAPP_SCREEN_W`/`DXAPP_SCREEN_H`, else `xdpyinfo`, else 1920x1080), the same rule as the Python runners' `show_image()`. Every frame is shown by default: a window slower than the NPU paces the pipeline, so measure throughput with `--no-display`. `--drop-frames` restores the depth-1 preview that discards stale frames (the sync preview is then capped at 10 fps, the async one at 60 fps, and the summary prints `dropped (stale)`).
+**Output order (async runners)**  
 
 Async runners get results back from dxrt's completion threads in any order. Each frame gets an index when it is submitted, and the display thread releases frames through a reorder buffer (`common/utility/frame_reorder.hpp`), so display, save and `DXAPP_VERIFY` output (written where the buffer releases a frame) follow the input order and equal the sync runner's frame by frame. The runner's one postprocessor is shared by dxrt's callback threads and serialized (`common/processors/serialized_postprocessor.hpp`). SuperPoint's tracker is updated by its visualizer, after the reorder buffer, so it also sees frames in input order.
 
@@ -203,7 +203,7 @@ Async runners get results back from dxrt's completion threads in any order. Each
 - On an interrupted run (Ctrl+C, SIGTERM, or closing the window) that wait ends at once, and the frames the reorder buffer already holds are still released in index order.
 - The reorder buffer holds at most twice the runner's in-flight depth. If a frame never comes back from dxrt, the lowest buffered frame is released once that cap is passed, so the display cannot stall; from then on output order is no longer guaranteed.
 
-`DXRT_TASK_MAX_LOAD=40` (a dxrt setting) raises dxrt's I/O buffer count from its default (about 7 jobs in flight) to the runners' 40-frame pipeline depth (instance segmentation keeps its own limit of 4). For a large model dxrt may allocate fewer buffers when NPU memory is short and logs `Buffer count reduced from 40 to N due to NPU memory limit (...)`. On the DX-M1 M.2 card used for testing (3.92 GiB), `yolopv2_384x640` did not start at 40 on DX-RT 3.4.1 (dxrt reported `Dynamic IPC task init failed` before the first frame) and needed `DXRT_TASK_MAX_LOAD=20` or less. On DX-RT 3.5.0 (driver 2.7.0) it starts at 40 and runs the whole video, with dxrt reducing the buffer count to 31 (v8 file) or 32 (v9 file). The limit depends on the device's free NPU memory, which other processes on the NPU share.
+`DXRT_TASK_MAX_LOAD=40` (a dxrt setting) raises dxrt's I/O buffer count from its default (about 7 jobs in flight) to the runners' 40-frame pipeline depth (instance segmentation keeps its own limit of 4). For a large model dxrt may allocate fewer buffers when NPU memory is short and logs `Buffer count reduced from 40 to N due to NPU memory limit (...)`. If a large model such as `yolopv2_384x640` fails to start at 40 (dxrt reports `Dynamic IPC task init failed` before the first frame), lower the value, for example to `DXRT_TASK_MAX_LOAD=20`. The limit depends on the device's free NPU memory, which other processes on the NPU share.
 
 **Output Management (`--save`)**  
 

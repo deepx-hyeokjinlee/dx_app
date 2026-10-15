@@ -1,10 +1,10 @@
 # Copyright (C) 2018- DEEPX Ltd. All rights reserved.
-"""Zoo-table metadata for the 147 additions, harvested from DX Model Zoo.html.
+"""Zoo-table metadata for the 147 additions, harvested from the DX Model Zoo page.
 
 Generated once and committed so nothing depends on an untracked HTML dump at runtime.
 139 of the 143 unpublished stems matched their table row by normalised name; the 4
 CLIP/ReID rows whose zoo name bears no resemblance to the .dxnn stem are listed as
-explicit exceptions in the generator, mirroring how migrate_registry_modelzoo.py
+explicit exceptions in the generator, mirroring how the registry migration
 handled its 3 unmatched entries. The mapping is a verified bijection: 147 stems, 147
 rows, none claimed twice.
 

@@ -53,9 +53,9 @@ Skills encapsulate reusable workflows that agents invoke during code generation.
 
 | Skill | Description |
 |-------|-------------|
-| `dx-swe-brainstorm` | Brainstorm and plan before any code generation |
-| `dx-swe-tdd` | Test-driven development — validate each file immediately after creation |
-| `dx-swe-verify` | Verify before claiming completion — evidence before assertions |
+| `dx-agent-brainstorm` | Brainstorm and plan before any code generation |
+| `dx-agent-tdd` | Test-driven development — validate each file immediately after creation |
+| `dx-agent-verify` | Verify before claiming completion — evidence before assertions |
 | `dx-swe-writing-plans` | Write structured implementation plans before touching code |
 | `dx-swe-executing-plans` | Execute a written implementation plan with review checkpoints |
 | `dx-swe-debugging` | Systematic debugging — diagnose before proposing fixes |
@@ -79,7 +79,7 @@ Skills encapsulate reusable workflows that agents invoke during code generation.
 
 ## Supported AI Tools
 
-dx_app agent-driven development works with four AI coding tools. Each auto-loads
+dx_app agent-driven development works with five AI coding tools. Each auto-loads
 the knowledge base through its own configuration.
 
 | Tool | Config Files | Agents Available |
@@ -88,6 +88,7 @@ the knowledge base through its own configuration.
 | **GitHub Copilot** | `.github/copilot-instructions.md`<br>6 agents in `.github/agents/`<br>17 skills in `.github/skills/`<br>4 instructions in `.github/instructions/` | `@dx-app-builder`, `@dx-python-builder`,<br>`@dx-cpp-builder`, `@dx-benchmark-builder`,<br>`@dx-model-manager`, `@dx-validator` |
 | **Cursor** | `.cursor/rules/dx-app.mdc` (always)<br>6 agent rules + 17 skill rules<br>`python-example.mdc`, `cpp-example.mdc`,<br>`tests.mdc` (27 total) | Free-form with<br>auto-applied rules |
 | **OpenCode** | `AGENTS.md`, `opencode.json`<br>6 agents in `.opencode/agents/`<br>17 skills in `.deepx/skills/` | `@dx-app-builder`<br>or `/dx-agent-app-build-python` |
+| **Codex CLI** | `AGENTS.md`<br>`.codex/skills/dx-codex-identity/SKILL.md` | Free-form with<br>auto-loaded instructions |
 
 ### Copilot File-Specific Instructions
 
@@ -107,9 +108,9 @@ context-specific instructions:
 
 | Slash Command | Description |
 |---|---|
-| `/dx-swe-brainstorm` | Brainstorm and plan before code generation |
-| `/dx-swe-tdd` | Test-driven development with incremental validation |
-| `/dx-swe-verify` | Verify completion with evidence before assertions |
+| `/dx-agent-brainstorm` | Brainstorm and plan before code generation |
+| `/dx-agent-tdd` | Test-driven development with incremental validation |
+| `/dx-agent-verify` | Verify completion with evidence before assertions |
 | `/dx-swe-writing-plans` | Write structured implementation plans |
 | `/dx-swe-executing-plans` | Execute implementation plans with review checkpoints |
 | `/dx-swe-debugging` | Systematic debugging — diagnose before fixing |
@@ -201,7 +202,7 @@ execution.
 | `.deepx/skills/` | 17 directories | Detailed skill workflows (one `SKILL.md` per directory) |
 | `.deepx/templates/` | Template files | Code generation templates |
 | `.deepx/knowledge/` | Knowledge files | Domain-specific reference material |
-| `.deepx/toolsets/` | 5 files | API references and schema documentation |
+| `.deepx/toolsets/` | 6 files | API references and schema documentation |
 | `.deepx/instructions/` | 6 files | Coding standards and workflow rules |
 | `.deepx/memory/` | 5 files | Persistent knowledge — pitfalls and session memory |
 | `.deepx/contextual-rules/` | 4 files | Context-dependent rules activated by task type |
@@ -268,7 +269,7 @@ execution.
 | **Claude Code** | `@dx-validator` followed by the prompt. |
 | **GitHub Copilot** | `@dx-validator` followed by the prompt. |
 | **Cursor** | Type the prompt directly. |
-| **OpenCode** | `@dx-validator` followed by the prompt, or run manually: `python .deepx/scripts/validate_app.py src/python_example/object_detection/yolo26n/` |
+| **OpenCode** | `@dx-validator` followed by the prompt, or run manually: `python .deepx/scripts/validate_app.py src/python_example/object_detection/yolo26/yolo26-n_640x640/` |
 
 ### Scenario 5: Build a Pose Estimation App
 
@@ -464,7 +465,7 @@ Agent knowledge lives in the `.deepx/` directory at the dx_app project root.
 | `skills/` | 17 | Skill workflow directories (one `SKILL.md` each) |
 | `templates/` | — | Code generation templates |
 | `knowledge/` | — | Domain-specific reference material |
-| `toolsets/` | 5 | API references (InferenceEngine, IFactory, dxrt-cli, model registry, pybind helpers) |
+| `toolsets/` | 6 | API references (InferenceEngine, IFactory, dxrt-cli, model registry, pybind helpers, OCR apps) |
 | `memory/` | 5 | Persistent knowledge (common pitfalls, platform API notes, optimization patterns, camera/display notes, model config cache) |
 | `contextual-rules/` | 4 | Coding standards, import rules, naming conventions, directory layout rules |
 | `prompts/` | 4 | System prompts for each specialist agent |
@@ -473,7 +474,7 @@ Agent knowledge lives in the `.deepx/` directory at the dx_app project root.
 !!! note "NOTE"
 
     Platform files (`.github/`, `.cursor/`, `.opencode/`, `CLAUDE.md`, `AGENTS.md`) are generated by `dx-agent-gen generate --repo dx-runtime/dx_app`. 
-    Do not edit them directly. Edit `.deepx/` source files and re-run the generator. A pre-commit hook runs `dx-agent-gen` automatically.
+    Do not edit them directly. Edit `.deepx/` source files and re-run the generator.
 
 Agents read from these directories at task start. Memory files are updated when
 new patterns or fixes are discovered during development.
@@ -493,7 +494,7 @@ Sub-agents invoked via handoff do not output sentinels — only the top-level ag
 
 Rules:  
 
-1. **CRITICAL** — Output `[DX-AGENT-DEV: START]` as the absolute first line of the first response, before any other text. This is non-negotiable even if the user says to proceed autonomously.  
+1. Output `[DX-AGENT-DEV: START]` as the absolute first line of the first response, before any other text.  
 2. Output `[DX-AGENT-DEV: DONE (output-dir: <path>)]` as the very last line after all work, validation, and file generation is complete.  
 3. If you are a sub-agent invoked via handoff/routing, do NOT output sentinels — only the top-level agent outputs them.  
 4. If the user sends multiple prompts in a session, output START/DONE for each prompt.  

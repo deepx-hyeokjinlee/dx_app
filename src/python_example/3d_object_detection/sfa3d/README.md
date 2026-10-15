@@ -66,7 +66,7 @@ src/cpp_example/3d_object_detection/sfa3d/sfa3d_608x608/
 
 ## 3. How to run
 
-### 3-1. Python (run from `src/python_example/`)
+### 3-1. Python (run from the variant directory)
 
 ```bash
 cd src/python_example/3d_object_detection/sfa3d/sfa3d_608x608
@@ -111,7 +111,7 @@ If the input is omitted, the default sample `sample/kitti/velodyne/000049.bin` i
 
 | Option | Description |
 |--------|-------------|
-| `-m`, `--model` | path to the `.dxnn` model (required) |
+| `-m`, `--model` | path to the `.dxnn` model (default: `assets/models/sfa3d_608x608.dxnn`) |
 | `-i`, `--image` | one LiDAR `.bin` file **or** a velodyne directory |
 | `--calib-dir` | directory of `{frame_id}.txt` calib files (paired with the `-i` stem) |
 | `--image2-dir` | directory of `{frame_id}.png/.jpg` camera images (paired with the `-i` stem) |
@@ -123,7 +123,8 @@ If the input is omitted, the default sample `sample/kitti/velodyne/000049.bin` i
 
 > With the default KITTI layout (`velodyne/` + `calib/` + `image_2/`),
 > `--calib-dir` and `--image2-dir` can be omitted.
-> Both Python and C++ accept `-h` / `--help`.
+> Both Python and C++ accept `-h` / `--help`. The C++ binary spells the long
+> options `--model_path` / `--image_path`; the short forms are the same.
 
 ---
 

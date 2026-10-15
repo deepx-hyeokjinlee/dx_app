@@ -4,7 +4,7 @@
 
 ## Overview
 
-dx_app provides 497 model variants across 28 AI tasks with Python (4 variants) and C++ examples. All 497 have a downloadable `.dxnn`. `SCRFD500M_PPU` and `YOLOV5Pose_PPU` example sources stay on disk and are not registered.
+dx_app provides 497 compiled `.dxnn` models across 28 AI tasks with Python (4 variants) and C++ examples.
 
 ## Response Language
 

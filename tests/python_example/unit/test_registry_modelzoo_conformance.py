@@ -259,7 +259,7 @@ def test_family_names_are_unique_across_tasks(registry):
     }
     assert not clashes, (
         f"family name(s) used in more than one task: {clashes} -- "
-        "add an entry to FAMILY_OVERRIDES in scripts/migrate_registry_modelzoo.py"
+        "add an entry to FAMILY_OVERRIDES above"
     )
 
 

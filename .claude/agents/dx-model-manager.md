@@ -183,7 +183,7 @@ for i, o in enumerate(out_info):
 
 > `csv_task` is a CSV-import artifact and is NOT authoritative for routing — use `add_model_task`. Several codes are shared (`OD`, `SEG`, `FD`, `POSE`); see `.deepx/toolsets/model-registry.md`.
 
-## Model Count by Task (v3.2.2)
+## Model Count by Task (v3.3.0)
 
 > Counts below are a snapshot. `config/model_registry.json` is the single source
 > of truth — query it (`jq 'group_by(.task) | map({(.[0].task): length}) | add'`)

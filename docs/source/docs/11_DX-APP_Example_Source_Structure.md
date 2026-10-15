@@ -184,11 +184,11 @@ src/python_example/common/
 │   ├── fast_yolact_postprocessor.py    # opt-in fast mask path (YOLACT)
 │   ├── obb_postprocessor.py            # YOLOv26OBB
 │   ├── pose_postprocessor.py           # YOLOv8-Pose
-│   ├── ppu_postprocessor.py            # PPU variants (YOLOv5/v7/SCRFD/Pose)
+│   ├── ppu_postprocessor.py            # PPU variants (YOLOv3/v4/v5/v7/v8/v9/v10/v11/v12, YOLOX)
 │   ├── classification_postprocessor.py # EfficientNet, AlexNet, etc.
 │   ├── efficientdet_postprocessor.py   # EfficientDet
 │   ├── fast_efficientdet_postprocessor.py # opt-in exact fast path (EfficientDet, byte-identical)
-│   ├── depth_postprocessor.py          # FastDepth, MiDaS
+│   ├── depth_postprocessor.py          # FastDepth, SCDepth
 │   ├── nanodet_postprocessor.py        # NanoDet
 │   ├── ssd_postprocessor.py            # SSD MobileNet
 │   ├── damoyolo_postprocessor.py       # DAMOYOLO
@@ -201,7 +201,7 @@ src/python_example/common/
 │   ├── sync_runner.py     # SyncRunner — sequential Pre→Infer→Post→Display loop
 │   ├── async_runner.py    # AsyncRunner — pipelined multi-thread runner
 │   ├── args.py            # Unified CLI argument parser (--model, --image, --video, etc.)
-│   ├── run_dir.py         # Directory-based batch runner
+│   ├── run_dir.py         # `--save` run-directory and run_info helper
 │   ├── sr_tiling.py       # Tiled super-resolution helper
 │   └── verify_serialize.py # Serialize results to JSON for numerical verification
 ├── inputs/                # 5 input source files
@@ -409,7 +409,7 @@ The `add_model.sh` script reads an entry from the registry and auto-generates:
 - 4 entry-point scripts under the variant directory (sync/async × python/cpp_postprocess)
 - C++ `<variant>_sync.cpp` and `<variant>_async.cpp` under `src/cpp_example/<task>/<family>/<variant>/`
 
-This enables onboarding a new model with zero manual code in most cases.
+This enables onboarding a new model with zero manual code in most cases; see the [DX Tool Guide](10_DX-APP_DX-Tool_Guide.md) for the options.
 
 ### Contributor Rules
 
@@ -529,6 +529,6 @@ If the example is intended to be part of the standard repository workflow, also 
 - `scripts/validate_models.sh`
 - `tests/cpp_example/`
 - `tests/python_example/`
-- `docs/10_DX-APP_DX-Tool_Guide.md`
+- [DX Tool Guide](10_DX-APP_DX-Tool_Guide.md)
 
 ---

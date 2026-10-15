@@ -44,7 +44,7 @@ Feature Tests
 | `test_dump_tensors.py` | `dump_tensors` | `--dump-tensors` tensor file generation |
 | `test_verify.py` | `verify` | `DXAPP_VERIFY` output of every downloaded model, sync and async: one non-empty record, per-frame file |
 | `test_verify_dumps.py` | `verify` | Runtime checks of past `DXAPP_VERIFY` regressions (async classification/detection, restoration and tiled SR, 3D detection, YOLOPv2 masks) |
-| `test_sync_async_parity.py` | `verify` | Async output equals sync frame by frame (video clip, DXRT_TASK_MAX_LOAD=40): every video-capable async runner, plus loops and an interrupt mid-video. The sweep leaves out the image-only tasks (super_resolution among them) and the registry rows marked `image_only`; `espcn-x4_17x17`, `realesrgan-x2_192x192`, `sfa3d_608x608` and `arcface_mobilefacenet_112x112` are compared in image mode instead. `yolopv2_384x640` runs at DXRT_TASK_MAX_LOAD=20 (it did not start at 40 on the test device with DX-RT 3.4.1, `MAX_LOAD` in the file); other models that get fewer than 40 buffers run at 40 with dxrt's reduced count |
+| `test_sync_async_parity.py` | `verify` | Async output equals sync frame by frame (video clip, DXRT_TASK_MAX_LOAD=40): every video-capable async runner, plus loops and an interrupt mid-video. The sweep leaves out the image-only tasks (super_resolution among them) and the registry rows marked `image_only`; `espcn-x4_17x17`, `realesrgan-x2_192x192`, `sfa3d_608x608` and `arcface_mobilefacenet_112x112` are compared in image mode instead. `yolopv2_384x640` runs at DXRT_TASK_MAX_LOAD=20 (`MAX_LOAD` in the file); other models that get fewer than 40 buffers run at 40 with dxrt's reduced count |
 | `test_multi_loop.py` | `multi_loop` | `-l N` loop count behavior |
 | `test_signal_handling.py` | `signal_handling` | SIGINT graceful shutdown; one Ctrl-C under `timeout` is one request; a later Ctrl-C ends a run stuck in its output (a FIFO) |
 
@@ -62,7 +62,7 @@ For CLI Tests
 
 For E2E Tests (Additional)  
 
-- **Models**: Run `./setup_sample_models.sh` to populate `assets/models/`. The current setup flow uses the DX-ModelZoo downloader path and can prepare models non-interactively for internal-network environments.  
+- **Models**: Run `./setup_sample_models.sh` to populate `assets/models/`. Pass `--all` to download every model non-interactively.  
 - **Test Data**: Ensure images exist in `sample/img/` and videos in `assets/videos/` (Run `./setup_sample_videos.sh`).  
 - **Libraries**: Shared libraries must be present in the `lib/` directory.  
 
@@ -113,7 +113,7 @@ cd ../../  # Go to project root (dx_app/)
 # Run only C++ E2E image tests (faster, skips stream)
 ./run_tc.sh --cpp --e2e-quick
 
-# Run C++ tests with code coverage (standalone, for SonarQube)
+# Run C++ tests with code coverage (standalone)
 ./run_tc.sh --cpp --coverage
 
 # Show all available options
@@ -122,7 +122,7 @@ cd ../../  # Go to project root (dx_app/)
 
 !!! note "TIP"
     Use `--e2e-quick` during development. It takes ~2–3 minutes, compared to 8–10 minutes for a full test.
-    Use `--coverage` for SonarQube analysis — it cannot be combined with --cli, --e2e, etc.
+    Use `--coverage` for coverage analysis — it cannot be combined with --cli, --e2e, etc.
 
 **Method B. Manual Execution via Pytest**  
 
@@ -227,7 +227,7 @@ sudo apt-get install gcovr -y
 sudo apt-get install lcov -y
 
 # [Recommended] Build with debug mode for the most reliable coverage results
-cd ../../  # Go to project root
+cd ../../  # Go to project root (dx_app/) from tests/cpp_example/
 ./build.sh --clean --coverage --type debug
 
 # [Alternative] Build with relwithdebinfo for faster builds (less accurate coverage)
@@ -241,15 +241,6 @@ ls build_x86_64/src/examples/*.gcno
 
 - `relwithdebinfo`: Recommended for development (1.5–2x slower, optimized with debug info)
 - `debug`: Most detailed coverage (3–5x slower, no optimization, full symbol info)
-
-```bash
-# [Recommended] Build with debug mode for most reliable coverage
-cd ../../  # Go to project root
-./build.sh --clean --coverage --type debug
-
-# [Alternative] Build with relwithdebinfo for faster turnaround
-./build.sh --clean --coverage --type relwithdebinfo
-```
 
 ### Report Generation
 
@@ -306,20 +297,20 @@ Report Features
 Coverage Filtering Rules  
 
 - **Included:** All source files within the `src/` directory.  
-- **Excluded:** System headers (`/usr/*\, third_party/*, extern/*`), and the `tests/` directory itself.
+- **Excluded:** System headers (`/usr/*`), `third_party/*`, `extern/*`, and the `tests/` directory itself.
 
 ---
 
 ## Maintenance & CI/CD
 
-### Repository checks (GitHub Actions)
+### Repository checks
 
-`scripts/ci_checks.sh` is the single entry point for the repository checks that need no NPU; those needing the DX-RT headers SKIP where they are missing. `.github/workflows/dxapp-checks.yml` runs it on every push and pull request (and on `workflow_dispatch`); developers run the same command.
+`scripts/ci_checks.sh` is the single entry point for the repository checks that need no NPU; those needing the DX-RT headers SKIP where they are missing. Developers and CI jobs run the same command.
 
 ```bash
 bash scripts/ci_checks.sh                  # every check, then a PASS / SKIP / FAIL summary
 bash scripts/ci_checks.sh --list           # the check names, in order
-bash scripts/ci_checks.sh --only guard-graph-boundary,workflow-yaml
+bash scripts/ci_checks.sh --only guard-graph-boundary,python-compile
 bash scripts/ci_checks.sh --require-dxrt   # a check skipped for want of the dxrt headers FAILS
 ```
 
@@ -335,47 +326,28 @@ bash scripts/ci_checks.sh --require-dxrt   # a check skipped for want of the dxr
 | `cxx14-headers` | `scripts/check_cxx14.sh`: the headers that own `g_interrupted()` compile as C++14 with `-Werror` | dxrt and OpenCV headers, g++ |
 | `cross-compile` | `scripts/check_cross_compile.sh`: the graph engine and CLI compile for aarch64 | `aarch64-linux-gnu-g++`, dxrt and OpenCV headers |
 | `python-compile` | `python -m compileall` over `src/python_example`, `src/bindings/python`, `scripts` and `tests` | Python |
-| `workflow-yaml` | every `.github/workflows/*.yml` parses and has a `jobs:` mapping | PyYAML |
 | `tests-scripts` | `pytest tests/scripts` (hermetic, see `tests/README.md`) with `--known-failures tests/scripts/known_target_failures.txt` | pytest, PyYAML, requests (cmake and g++ for the tests that use them; the others skip) |
 
-**Known TARGET failures.** `tests/scripts/known_target_failures.txt` lists the `tests/scripts` tests that already fail on the release base (`feat/per-model-example-dirs` at 2eb1350e), one `<test id> | <reason>` per line. `tests-scripts` runs each of them as `xfail(strict=True)` (`tests/scripts/known_failures.py`): the check stays green while they fail, and turns red (XPASS(strict)) the day one passes, until its line is deleted. A malformed line, a test listed twice or a missing list file is a usage error (exit 4). A plain `pytest tests/scripts` reads no list and shows those tests failing. The list today holds only its header, which is accepted: `test_generate_build_bat.py::test_run_bat_executes_bare_relative_filename` now skips outside Windows (`skipif(os.name != "nt")`, it runs a `.bat` through `cmd.exe`), and the `test_setup_demo_models.py` tests take the expected count from `run_demo.py`'s `DEMOS`.
+**Known TARGET failures.** `tests/scripts/known_target_failures.txt` lists the `tests/scripts` tests that are known to fail on the release base, one `<test id> | <reason>` per line. `tests-scripts` runs each of them as `xfail(strict=True)` (`tests/scripts/known_failures.py`): the check stays green while they fail, and turns red (XPASS(strict)) the day one passes, until its line is deleted. A malformed line, a test listed twice or a missing list file is a usage error (exit 4). A plain `pytest tests/scripts` reads no list and shows those tests failing. The list today holds only its header, which is accepted: `test_generate_build_bat.py::test_run_bat_executes_bare_relative_filename` now skips outside Windows (`skipif(os.name != "nt")`, it runs a `.bat` through `cmd.exe`), and the `test_setup_demo_models.py` tests take the expected count from `run_demo.py`'s `DEMOS`.
 
 **SKIP versus FAIL.** A check whose prerequisite is missing on this machine prints `SKIP` with the reason, and the run still exits 0; only a `FAIL` makes it exit 1. `--require-dxrt` turns the missing dxrt headers of `header-odr`, `cxx14-headers` and `cross-compile` into a `FAIL`. A missing cross compiler is still a `SKIP`. `--only` runs the named checks (an unknown name exits 2).
 
-**The runner's view, locally.** The GitHub-hosted runner has no dxrt headers, so those three checks are skipped there. To see the same on your machine:
+**A machine without the dxrt headers.** Those three checks are skipped where the headers are missing. To see that run on a machine that has them:
 
 ```bash
 DXRT_INCLUDE_DIR=/nonexistent bash scripts/ci_checks.sh
 ```
 
-Other variables: `PYTHON` (the interpreter for the checks, default the active virtual environment's, else `python3`) and `DXAPP_CROSS_CXX`. `DXAPP_CHECKS_RUNNER` is a repository variable that replaces the `ubuntu-24.04` runner of the `checks` job. Pull requests from a fork always run on `ubuntu-24.04`, whatever the variable says, so a fork's code never reaches that runner; pushes, `workflow_dispatch` and pull requests from branches of this repository use it.
-
-**The NPU job** (`npu` in the workflow) is off by default. It needs a self-hosted runner and runs tests on the real device.
-
-- Enable it with the repository variable `DXAPP_NPU_CI=true` (Settings, Secrets and variables, Actions, Variables), together with three more variables:
-  - `DXAPP_NPU_PYTHON`: a virtual environment's Python with pybind11, pytest and numpy;
-  - `DXAPP_NPU_RUNTIME_DIR`: the dx-runtime checkout, for `scripts/sanity_check.sh`;
-  - `DXAPP_NPU_ASSETS_DIR`: the models and videos, laid out as `setup.sh` fills `assets/`.
-- Register a runner with the labels `self-hosted, linux, x64, dxapp-npu`, with DX-RT, the NPU driver, cmake, ninja, g++ and OpenCV installed.
-- It runs on `workflow_dispatch` and on pushes to `main` or `staging`, after the `checks` job passes, and never on `pull_request`.
-- What it runs, in order, every NPU step under an external `timeout` (a hung hardware case fails its step instead of holding the runner):
-  1. the NPU sanity check, judged by the text `Sanity check PASSED!`;
-  2. `scripts/ci_checks.sh --require-dxrt --only header-odr,cxx14-headers`;
-  3. a link from `assets` to `DXAPP_NPU_ASSETS_DIR`;
-  4. the build and install into `bin/`, with `graph_engine_test` and `common_unit_test` copied there;
-  5. `graph_engine_test` (0 failures, 0 skipped) and `common_unit_test` (0 failures);
-  6. the graph trio: `tests/cpp_example/test_graph_engine.py`, `test_graph_cli.py` and `test_graph_python.py`.
-
-The `checks` job also marks the checkout as a git `safe.directory`, so the hermetic guard of `tests/scripts` can list the tracked files in a container runner.
+Other variables: `PYTHON` (the interpreter for the checks, default the active virtual environment's, else `python3`) and `DXAPP_CROSS_CXX`.
 
 ### Continuous Integration (CI) Integration
 
-**SonarQube Integration**  
+**Coverage Reports**  
 
-XML reports generated via the `--coverage` flag are utilized by the CI server for static code analysis and test coverage tracking. This ensures long-term code quality and helps identify untested logic paths during the development lifecycle.  
+The XML reports generated via the `--coverage` flag can be fed to a code-quality server (for example SonarQube) for static analysis and test coverage tracking, which helps identify untested logic paths during the development lifecycle.  
 
-**Nightly Build**  
+**Scheduled Regression Runs**  
 
-A full suite of E2E tests is executed every night to perform regression testing. This process ensures that the application remains stable and functional despite frequent updates to NPU drivers, firmware, and the underlying runtime environment.  
+Running the full E2E suite on a schedule (for example nightly) catches regressions caused by updates to NPU drivers, firmware, and the underlying runtime environment.  
 
 ---

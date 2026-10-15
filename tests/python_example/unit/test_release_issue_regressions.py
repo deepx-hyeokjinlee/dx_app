@@ -281,7 +281,8 @@ def test_generic_fast_segmentation_postprocessor_exists_in_both_languages():
 
 def test_add_model_exposes_generic_fast_segmentation_alias():
     """Model generation scripts should expose the generic fast segmentation alias."""
-    add_model = _read("scripts/add_model.sh")
+    # add_model.sh is a wrapper; the generation (and its postprocessor table) lives in add_model_variant.py.
+    add_model = _read("scripts/add_model.sh") + _read("scripts/add_model_variant.py")
     dx_tool = _read("scripts/dx_tool.sh")
 
     assert "fast_segmentation" in add_model

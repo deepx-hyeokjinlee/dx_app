@@ -282,8 +282,8 @@ as leaving `"port"` out. Validation:
 * Every shape rule applies to the selected port's shape. The message names
   the port: `"drive" port "drivable" produces labelmap, not boxes` on a ROI
   edge, and `"drive" port "lane" produces labelmap, and only an image can
-  be handed off on a plain edge` on a plain one. Without `"port"`, every
-  message is what it was before ports existed.
+  be handed off on a plain edge` on a plain one. Without `"port"`, the
+  message names no port.
 * `"align": "face5"` on a non-primary port is `GRAPH_ALIGN`: the port
   carries no landmarks, so crop from the primary boxes.
 * One edge per `(from, to)` pair still holds, so a consumer reads one output
@@ -1028,7 +1028,7 @@ ERROR [GRAPH_SCHEMA] g.json node[1] (model "yolov8-n_640x640"): missing required
 Node `"type"` values are checked the same way. `"source"` is the only type;
 a model node carries a `"model"` name and no `"type"` at all. In
 particular `{"type": "model", "model": "yolov8-n_640x640"}` — a natural thing to
-write — is **rejected**, because it used to be accepted only by accident.
+write — is **rejected**.
 
 Two deliberate exceptions to the key rule:
 
@@ -1081,11 +1081,11 @@ of them.
   compiles the engine and the CLI with the cross compiler
   (`-fsyntax-only`); nothing is linked or run on aarch64. Concurrency and
   `--max-inflight` were validated with x86_64 dxrt.
-- **Windows** is **not built on Windows here**. The graph targets get MSVC
+- **Windows** is not built or tested on Windows in this release. The graph targets get MSVC
   flags (`/bigobj`, C5038 and C4062 as errors), and Ctrl-C goes through
   `SetConsoleCtrlHandler`: repeats within 200 ms are one request, a later
   press terminates, and Ctrl-Break terminates at once. `tests\windows\run_tests.bat
-  graph` runs the CLI smoke tests. All of it was checked on Linux only; see
+  graph` runs the CLI smoke tests. The Windows support is verified on Linux only; see
   *Graph engine on Windows* in `docs/source/docs/02_DX-APP_Installation_and_Build.md`.
 
 ## Not in this release
@@ -1124,8 +1124,7 @@ produces, likewise only ever names a node of the frame's own stream.)
 
 **Reports.** With several sources every frame in `--report` carries
 `"stream": "<source_id>"`, and its `"index"` counts the frames of that
-stream (0, 1, ... in each). A one-source report has no `"stream"` key: it
-is byte for byte what it was before streams existed.
+stream (0, 1, ... in each). A one-source report has no `"stream"` key.
 
 **Order.** The streams are read in turn: one frame from each stream still
 reading, in source declaration order, round after round. Both executors
@@ -1240,7 +1239,7 @@ first frame` and blames no stream (exit 0), as with one source.
 ## Tracking costs latency
 
 An IoU tracker is stateful and strictly frame-ordered: feeding it frame 3
-before frame 2 breaks the ids. The design (spec §4.5) keeps detection
+before frame 2 breaks the ids. The design keeps detection
 inference parallel and makes only the tracking step wait for frame order.
 **Every asynchronous graph pays reorder latency** — a frame that finishes
 early waits until every earlier frame has been handed out — **and a graph that
@@ -1541,12 +1540,11 @@ a trait in a header that declares none, or that quotes the declaration a
 second time, stops the build. A port name must also be one the generator
 knows for the factory's result type (`UNKNOWN PORT`).
 
-`vitpose-s_256x192` also decodes its output as the 17 VitPose heatmaps it
-is, as the Python example does, where it used to run a YOLOv8-pose decoder.
-Its C++ and Python keypoints agree to within 2.1e-5 px. It no longer reads
-`score_threshold` or `nms_threshold`. `dark-hrnet-w32_256x192` got the same
-decoder fix, and its C++ and Python keypoints agree to the same 2.1e-5 px
-on its v9 `.dxnn`.
+`vitpose-s_256x192` decodes its output as the 17 VitPose heatmaps, as the
+Python example does; its C++ and Python keypoints agree to within 2.1e-5 px,
+and it reads neither `score_threshold` nor `nms_threshold`.
+`dark-hrnet-w32_256x192` uses the same decoder, and its C++ and Python
+keypoints agree to the same 2.1e-5 px on its v9 `.dxnn`.
 
 ## Your own registry (`IModelRegistry`)
 

@@ -13,4 +13,4 @@ python3 -m pytest tests/cpp_example
 
 Headless machines need no display: without `DISPLAY` the harness sets `QT_QPA_PLATFORM=offscreen` for the examples.
 
-On Windows the tests find the binaries in `bin/Release` (or another config dir), else `bin/`, with `.exe` names (`tests/test_helpers/platform_paths.py`); not run on Windows here.
+On Windows the tests find the binaries in `bin/Release` (or another config dir), else `bin/`, with `.exe` names (`tests/test_helpers/platform_paths.py`).

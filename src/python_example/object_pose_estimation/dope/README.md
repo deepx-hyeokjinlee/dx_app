@@ -17,8 +17,8 @@ provides 4 Python variants and 2 C++ variants.
 
 ## Demo scope and limits
 
-This example is a **visualization demo**. It follows the simplified `dope_decode`
-path from `dx-modelzoo` rather than the full postprocess of
+This example is a **visualization demo**. It follows a simplified `dope_decode`
+path rather than the full postprocess of
 [NVlabs/Deep_Object_Pose](https://github.com/NVlabs/Deep_Object_Pose).
 
 | Item | This example (demo) | NVlabs original |
@@ -75,7 +75,7 @@ src/cpp_example/object_pose_estimation/dope/dope-hope-ketchup_480x640/
 
 ## 3. How to run
 
-### 3-1. Python (run from `src/python_example/`)
+### 3-1. Python (run from the variant directory)
 
 ```bash
 cd src/python_example/object_pose_estimation/dope/dope-hope-ketchup_480x640
