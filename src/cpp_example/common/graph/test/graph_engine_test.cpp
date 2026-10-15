@@ -12108,7 +12108,7 @@ void TestVolumeSamplesADepthMapOfAnotherSize() {
     double area = 0.0;
     double median = 0.0;
     double volume = 0.0;
-    // Mask columns 100..149 of 500 sit at depth columns 153..229 of 768: the left half, depth 2.
+    // Mask columns 100..149 of 500 sit at depth columns 154..229 of 768: the left half, depth 2.
     GRAPH_CHECK(NamedNumber(records->items[0], "mask_area_px", &area) && area == 2500.0);
     GRAPH_CHECK(NamedNumber(records->items[0], "median_depth", &median) && median == 2.0);
     GRAPH_CHECK(NamedNumber(records->items[0], "volume_proxy", &volume) && volume == 5000.0);

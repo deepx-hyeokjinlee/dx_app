@@ -3,8 +3,8 @@
  * @brief CPU reducers a graph runs after model nodes: head pose and volume.
  *
  * A cpu node does not load a .dxnn. Its inputs arrive on "carry": "result"
- * edges (the producer payloads, not crops), and both executors call ReduceCpu
- * once those parents of the frame have finished.
+ * edges (the producer results, payload and origin, not crops), and both
+ * executors call ReduceCpu once those parents of the frame have finished.
  */
 #ifndef DXAPP_GRAPH_CPU_REDUCE_HPP
 #define DXAPP_GRAPH_CPU_REDUCE_HPP
@@ -38,7 +38,8 @@ struct CpuReduction {
  * largest face has fewer than five landmarks or solvePnP fails.
  *
  * volume records, one per package box, all in source-frame pixels: numbers
- * box_x, box_y, box_w, box_h, class_id, mask_area_px, and median_depth plus
+ * box_x, box_y, box_w, box_h, class_id, mask_area_px (fractional when the
+ * mask is not the frame's size), and median_depth plus
  * volume_proxy (mask_area_px x median_depth x scale_factor) when the
  * overlapping instance mask has a finite depth sample; text class_name.
  * Boxes go through their origin (RestoreBox: a hand-off is mapped back). The
