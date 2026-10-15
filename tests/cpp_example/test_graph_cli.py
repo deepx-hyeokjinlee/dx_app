@@ -73,6 +73,7 @@ SAMPLE_GRAPHS = [
     "gallery_known_person.json",
     "driver_attention.json",
     "multistream_people_count.json",
+    "logistics_volume_alert.json",
 ]
 # DX-M1 cannot load these together: realesrgan-x2 plus yolov8-n plus a third model.
 NPU_WEIGHT_EXCLUDED = (
@@ -1741,6 +1742,18 @@ def test_driver_attention_decides_on_head_pose_numbers():
 
 
 @pytest.mark.graph
+def test_logistics_volume_alert_decides_on_the_summed_volume():
+    code, out = _check_json(GRAPH_DIR / "logistics_volume_alert.json")
+    assert code == 0 and out["ok"] is True and out["errors"] == [], out
+    with open(str(GRAPH_DIR / "logistics_volume_alert.json"), encoding="utf-8") as handle:
+        spec = json.load(handle)
+    (load,) = [n for n in spec["nodes"] if n.get("op") == "condition"]
+    assert load["params"]["value"] == "volume_proxy" and load["params"]["reduce"] == "sum"
+    assert load["params"]["event"] == "load_high"
+    assert {"from": "volume", "to": load["id"], "carry": "result"} in spec["edges"]
+
+
+@pytest.mark.graph
 def test_docs_say_a_stop_request_finishes_every_stream():
     for name in ("03_DX-APP_CPP_Example_Usage_Guide.md", "09_DX-APP_Project_Overview.md"):
         text = (PROJECT_ROOT / "docs" / "source" / "docs" / name).read_text(encoding="utf-8")
@@ -1911,6 +1924,25 @@ def test_logistics_volume_measures_the_package_on_its_sample(tmp_path):
         assert n["mask_area_px"] > 0, n
         assert 0.0 <= n["median_depth"] <= 1.0, n          # the depth map is normalized per frame
         assert n["volume_proxy"] == pytest.approx(n["mask_area_px"] * n["median_depth"]), n
+
+
+@pytest.mark.graph_e2e
+def test_logistics_volume_alert_sums_the_packages_and_raises_load_high(tmp_path):
+    graph = "logistics_volume_alert.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    report, events = tmp_path / "report.json", tmp_path / "events.jsonl"
+    result = run("multi_model_graph_sync", "--graph", "{}/{}".format(GRAPHS, graph),
+                 "--report", str(report), "--events", str(events))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frame = json.loads(report.read_text(encoding="utf-8"))["frames"][0]
+    total = sum(r["numbers"].get("volume_proxy", 0.0) for r in frame["nodes"]["volume"]["payload"]["items"])
+    value = frame["nodes"]["load"]["payload"]["items"][0]["numbers"]["value"]
+    assert value == pytest.approx(total)
+    lines = [json.loads(line) for line in events.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert [(e["node"], e["event"]) for e in lines] == ([("load", "load_high")] if total > 100 else [])
+    assert total > 100, "the sample's suitcase passes the template's threshold"
 
 
 # ---------------------------------------------------------------- tier 3

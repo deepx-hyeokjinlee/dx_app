@@ -75,7 +75,7 @@ Two binaries are built from one engine and differ in exactly one value:
 
 Both produce the same `FrameReport` for the same input — `--report` writes
 it as JSON, and `tests/cpp_example/test_graph_cli.py` compares the two files
-byte for byte on real hardware for **all twenty-one shipped sample graphs**
+byte for byte on real hardware for **all twenty-two shipped sample graphs**
 (a graph whose model file is missing is skipped), covering
 every payload shape they produce — `frame`, `boxes`, `obboxes`,
 `keypoints`, `labelmap`, `densemap`, `image`, `scores`, `vector` and
@@ -108,13 +108,14 @@ Shipped samples, next to the CLI sources in `src/cpp_example/multi_model_graph/`
 | `gallery_known_person.json` | each person's ReID embedding named after the nearest gallery entry, or `unknown` | `yolov8-n_640x640` → `repvgg-a0-reid_256x128` → logic |
 | `driver_attention.json` | the driver's head pose decides: `looking_away` when the yaw passes ±30°, `head_down` when the pitch drops below −20° (conditions on a cpu node's numbers, cooldown 3 s) | `scrfd-500m_640x640` → `headpose` → logic |
 | `multistream_people_count.json` | two sources through one detector; people counted per stream, a `crowded` event in a stream with 5 or more | `yolov8-n_640x640` → logic |
+| `logistics_volume_alert.json` | the packages' summed `volume_proxy` raises `load_high` above 100 (cooldown 10 s); relative, so tune the threshold per camera | `yolo26-n_640x640` + `yolo26-n-seg_640x640` + `yolo26-depth-n_768x768` → `volume` → logic |
 
 `hand_cascade.json`, `dms_headpose.json` and `logistics_volume.json` are
 shipped scenarios. The hand cascade is a crop chain. Head pose and volume
 are cpu nodes. CLIP prompt scores are not a graph node (see *Not in this
 release*).
 
-The last eight are decision graphs (see *Logic nodes*). On their sample image
+The last nine are decision graphs (see *Logic nodes*). On their sample image
 they show one decision each; their scenes are videos, for example
 `--input assets/videos/person-pair-hallway.mp4` (two people walking a
 hallway) with `--loop` for a Live run.
