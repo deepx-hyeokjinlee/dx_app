@@ -741,6 +741,32 @@ bool Parses(const std::string& json) {
     return true;
 }
 
+}  // namespace
+
+/// --output-layers names a frame's files <frame>_<node id>.png beside
+/// <frame>_base.png (the clean frame) and <frame>_events.png (the event
+/// panel), so a node may not be called "base" or "events".
+void TestParseRejectsTheLayerFileNamesAsNodeIds() {
+    const char* const reserved[] = {"base", "events"};
+    for (const char* id : reserved) {
+        std::string message;
+        GRAPH_CHECK(ThrowsWithCode(
+            std::string("{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\","
+                        "\"uri\":\"a.jpg\"},{\"id\":\"") + id +
+                "\",\"model\":\"m\"}],\"edges\":[{\"from\":\"cam\",\"to\":\"" + id + "\"}]}",
+            GraphErrorCode::kGraphSchema, &message));
+        GRAPH_CHECK(message.find(std::string("node id \"") + id + "\" is reserved") != std::string::npos);
+        GRAPH_CHECK(message.find("node[1]") != std::string::npos);
+        GRAPH_CHECK(message.find("-> ") != std::string::npos);
+    }
+    // only the exact names: other ids that start with them are fine
+    GRAPH_CHECK(Parses("{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\","
+                       "\"uri\":\"a.jpg\"},{\"id\":\"base_od\",\"model\":\"m\"}],"
+                       "\"edges\":[{\"from\":\"cam\",\"to\":\"base_od\"}]}"));
+}
+
+namespace {
+
 const std::string kRoiWhere =
     "ERROR [GRAPH_SCHEMA] test.json edge[1] \"od\"->\"reid\": ";
 const std::string kTrackWhere = "ERROR [GRAPH_SCHEMA] test.json node[1]: ";
@@ -14733,6 +14759,7 @@ int main() {
     TestParseRejectsWrongTypes();
     TestParseRejectsUnsupportedVersion();
     TestParseRejectsReservedKeys();
+    TestParseRejectsTheLayerFileNamesAsNodeIds();
     TestSchemaRejectsAFractionalVersion();
     TestSchemaRejectsANonStringName();
     TestSchemaChecksEachRoiNumber();

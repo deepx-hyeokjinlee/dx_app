@@ -733,6 +733,15 @@ GraphSpec ParseGraphText(const std::string& json_text,
                              "duplicate node id \"" + parsed.id + "\"",
                              "node ids must be unique");
         }
+        // --output-layers names a frame's files after its node ids, beside
+        // <frame>_base.png (the clean frame) and <frame>_events.png (the
+        // event panel): a node with either name would overwrite one of them.
+        if (parsed.id == "base" || parsed.id == "events") {
+            throw GraphError(GraphErrorCode::kGraphSchema, Where(origin, node_label),
+                             "node id \"" + parsed.id + "\" is reserved",
+                             "rename the node: --output-layers writes the clean frame as "
+                             "<frame>_base.png and the event panel as <frame>_events.png");
+        }
 
         json::const_iterator type = node.find("type");
         const bool declared_source =

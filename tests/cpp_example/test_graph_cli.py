@@ -3254,6 +3254,25 @@ def test_check_json_duplicate_node_id_names_the_node_index(tmp_path):
     assert error["node"] == "od", error
 
 
+@pytest.mark.graph
+@pytest.mark.parametrize("reserved", ["base", "events"])
+def test_check_rejects_the_node_ids_layer_files_are_named_after(tmp_path, reserved):
+    """--output-layers writes <frame>_<node id>.png beside <frame>_base.png and
+    <frame>_events.png: a node called "base" or "events" would overwrite one of
+    them, so --check refuses the id, pinned to the node."""
+    graph = _write_graph(tmp_path, [{"id": reserved, "model": "yolov8n"}])
+    status, out = _check_json(graph)
+    assert status == 1, out
+    error = out["errors"][0]
+    assert error["code"] == "GRAPH_SCHEMA", error
+    assert error["node"] == reserved, error
+    assert 'node id "{}" is reserved'.format(reserved) in error["what"], error
+    assert error["how"], error
+    result = run(BINARIES[0], "--check", str(graph))
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert 'node id "{}" is reserved'.format(reserved) in result.stdout + result.stderr
+
+
 # ---------------------------------------------------------------- graph composer P2
 
 # A tracked person detector, a person filter, a right-half zone and an alarm.
