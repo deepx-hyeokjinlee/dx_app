@@ -191,7 +191,7 @@ struct FrameCtx {
     cv::Mat frame;  ///< an owned copy: sources reuse their buffer
     std::vector<int> pending_inputs;
     std::vector<std::vector<RoiCrop> > inbox;
-    std::vector<std::vector<StageDataPtr> > result_in;  ///< carry-result payloads, per node
+    std::vector<std::vector<StageResult> > result_in;  ///< carry-result payloads and origins, per node
     std::vector<std::vector<LogicInput> > logic_in;  ///< what a logic node's edges brought
     std::map<std::size_t, std::vector<GraphEvent> > node_events;  ///< per logic node
     std::vector<char> got_frame;
@@ -295,7 +295,12 @@ void ReleaseSuccessors(const StageGraph& graph, std::size_t index,
                     if (mine != ctx.report.node_results.end()) input.origin = mine->second.origin;
                     ctx.logic_in[edge.to].push_back(input);
                 } else if (cargo.payload) {
-                    ctx.result_in[edge.to].push_back(cargo.payload);
+                    StageResult input;
+                    input.data = cargo.payload;
+                    std::map<std::string, StageResult>::const_iterator mine =
+                        ctx.report.node_results.find(producer_id);
+                    if (mine != ctx.report.node_results.end()) input.origin = mine->second.origin;
+                    ctx.result_in[edge.to].push_back(input);
                 }
             } else if (!edge.roi.present) {
                 if (graph.nodes()[index].is_source) {
@@ -444,7 +449,7 @@ struct AsyncExecutor::Engine {
         // the one edge this stream brings it.
         ctx->pending_inputs = plan.in_edges;
         ctx->inbox.assign(n, std::vector<RoiCrop>());
-        ctx->result_in.assign(n, std::vector<StageDataPtr>());
+        ctx->result_in.assign(n, std::vector<StageResult>());
         ctx->logic_in.assign(n, std::vector<LogicInput>());
         ctx->got_frame.assign(n, 0);
         ctx->frame_in.assign(n, FrameView());

@@ -31,19 +31,28 @@ struct CpuReduction {
  * @brief Run `op` ("headpose" or "volume") on `inputs`.
  *
  * `frame_size` is the stream frame. headpose builds a pinhole camera with
- * focal length equal to the frame width. volume ignores it. `inputs` are
+ * focal length equal to the frame width; volume counts mask areas in it. `inputs` are
  * matched by shape, not by order.
  *
  * headpose records: numbers pitch, yaw, roll (degrees). Empty when the
  * largest face has fewer than five landmarks or solvePnP fails.
  *
- * volume records, one per package box: numbers box_x, box_y, box_w, box_h,
- * class_id, mask_area_px, and median_depth plus volume_proxy when the
- * overlapping instance mask and the depth map share a size and the mask has
- * a finite sample; text class_name.
+ * volume records, one per package box, all in source-frame pixels: numbers
+ * box_x, box_y, box_w, box_h, class_id, mask_area_px, and median_depth plus
+ * volume_proxy (mask_area_px x median_depth x scale_factor) when the
+ * overlapping instance mask has a finite depth sample; text class_name.
+ * Boxes go through their origin (RestoreBox: a hand-off is mapped back). The
+ * instance mask and the depth map are full-frame rasters of any size, both
+ * covering the frame as the overlay places them: each mask pixel's centre is
+ * read from the depth pixel at the same place of the frame (nearest), never
+ * resized. An input whose origin does not cover the frame (a crop, or an
+ * inv_align that is not a positive axis-aligned scale) and a depth map that is
+ * not spatial are a frame error.
+ *
+ * Each input is a parent's result: its payload and its origin.
  */
 CpuReduction ReduceCpu(const std::string& op, const StageParams& params,
-                       const std::vector<StageDataPtr>& inputs,
+                       const std::vector<StageResult>& inputs,
                        const cv::Size& frame_size);
 
 /// volume's package classes when its "classes" / "class_ids" are left out

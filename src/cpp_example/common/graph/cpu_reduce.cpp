@@ -9,6 +9,8 @@
 
 #include <opencv2/calib3d.hpp>
 
+#include "common/graph/roi_router.hpp"
+
 namespace dxapp {
 namespace graph {
 namespace {
@@ -28,11 +30,23 @@ std::string LowerCopy(const std::string& text) {
     return lowered;
 }
 
-const StageData* FindShape(const std::vector<StageDataPtr>& inputs, Shape shape) {
+const StageResult* FindShape(const std::vector<StageResult>& inputs, Shape shape) {
     for (std::size_t i = 0; i < inputs.size(); ++i) {
-        if (inputs[i] && inputs[i]->shape() == shape) return inputs[i].get();
+        if (inputs[i].data && inputs[i].data->shape() == shape) return &inputs[i];
     }
     return NULL;
+}
+
+/**
+ * A full-frame raster (an instance mask, a depth map) covers the image its node ran on, and that image covers the
+ * source frame: the frame itself, or a hand-off image whose inv_align is a positive axis-aligned scale (README
+ * "Coordinates after a hand-off"). graph_visualizer.cpp places both rasters over the frame that way. A crop, or an
+ * image under rotation, shear or translation, does not cover the frame.
+ */
+bool CoversFrame(const RoiRef& origin) {
+    const cv::Matx23f& m = origin.inv_align;
+    return !origin.from_roi && m(0, 1) == 0.f && m(1, 0) == 0.f && m(0, 2) == 0.f && m(1, 2) == 0.f &&
+           m(0, 0) > 0.f && m(1, 1) > 0.f;
 }
 
 std::vector<int> ClassIds(const StageParams& params) {
@@ -105,26 +119,24 @@ int CountOnMask(const cv::Mat& mask) {
     return count;
 }
 
+/// The median of `depth` under `mask`, two rasters covering the frame at any sizes (CoversFrame): each mask pixel's
+/// centre is carried to its place in the frame and read from the depth pixel there (nearest). Equal sizes read
+/// pixel for pixel.
 bool MedianUnderMask(const cv::Mat& depth, const cv::Mat& mask, double* median) {
-    if (depth.empty() || mask.empty() || depth.rows != mask.rows || depth.cols != mask.cols) {
-        return false;
-    }
-    if (depth.channels() != 1) return false;
+    if (depth.empty() || mask.empty() || depth.channels() != 1) return false;
+    if (depth.depth() != CV_32F && depth.depth() != CV_64F) return false;
     cv::Mat plane = mask.channels() == 1 ? mask : cv::Mat();
     if (mask.channels() != 1) cv::extractChannel(mask, plane, 0);
-    if (plane.rows != depth.rows || plane.cols != depth.cols) return false;
+    const double sx = static_cast<double>(depth.cols) / plane.cols;
+    const double sy = static_cast<double>(depth.rows) / plane.rows;
     std::vector<double> samples;
-    for (int y = 0; y < depth.rows; ++y) {
-        for (int x = 0; x < depth.cols; ++x) {
+    for (int y = 0; y < plane.rows; ++y) {
+        const int dy = std::min(depth.rows - 1, static_cast<int>((y + 0.5) * sy));
+        for (int x = 0; x < plane.cols; ++x) {
             if (!MaskOn(plane, y, x)) continue;
-            double value = 0.0;
-            if (depth.depth() == CV_32F) {
-                value = depth.at<float>(y, x);
-            } else if (depth.depth() == CV_64F) {
-                value = depth.at<double>(y, x);
-            } else {
-                return false;
-            }
+            const int dx = std::min(depth.cols - 1, static_cast<int>((x + 0.5) * sx));
+            const double value = depth.depth() == CV_32F ? static_cast<double>(depth.at<float>(dy, dx))
+                                                         : depth.at<double>(dy, dx);
             if (std::isfinite(value)) samples.push_back(value);
         }
     }
@@ -172,10 +184,10 @@ CpuReduction Missing(const std::string& what) {
     return out;
 }
 
-CpuReduction ReduceHeadPose(const std::vector<StageDataPtr>& inputs, const cv::Size& frame_size) {
-    const StageData* boxes_data = FindShape(inputs, Shape::kBoxes);
-    if (boxes_data == NULL) return Missing("boxes");
-    const BoxesData* boxes = static_cast<const BoxesData*>(boxes_data);
+CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Size& frame_size) {
+    const StageResult* boxes_in = FindShape(inputs, Shape::kBoxes);
+    if (boxes_in == NULL) return Missing("boxes");
+    const BoxesData* boxes = static_cast<const BoxesData*>(boxes_in->data.get());
     const BoxItem* face = LargestBox(boxes->items);
     CpuReduction out = EmptyRecords();
     if (face == NULL || face->landmarks.size() < 5 || frame_size.width <= 0 ||
@@ -264,27 +276,48 @@ const BoxItem* BestOverlap(const BoxItem& detection, const std::vector<BoxItem>&
     return best;
 }
 
-CpuReduction ReduceVolume(const StageParams& params, const std::vector<StageDataPtr>& inputs) {
-    const StageData* boxes_data = FindShape(inputs, Shape::kBoxes);
-    const StageData* instances_data = FindShape(inputs, Shape::kInstances);
-    const StageData* depth_data = FindShape(inputs, Shape::kDenseMap);
-    if (boxes_data == NULL) return Missing("boxes");
-    if (instances_data == NULL) return Missing("instances");
-    if (depth_data == NULL) return Missing("densemap");
-    const BoxesData* boxes = static_cast<const BoxesData*>(boxes_data);
-    const BoxesData* instances = static_cast<const BoxesData*>(instances_data);
-    const DenseMapData* depth = static_cast<const DenseMapData*>(depth_data);
+CpuReduction ReduceVolume(const StageParams& params, const std::vector<StageResult>& inputs,
+                          const cv::Size& frame_size) {
+    const StageResult* boxes_in = FindShape(inputs, Shape::kBoxes);
+    const StageResult* instances_in = FindShape(inputs, Shape::kInstances);
+    const StageResult* depth_in = FindShape(inputs, Shape::kDenseMap);
+    if (boxes_in == NULL) return Missing("boxes");
+    if (instances_in == NULL) return Missing("instances");
+    if (depth_in == NULL) return Missing("densemap");
+    const BoxesData* boxes = static_cast<const BoxesData*>(boxes_in->data.get());
+    const BoxesData* instances = static_cast<const BoxesData*>(instances_in->data.get());
+    const DenseMapData* depth = static_cast<const DenseMapData*>(depth_in->data.get());
+    const char* off_frame = !CoversFrame(boxes_in->origin)                       ? "boxes"
+                            : !CoversFrame(instances_in->origin)                 ? "instances"
+                            : !CoversFrame(depth_in->origin) || !depth->spatial ? "densemap"
+                                                                                 : NULL;
+    if (off_frame != NULL) {
+        CpuReduction out = EmptyRecords();
+        out.error = std::string("volume reads full-frame results, and its ") + off_frame + " input is not one";
+        return out;
+    }
     const std::vector<int> ids = ClassIds(params);
     const std::vector<std::string> names = ClassNames(params);
     std::map<std::string, double>::const_iterator scale_it = params.numeric.find("scale_factor");
     const double scale = scale_it == params.numeric.end() ? kDefaultScaleFactor : scale_it->second;
 
+    // Every box in source pixels: a detector or a segmenter that ran on a hand-off image is mapped back.
+    std::vector<BoxItem> segments = instances->items;
+    for (std::size_t i = 0; i < segments.size(); ++i) {
+        segments[i].box = RestoreBox(segments[i].box, instances_in->origin);
+    }
     std::shared_ptr<RecordsData> records(new RecordsData());
     for (std::size_t i = 0; i < boxes->items.size(); ++i) {
-        const BoxItem& item = boxes->items[i];
-        if (!IsPackage(item, ids, names)) continue;
-        const BoxItem* segment = BestOverlap(item, instances->items, ids, names);
-        const int area = segment == NULL ? 0 : CountOnMask(segment->mask);
+        if (!IsPackage(boxes->items[i], ids, names)) continue;
+        BoxItem item = boxes->items[i];
+        item.box = RestoreBox(item.box, boxes_in->origin);
+        const BoxItem* segment = BestOverlap(item, segments, ids, names);
+        // A mask pixel stands for (frame / mask) source pixels on each axis.
+        double area = 0.0;
+        if (segment != NULL && !segment->mask.empty() && frame_size.width > 0 && frame_size.height > 0) {
+            area = CountOnMask(segment->mask) * (static_cast<double>(frame_size.width) / segment->mask.cols) *
+                   (static_cast<double>(frame_size.height) / segment->mask.rows);
+        }
         double median = 0.0;
         const bool has_median =
             segment != NULL && MedianUnderMask(depth->values, segment->mask, &median);
@@ -310,10 +343,10 @@ CpuReduction ReduceVolume(const StageParams& params, const std::vector<StageData
 }  // namespace
 
 CpuReduction ReduceCpu(const std::string& op, const StageParams& params,
-                       const std::vector<StageDataPtr>& inputs,
+                       const std::vector<StageResult>& inputs,
                        const cv::Size& frame_size) {
     if (op == "headpose") return ReduceHeadPose(inputs, frame_size);
-    if (op == "volume") return ReduceVolume(params, inputs);
+    if (op == "volume") return ReduceVolume(params, inputs, frame_size);
     CpuReduction out = EmptyRecords();
     out.error = "unknown cpu op \"" + op + "\"";
     return out;

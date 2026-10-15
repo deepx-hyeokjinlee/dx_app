@@ -59,6 +59,7 @@
 #include "multi_model_graph/graph_cli_output.hpp"
 #include "multi_model_graph/graph_consumer.hpp"
 #include "multi_model_graph/graph_report_writer.hpp"
+#include "common/graph/cpu_reduce.hpp"
 #include "common/graph/user_logic.hpp"
 #include "multi_model_graph/graph_cli.hpp"
 
@@ -12009,7 +12010,8 @@ void TestVolumeProxyMatchesSyncAndAsync() {
         "{\"from\":\"det\",\"to\":\"volume\",\"carry\":\"result\"},"
         "{\"from\":\"seg\",\"to\":\"volume\",\"carry\":\"result\"},"
         "{\"from\":\"depth\",\"to\":\"volume\",\"carry\":\"result\"}]}";
-    const cv::Mat frame = cv::Mat::zeros(32, 32, CV_8UC3);
+    // A full-frame instance mask is a raster of the frame: 4x4 here, as the mask.
+    const cv::Mat frame = cv::Mat::zeros(4, 4, CV_8UC3);
 
     FakeModelRegistry sync_registry;
     sync_registry.AddModel(CpuFixtureModel("det", Shape::kBoxes), boxes);
@@ -12036,6 +12038,133 @@ void TestVolumeProxyMatchesSyncAndAsync() {
     GRAPH_CHECK(NamedNumber(records->items[0], "volume_proxy", &volume) && volume == 24.0);
     GRAPH_CHECK(records->items[0].text.size() == 1 &&
                 records->items[0].text[0].second == "backpack");
+}
+
+// Phase 4: the depth model's raster (768x768, a stretch of the frame) and a segmenter's mask (the frame's own
+// 500x333) both cover the frame. volume reads the depth at each mask pixel's place in the frame, as the overlay
+// places both; it used to give no volume_proxy unless the two had one size, which no real model pair has.
+const char kVolumeGraph[] =
+    "{\"version\":1,\"name\":\"volume\",\"nodes\":["
+    "{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+    "{\"id\":\"det\",\"model\":\"det\"},"
+    "{\"id\":\"seg\",\"model\":\"seg\"},"
+    "{\"id\":\"depth\",\"model\":\"depth\"},"
+    "{\"id\":\"volume\",\"type\":\"cpu\",\"op\":\"volume\"}],"
+    "\"edges\":[{\"from\":\"cam\",\"to\":\"det\"},{\"from\":\"cam\",\"to\":\"seg\"},"
+    "{\"from\":\"cam\",\"to\":\"depth\"},"
+    "{\"from\":\"det\",\"to\":\"volume\",\"carry\":\"result\"},"
+    "{\"from\":\"seg\",\"to\":\"volume\",\"carry\":\"result\"},"
+    "{\"from\":\"depth\",\"to\":\"volume\",\"carry\":\"result\"}]}";
+
+/// A 768x768 depth raster over the frame: 2 on its left half, 9 on its right.
+std::shared_ptr<DenseMapData> SplitDepth768() {
+    std::shared_ptr<DenseMapData> depth(new DenseMapData());
+    depth->values = cv::Mat(768, 768, CV_32FC1, cv::Scalar(9.0f));
+    depth->values(cv::Rect(0, 0, 384, 768)).setTo(2.0f);
+    return depth;
+}
+
+/// A suitcase at `box` and its instance: a mask raster of `mask_size` with `box_in_mask` on.
+void SuitcaseFixture(const cv::Rect2f& box, const cv::Size& mask_size, const cv::Rect& box_in_mask,
+                     std::shared_ptr<BoxesData>* boxes, std::shared_ptr<BoxesData>* instances) {
+    boxes->reset(new BoxesData(Shape::kBoxes));
+    BoxItem package;
+    package.box = box;
+    package.class_id = 28;
+    package.class_name = "suitcase";
+    (*boxes)->items.push_back(package);
+    instances->reset(new BoxesData(Shape::kInstances));
+    BoxItem segment = package;
+    segment.box = cv::Rect2f(box_in_mask);
+    segment.mask = cv::Mat::zeros(mask_size, CV_8UC1);
+    segment.mask(box_in_mask).setTo(255);
+    (*instances)->items.push_back(segment);
+}
+
+void TestVolumeSamplesADepthMapOfAnotherSize() {
+    std::shared_ptr<BoxesData> boxes;
+    std::shared_ptr<BoxesData> instances;
+    SuitcaseFixture(cv::Rect2f(100.f, 100.f, 50.f, 50.f), cv::Size(500, 333), cv::Rect(100, 100, 50, 50),
+                    &boxes, &instances);
+    const cv::Mat frame = cv::Mat::zeros(333, 500, CV_8UC3);
+
+    FakeModelRegistry sync_registry;
+    sync_registry.AddModel(CpuFixtureModel("det", Shape::kBoxes), boxes);
+    sync_registry.AddModel(CpuFixtureModel("seg", Shape::kInstances), instances);
+    sync_registry.AddModel(CpuFixtureModel("depth", Shape::kDenseMap), SplitDepth768());
+    const FrameReport expected = RunSync(kVolumeGraph, &sync_registry, frame);
+
+    FakeModelRegistry async_registry;
+    async_registry.AddModel(CpuFixtureModel("det", Shape::kBoxes), boxes);
+    async_registry.AddModel(CpuFixtureModel("seg", Shape::kInstances), instances);
+    async_registry.AddModel(CpuFixtureModel("depth", Shape::kDenseMap), SplitDepth768());
+    const FrameReport actual = RunAsync(kVolumeGraph, &async_registry, frame);
+
+    GRAPH_CHECK(expected.error.empty());
+    GRAPH_CHECK(expected == actual);
+    const RecordsData* records = RecordsOf(expected, "volume");
+    GRAPH_CHECK(records != NULL && records->items.size() == 1);
+    if (records == NULL || records->items.size() != 1) return;
+    double area = 0.0;
+    double median = 0.0;
+    double volume = 0.0;
+    // Mask columns 100..149 of 500 sit at depth columns 153..229 of 768: the left half, depth 2.
+    GRAPH_CHECK(NamedNumber(records->items[0], "mask_area_px", &area) && area == 2500.0);
+    GRAPH_CHECK(NamedNumber(records->items[0], "median_depth", &median) && median == 2.0);
+    GRAPH_CHECK(NamedNumber(records->items[0], "volume_proxy", &volume) && volume == 5000.0);
+}
+
+/// One cpu input: a payload and the origin its producer's result carries (inv_align a scale for a hand-off).
+StageResult CpuInputOf(const StageDataPtr& data, float scale) {
+    StageResult input;
+    input.data = data;
+    input.origin.inv_align = cv::Matx23f(scale, 0.f, 0.f, 0.f, scale, 0.f);
+    return input;
+}
+
+double VolumeNumber(const CpuReduction& out, const char* name) {
+    const RecordsData* records = static_cast<const RecordsData*>(out.result.data.get());
+    double value = -1.0;
+    if (records == NULL || records->items.size() != 1 || !NamedNumber(records->items[0], name, &value)) return -1.0;
+    return value;
+}
+
+// A segmenter that ran on a x2 hand-off (1000x666 for a 500x333 frame): its box and mask are in that image's
+// pixels. volume pairs it with the detector's box and reports source pixels.
+void TestVolumeMapsAHandedOffSegmenterToSourcePixels() {
+    std::shared_ptr<BoxesData> boxes;
+    std::shared_ptr<BoxesData> instances;
+    SuitcaseFixture(cv::Rect2f(100.f, 100.f, 50.f, 50.f), cv::Size(1000, 666), cv::Rect(200, 200, 100, 100),
+                    &boxes, &instances);
+    std::vector<StageResult> inputs;
+    inputs.push_back(CpuInputOf(boxes, 1.f));
+    inputs.push_back(CpuInputOf(instances, 0.5f));
+    inputs.push_back(CpuInputOf(SplitDepth768(), 1.f));
+    const CpuReduction out = ReduceCpu("volume", StageParams(), inputs, cv::Size(500, 333));
+    GRAPH_CHECK(out.error.empty());
+    GRAPH_CHECK(VolumeNumber(out, "box_x") == 100.0);
+    GRAPH_CHECK(VolumeNumber(out, "mask_area_px") == 2500.0);   // 10000 mask pixels of a quarter source pixel
+    GRAPH_CHECK(VolumeNumber(out, "median_depth") == 2.0);
+    GRAPH_CHECK(VolumeNumber(out, "volume_proxy") == 5000.0);
+}
+
+// An input that does not cover the frame (a crop, or a rotated image) is refused, not measured.
+void TestVolumeRefusesARasterThatDoesNotCoverTheFrame() {
+    std::shared_ptr<BoxesData> boxes;
+    std::shared_ptr<BoxesData> instances;
+    SuitcaseFixture(cv::Rect2f(100.f, 100.f, 50.f, 50.f), cv::Size(500, 333), cv::Rect(100, 100, 50, 50),
+                    &boxes, &instances);
+    std::vector<StageResult> inputs;
+    inputs.push_back(CpuInputOf(boxes, 1.f));
+    inputs.push_back(CpuInputOf(instances, 1.f));
+    inputs.push_back(CpuInputOf(SplitDepth768(), 1.f));
+    inputs[2].origin.inv_align = cv::Matx23f(0.f, -1.f, 333.f, 1.f, 0.f, 0.f);   // rotated 90 degrees
+    const CpuReduction rotated = ReduceCpu("volume", StageParams(), inputs, cv::Size(500, 333));
+    GRAPH_CHECK(rotated.error == "volume reads full-frame results, and its densemap input is not one");
+    inputs[2].origin = RoiRef();
+    inputs[1].origin.from_roi = true;
+    const CpuReduction crop = ReduceCpu("volume", StageParams(), inputs, cv::Size(500, 333));
+    GRAPH_CHECK(crop.error == "volume reads full-frame results, and its instances input is not one");
 }
 
 // Graph Composer P1: every non-source node's time in this frame, sync.
@@ -15715,6 +15844,9 @@ int main() {
     TestCpuNodeRejectsAGenericFuseAndABadResultEdge();
     TestHeadPoseMatchesSyncAndAsync();
     TestVolumeProxyMatchesSyncAndAsync();
+    TestVolumeSamplesADepthMapOfAnotherSize();
+    TestVolumeMapsAHandedOffSegmenterToSourcePixels();
+    TestVolumeRefusesARasterThatDoesNotCoverTheFrame();
     TestSyncExecutorTimesEveryNode();
     TestAsyncExecutorTimesEveryNode();
     TestReportToJsonWritesNodeMsOnlyWhenAsked();

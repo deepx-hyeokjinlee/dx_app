@@ -40,8 +40,8 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
     std::map<std::size_t, std::vector<RoiCrop> > roi_inbox;
     // node index -> the view its full-frame input comes from
     std::map<std::size_t, FrameView> frame_inbox;
-    // node index -> parent payloads on carry-result edges
-    std::map<std::size_t, std::vector<StageDataPtr> > result_inbox;
+    // node index -> parent results (payload and origin) on carry-result edges
+    std::map<std::size_t, std::vector<StageResult> > result_inbox;
     // node index -> what its "carry": "result" edges bring a logic node
     std::map<std::size_t, std::vector<LogicInput> > logic_inbox;
     // node index -> the view it actually ran on (full-frame nodes only)
@@ -70,10 +70,10 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             report.node_results[node.id] = result;
             view[index] = source_view;
         } else if (node.is_cpu) {
-            const std::vector<StageDataPtr> empty_inputs;
-            std::map<std::size_t, std::vector<StageDataPtr> >::const_iterator found =
+            const std::vector<StageResult> empty_inputs;
+            std::map<std::size_t, std::vector<StageResult> >::const_iterator found =
                 result_inbox.find(index);
-            const std::vector<StageDataPtr>& inputs =
+            const std::vector<StageResult>& inputs =
                 found == result_inbox.end() ? empty_inputs : found->second;
             const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
             const CpuReduction reduced = ReduceCpu(node.op, node.params, inputs, frame.size());
@@ -209,7 +209,12 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
                     if (mine != report.node_results.end()) input.origin = mine->second.origin;
                     logic_inbox[edge.to].push_back(input);
                 } else {
-                    result_inbox[edge.to].push_back(cargo.payload);
+                    StageResult input;
+                    input.data = cargo.payload;
+                    std::map<std::string, StageResult>::const_iterator mine =
+                        report.node_results.find(node.id);
+                    if (mine != report.node_results.end()) input.origin = mine->second.origin;
+                    result_inbox[edge.to].push_back(input);
                 }
                 continue;
             }
