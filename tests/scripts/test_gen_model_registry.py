@@ -1002,3 +1002,36 @@ def test_list_models_rows_are_every_variant_plus_alias_of_rows(tmp_path):
     for name, variant in listed:
         assert variant == by_name[alias_of[name]["alias_of"]]["variant"]
     assert ("deit_base384_distilled", "deit-b_384x384_distilled") in listed
+
+
+def test_only_emits_a_registry_of_the_named_variants(tmp_path):
+    """An exported graph project's registry (scripts/export_graph_project.py): the used models, and
+    every old name or alias of them, so the graph's own model names still resolve."""
+    out = tmp_path / "gen"
+    r = subprocess.run([sys.executable, str(GENERATOR), "--out-dir", str(out), "--only", "yolov8-n_640x640",
+                        "--print-sources"], capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    sources = r.stdout.split(";")
+    assert sorted(Path(s).name for s in sources) == ["graph_registry_all.cpp",
+                                                     "graph_registry_object_detection.cpp"]
+    text = "".join(Path(s).read_text() for s in sources)
+    assert re.findall(r'info\.variant = "([^"]+)"', text) == ["yolov8-n_640x640"]
+    assert set(re.findall(r'AddAlias\("[^"]+", "([^"]+)"', text)) <= {"yolov8-n_640x640"}
+
+
+def test_only_refuses_a_variant_the_registry_lacks(tmp_path):
+    r = subprocess.run([sys.executable, str(GENERATOR), "--out-dir", str(tmp_path), "--only",
+                        "yolov8-n_640x640,no-such-variant"], capture_output=True, text=True, timeout=120)
+    assert r.returncode == 1
+    assert "not in the registry: no-such-variant" in r.stderr
+
+
+def test_subset_entries_keeps_registry_order_and_the_aliases_of_kept_rows():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import gen_model_registry as gen
+    rows = [{"variant": "a"}, {"variant": "b"}, {"variant": "c"}]
+    aliases = [("old_a", "a", "legacy"), ("old_b", "b", "legacy")]
+    kept, kept_aliases = gen.subset_entries(rows, aliases, ["c", "a"])
+    assert [r["variant"] for r in kept] == ["a", "c"] and kept_aliases == [("old_a", "a", "legacy")]
+    with pytest.raises(gen.GenError, match="not in the registry: z"):
+        gen.subset_entries(rows, aliases, ["z"])

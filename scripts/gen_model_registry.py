@@ -590,6 +590,19 @@ def build_entries(registry_path, cpp_root, strict, download_names):
     return rows, aliases
 
 
+def subset_entries(rows, aliases, variants):
+    """(rows, aliases) of only `variants`, in registry order, with the aliases
+    (old names, alias_of) of the rows kept: the registry of an exported graph
+    project (scripts/export_graph_project.py). Raises GenError naming every
+    variant the registry lacks."""
+    wanted = set(variants)
+    unknown = sorted(wanted - {row["variant"] for row in rows})
+    if unknown:
+        raise GenError("not in the registry: " + ", ".join(unknown))
+    return ([row for row in rows if row["variant"] in wanted],
+            [alias for alias in aliases if alias[1] in wanted])
+
+
 def _split_units(rows):
     by_task = defaultdict(list)
     for row in rows:
@@ -858,6 +871,9 @@ def main():
     parser.add_argument("--strict", action="store_true",
                         help="fail on registry/factory name drift (scripts/ci_checks.sh: codegen-strict)")
     parser.add_argument("--print-sources", action="store_true")
+    parser.add_argument("--only", default=None,
+                        help="comma-separated variants: emit a registry of only these "
+                             "(an exported graph project, scripts/export_graph_project.py)")
     args = parser.parse_args()
     if args.docs is None:
         tracked = args.docs_only or args.check_docs
@@ -866,6 +882,9 @@ def main():
     try:
         rows, aliases = build_entries(args.registry, args.cpp_root, args.strict,
                                       load_download_names(args.manifest))
+        if args.only:
+            rows, aliases = subset_entries(rows, aliases,
+                                           [v for v in args.only.split(",") if v])
     except GenError as exc:
         print("ERROR {}".format(exc), file=sys.stderr)
         return 1
