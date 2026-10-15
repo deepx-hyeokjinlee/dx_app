@@ -302,7 +302,8 @@ inline json serializeHandLandmark(const std::vector<HandLandmarkResult>& items, 
     for (const auto& d : items) {
         json lm = json::array();
         for (const auto& kp : d.landmarks) {
-            lm.push_back({{"x", kp.x}, {"y", kp.y}, {"z", kp.confidence}});
+            // Keypoint has no depth; its confidence is the hand's presence.
+            lm.push_back({{"x", kp.x}, {"y", kp.y}});
         }
         dets.push_back({
             {"confidence", d.confidence},

@@ -40,6 +40,8 @@
 #include "common/graph/result_to_shape.hpp"
 #include "common/graph/stage_graph.hpp"
 #include "common/graph/test/fake_model_registry.hpp"
+#include "common/processors/hand_landmark_postprocessor.hpp"
+#include "common/processors/mediapipe_hand_postprocessor.hpp"
 #include "common/utility/visualization.hpp"
 #include "common/visualizers/segmentation_visualizer.hpp"
 
@@ -248,6 +250,132 @@ void TestHandLandmarkConversion() {
     GRAPH_CHECK(kps->items[0].confidence == 0.77f);
     GRAPH_CHECK(kps->items[0].keypoints.size() == 3);
     GRAPH_CHECK(kps->items[0].keypoints[2].y == 3.f);
+}
+
+/// A float tensor over `values`, shaped [1, n] or [1, n, k] - the layouts
+/// dxrt hands the MediaPipe hand models' postprocessors.
+dxrt::TensorPtr FloatTensor(const char* name, std::vector<float>& values,
+                            const std::vector<int64_t>& shape) {
+    return std::make_shared<dxrt::Tensor>(name, shape, dxrt::DataType::FLOAT,
+                                          values.data());
+}
+
+/// The palm detector decodes into FaceDetectionResult, but what it finds is
+/// a hand: the graph's boxes (report class_name, drawn label) say so.
+void TestPalmDetectorBoxesAreNamedHand() {
+    const int kAnchors = 2016;
+    std::vector<float> reg(static_cast<std::size_t>(kAnchors) * 18, 0.f);
+    std::vector<float> scores(kAnchors, -10.f);
+    const int centre = (12 * 24 + 12) * 2;  // stride-8 cell (12, 12)
+    reg[centre * 18 + 2] = 40.f;
+    reg[centre * 18 + 3] = 40.f;
+    reg[centre * 18 + 4 + 5] = -10.f;  // middle-finger MCP above the wrist
+    scores[centre] = 5.f;
+    std::vector<int64_t> reg_shape;
+    reg_shape.push_back(1); reg_shape.push_back(kAnchors); reg_shape.push_back(18);
+    std::vector<int64_t> score_shape;
+    score_shape.push_back(1); score_shape.push_back(kAnchors); score_shape.push_back(1);
+    dxrt::TensorPtrs outputs;
+    outputs.push_back(FloatTensor("regressors", reg, reg_shape));
+    outputs.push_back(FloatTensor("classificators", scores, score_shape));
+
+    PreprocessContext ctx;
+    ctx.original_width = 192;
+    ctx.original_height = 192;
+    ctx.input_width = 192;
+    ctx.input_height = 192;
+    MediaPipeHandPostprocessor palm(192, 0.5f, 0.3f);
+    const std::vector<FaceDetectionResult> hands = palm.process(outputs, ctx);
+    GRAPH_CHECK(hands.size() == 1);
+
+    StageDataPtr data = ToStageData(hands);
+    const BoxesData* boxes = dynamic_cast<const BoxesData*>(data.get());
+    GRAPH_CHECK(boxes != NULL);
+    if (boxes == NULL || boxes->items.size() != 1) return;
+    GRAPH_CHECK(boxes->items[0].class_name == "hand");
+
+    // A real face detector's boxes are still faces.
+    std::vector<FaceDetectionResult> faces(1);
+    faces[0].box.push_back(0.f); faces[0].box.push_back(0.f);
+    faces[0].box.push_back(10.f); faces[0].box.push_back(10.f);
+    StageDataPtr face_data = ToStageData(faces);
+    const BoxesData* face_boxes = dynamic_cast<const BoxesData*>(face_data.get());
+    GRAPH_CHECK(face_boxes != NULL && face_boxes->items.size() == 1 &&
+                face_boxes->items[0].class_name == "face");
+}
+
+/// Brightest channel in the 5x5 window around `point`: lines are drawn
+/// anti-aliased, so one exact pixel is too strict a probe.
+int PeakAround(const cv::Mat& canvas, const cv::Point& point) {
+    const cv::Rect window = cv::Rect(point.x - 2, point.y - 2, 5, 5) &
+                            cv::Rect(0, 0, canvas.cols, canvas.rows);
+    double peak = 0.0;
+    cv::minMaxLoc(canvas(window).reshape(1), NULL, &peak);
+    return static_cast<int>(peak);
+}
+
+/// hand_cascade's landmark node, end to end: HandLandmarkLite's decoded
+/// output (z negative, as on the NPU) through the graph payload onto the
+/// canvas. All 21 points and the hand's own bones are drawn; COCO body limbs
+/// between hand indices are not.
+void TestHandLandmarksAreDrawnWithTheHandSkeleton() {
+    // Wrist at the bottom, five vertical fingers: MCP, PIP, DIP, TIP.
+    std::vector<cv::Point2f> points;
+    points.push_back(cv::Point2f(112.f, 200.f));
+    points.push_back(cv::Point2f(70.f, 180.f));
+    points.push_back(cv::Point2f(50.f, 160.f));
+    points.push_back(cv::Point2f(35.f, 140.f));
+    points.push_back(cv::Point2f(25.f, 120.f));
+    const float finger_x[] = {76.f, 112.f, 148.f, 184.f};
+    const float joint_y[] = {150.f, 115.f, 85.f, 55.f};
+    for (int f = 0; f < 4; ++f) {
+        for (int j = 0; j < 4; ++j) points.push_back(cv::Point2f(finger_x[f], joint_y[j]));
+    }
+    std::vector<float> landmarks;
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        landmarks.push_back(points[i].x);
+        landmarks.push_back(points[i].y);
+        landmarks.push_back(-3.f - static_cast<float>(i));  // relative depth
+    }
+    std::vector<float> presence(1, 0.98f);
+    std::vector<float> handedness(1, 0.2f);
+    std::vector<float> world(63, 0.01f);
+    std::vector<int64_t> flat63;
+    flat63.push_back(1); flat63.push_back(63);
+    std::vector<int64_t> flat1;
+    flat1.push_back(1); flat1.push_back(1);
+    dxrt::TensorPtrs outputs;
+    outputs.push_back(FloatTensor("Identity", landmarks, flat63));
+    outputs.push_back(FloatTensor("Identity_1", presence, flat1));
+    outputs.push_back(FloatTensor("Identity_2", handedness, flat1));
+    outputs.push_back(FloatTensor("Identity_3", world, flat63));
+
+    PreprocessContext ctx;
+    ctx.original_width = 224;
+    ctx.original_height = 224;
+    HandLandmarkPostprocessor post(224, 224);
+    const std::vector<HandLandmarkResult> hands = post.process(outputs, ctx);
+    GRAPH_CHECK(hands.size() == 1);
+
+    FrameReport report;
+    StageResult landmark;
+    landmark.data = ToStageData(hands);
+    report.node_results["landmark"] = landmark;
+    const cv::Mat source = cv::Mat::zeros(224, 224, CV_8UC3);
+    const cv::Mat canvas = RenderReport(source, report);
+
+    int drawn_points = 0;
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        if (PeakAround(canvas, cv::Point(cvRound(points[i].x), cvRound(points[i].y))) > 100) {
+            ++drawn_points;
+        }
+    }
+    GRAPH_CHECK(drawn_points == 21);
+    // Hand bones: wrist -> index MCP, index MCP -> middle MCP (palm).
+    GRAPH_CHECK(PeakAround(canvas, cv::Point(94, 175)) > 100);
+    GRAPH_CHECK(PeakAround(canvas, cv::Point(94, 150)) > 100);
+    // COCO's left shoulder -> left hip (5 -> 11) is not a hand bone.
+    GRAPH_CHECK(PeakAround(canvas, cv::Point(94, 118)) == 0);
 }
 
 void TestFaceAlignmentConversion() {
@@ -11885,6 +12013,8 @@ int main() {
     TestInstanceSegmentationConversion();
     TestPoseConversionIsDirectCopy();
     TestHandLandmarkConversion();
+    TestPalmDetectorBoxesAreNamedHand();
+    TestHandLandmarksAreDrawnWithTheHandSkeleton();
     TestFaceAlignmentConversion();
     TestSegmentationConversionCatchesTransposition();
     TestSegmentationConversionDefensiveSizeCheck();
