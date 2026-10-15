@@ -104,7 +104,13 @@ inline std::string WorkingDir() {
  */
 inline std::string RuntimeRoot() {
     const char* given = std::getenv("DXAPP_ROOT");
-    if (given != NULL && given[0] != '\0') return std::string(given);
+    if (given != NULL && given[0] != '\0') {
+        std::string root(given);  // "/p/" and "/p" name one root
+        while (root.size() > 1 && (root[root.size() - 1] == '/' || root[root.size() - 1] == '\\')) {
+            root.erase(root.size() - 1);
+        }
+        return root;
+    }
 #if defined(PROJECT_ROOT_DIR)
     return std::string(PROJECT_ROOT_DIR);
 #else

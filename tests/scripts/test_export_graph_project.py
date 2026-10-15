@@ -166,7 +166,7 @@ def test_run_sh_writes_results_and_readme_says_where_events_go(project):
     assert '--output "$SCRIPT_DIR/results/result.jpg" --events "$SCRIPT_DIR/results/events.jsonl"' in run_sh
     readme = (out / "README.md").read_text()
     for text in ("./setup.sh", "./run.sh", "results/events.jsonl", "`user_logic/tag_people.cpp` | tag | boxes",
-                 "[EVENT]"):
+                 "[EVENT]", "only for the program it starts"):
         assert text in readme, text
     assert subprocess.run(["bash", "-n", str(out / "setup.sh")]).returncode == 0
     assert subprocess.run(["bash", "-n", str(out / "run.sh")]).returncode == 0

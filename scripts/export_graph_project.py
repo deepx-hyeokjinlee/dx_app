@@ -668,7 +668,9 @@ factories of the models this graph uses.
 ```
 
 The project can be moved or copied anywhere: the program finds graph.json,
-models/ and src/ from `.dxapp-root` (or `DXAPP_ROOT`, which run.sh sets).
+models/ and src/ from `.dxapp-root` (or `DXAPP_ROOT`, which run.sh sets
+only for the program it starts; do not export it in your shell, because
+dx_app's own programs read it too).
 `BUILD_DIR=<dir> ./setup.sh` builds elsewhere; run.sh reads the same variable.
 
 ## Where events go

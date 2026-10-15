@@ -15159,6 +15159,85 @@ void TestProjectArgsFillInTheProjectsGraphAndModels() {
     GRAPH_CHECK(cli::ProjectArgs(Words(absolute, 1), fixed, "/p").args == Words(absolute_out, 5));
 }
 
+// ---------------------------------------------------------------------
+// Phase 3 review: nothing a user class does ends the run
+// ---------------------------------------------------------------------
+
+namespace {
+
+/// Its constructor throws: the class cannot be made.
+struct ThrowsInItsConstructor {
+    ThrowsInItsConstructor() { throw std::runtime_error("no camera config"); }
+    BoxesData Run(const BoxesData& input, UserContext&) { return input; }
+};
+
+/// Throws something that is not a std::exception.
+struct ThrowsAnInt {
+    BoxesData Run(const BoxesData&, UserContext&) { throw 1; }
+};
+
+}  // namespace
+
+void TestAUserClassThatCannotBeMadeOrThrowsAnythingPassesThrough() {
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, ThrowsInItsConstructor>("tag_boxes");
+    std::vector<FrameReport> reports = RunLogicFrames(UserGraph(), LogicRegistry(), Keys(3), false);
+    GRAPH_CHECK(reports.size() == 3);
+    if (reports.size() == 3) {
+        GRAPH_CHECK(reports[0].error.find("node \"u\": user logic \"tag_boxes\" could not be made: "
+                                          "no camera config") != std::string::npos);
+        GRAPH_CHECK(reports[1].error.empty() && reports[2].error.empty());  // said once, then pass-through
+        const BoxesData* user = BoxesOf(reports[2], "u");
+        GRAPH_CHECK(user != NULL && user->items.size() == 1 && user->items[0].class_name == "person");
+        GRAPH_CHECK(EventsOf(reports[2], "z").size() == 1);  // the zone still runs
+    }
+    const std::vector<FrameReport> async = RunLogicFrames(UserGraph(), ReversedLogicRegistry(), Keys(3), true);
+    GRAPH_CHECK(async.size() == 3);
+    for (std::size_t i = 0; i < 3 && i < async.size() && i < reports.size(); ++i) {
+        GRAPH_CHECK(reports[i] == async[i]);
+    }
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, ThrowsAnInt>("tag_boxes");
+    reports = RunLogicFrames(UserGraph(), ReversedLogicRegistry(), Keys(2), true);
+    GRAPH_CHECK(reports.size() == 2);
+    for (std::size_t i = 0; i < reports.size(); ++i) {
+        GRAPH_CHECK(reports[i].error.find("user logic \"tag_boxes\" failed: an exception that is not a "
+                                          "std::exception") != std::string::npos);
+        const BoxesData* user = BoxesOf(reports[i], "u");
+        GRAPH_CHECK(user != NULL && user->items.size() == 1);
+    }
+    ClearUserLogic();
+}
+
+void TestAUserNodeWithoutANamePassesThrough() {
+    ClearUserLogic();
+    RegisterUserLogic<BoxesData, TagBoxes>("tag_boxes");
+    LogicConfig config;  // an unvalidated spec: no "name"
+    config.id = "u";
+    config.op = "user";
+    LogicInput input;
+    input.edge = 1;
+    input.from = "od";
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(10.f, 10.f, 20.f, 20.f, 0.9f, "person"));
+    input.data = boxes;
+    LogicFrame frame;
+    frame.frame_size = cv::Size(100, 100);
+    LogicState state;
+    const LogicOutput out = RunLogic(config, std::vector<LogicInput>(1, input), frame, &state);
+    const BoxesData* same = dynamic_cast<const BoxesData*>(out.result.data.get());
+    GRAPH_CHECK(out.events.empty() && out.error.empty() && same != NULL && same->items[0].class_name == "person");
+    ClearUserLogic();
+}
+
+void TestDxappRootLosesItsTrailingSlash() {
+    RootEnv slash("/opt/exported//");
+    GRAPH_CHECK(::dxapp::RuntimeRoot() == "/opt/exported");
+    GRAPH_CHECK(::dxapp::ResolveRepoRelative("sample/a.jpg") == "/opt/exported/sample/a.jpg");
+    RootEnv top("/");
+    GRAPH_CHECK(::dxapp::RuntimeRoot() == "/");
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -15578,6 +15657,9 @@ int main() {
     TestARegisteredUserClassRunsInPlaceOfThePassThrough();
     TestEachLogicStateHasItsOwnUserObject();
     TestUserClassFailuresPassTheInputThroughAndSayWhy();
+    TestAUserClassThatCannotBeMadeOrThrowsAnythingPassesThrough();
+    TestAUserNodeWithoutANamePassesThrough();
+    TestDxappRootLosesItsTrailingSlash();
     TestProjectArgsFillInTheProjectsGraphAndModels();
 
     std::printf("%d checks, %d failures, %d skipped\n",

@@ -690,7 +690,9 @@ records a frame error and its input passes through.
 galleries) are read against `$DXAPP_ROOT` when it is set, else against the
 repository the program was built from, else, for an exported project, the
 nearest folder holding `.dxapp-root` (from the program's directory up, then
-from the working directory up). `run.sh` sets `DXAPP_ROOT`.
+from the working directory up). `run.sh` sets `DXAPP_ROOT` for the program
+it starts only; a `DXAPP_ROOT` exported in a shell would point every dx_app
+program there.
 
 ---
 

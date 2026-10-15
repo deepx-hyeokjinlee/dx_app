@@ -996,10 +996,24 @@ LogicOutput RunUser(const LogicConfig& config, const std::vector<LogicInput>& in
     const std::shared_ptr<BoxesData> boxes = SourceBoxes(*input);
     const StageDataPtr given = boxes ? StageDataPtr(boxes) : input->data;
     out.result.data = given;
-    const std::string& name = config.text.at("name");
+    // ValidateGraph requires "name"; a spec that skipped it passes through.
+    const std::map<std::string, std::string>::const_iterator named = config.text.find("name");
+    if (named == config.text.end()) return out;
+    const std::string& name = named->second;
     if (!s->user_looked_up) {
+        // Asked once per stream. A class that cannot be made says so on this
+        // frame; the node then passes its input through, as with no class.
         s->user_looked_up = true;
-        s->user = MakeUserLogic(name);  // unique_ptr -> shared_ptr; null: pass-through
+        try {
+            s->user = MakeUserLogic(name);  // unique_ptr -> shared_ptr; null: pass-through
+        } catch (const std::exception& e) {
+            out.error = "user logic \"" + name + "\" could not be made: " + e.what();
+            return out;
+        } catch (...) {
+            out.error = "user logic \"" + name +
+                        "\" could not be made: an exception that is not a std::exception";
+            return out;
+        }
     }
     if (!s->user || !given) return out;
     UserContext ctx(config.id, frame.time_s, frame.frame_size);
@@ -1008,6 +1022,9 @@ LogicOutput RunUser(const LogicConfig& config, const std::vector<LogicInput>& in
         produced = s->user->Run(given, ctx);
     } catch (const std::exception& e) {
         out.error = "user logic \"" + name + "\" failed: " + e.what();
+        return out;
+    } catch (...) {
+        out.error = "user logic \"" + name + "\" failed: an exception that is not a std::exception";
         return out;
     }
     if (!produced || produced->shape() != given->shape()) {
