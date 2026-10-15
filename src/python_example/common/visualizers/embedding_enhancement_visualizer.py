@@ -20,8 +20,7 @@ class EmbeddingVisualizer(IVisualizer):
     """Stateful embedding comparison visualizer.
 
     First image is captured as a reference. Subsequent calls produce a
-    side-by-side comparison canvas with cosine similarity, matching the
-    demo_embedding_compare / demo_reid_compare output.
+    side-by-side comparison canvas with cosine similarity.
 
     ``NEEDS_REFERENCE`` tells the runner that returning nothing for the first frame is
     by design, so that a ``--save`` run which produces no picture can explain itself

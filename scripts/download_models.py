@@ -25,7 +25,6 @@ Requirements:
 import argparse
 import json
 import os
-import shutil
 import ssl
 import sys
 import time
@@ -483,74 +482,6 @@ def download_all(models: list[dict], output_dir: Path, session,
     return counters
 
 
-# ── Internal (local copy) ─────────────────────────────────────────────────────
-
-def copy_file(src: Path, dest: Path, force: bool = False) -> dict:
-    """Copy a single file from local path. Skips if already exists, unless force=True."""
-    filename = dest.name
-    if dest.exists() and not force:
-        return {"status": "skip", "file": filename, "size": dest.stat().st_size}
-    if not src.exists():
-        return {"status": "error", "file": filename, "error": f"source not found: {src}"}
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        shutil.copy2(src, dest)
-        return {"status": "ok", "file": filename, "size": dest.stat().st_size}
-    except Exception as e:
-        return {"status": "error", "file": filename, "error": str(e)}
-
-
-def copy_all(models: list[dict], output_dir: Path, internal_path: Path,
-             workers: int = 4, force: bool = False, with_json: bool = True) -> dict:
-    """Copy all models in parallel from a local directory. Returns the counters."""
-    if not internal_path.is_dir():
-        error(f"Internal path not found or not a directory: {internal_path}")
-        sys.exit(1)
-
-    _prepare_output_dir(output_dir)
-
-    tasks = []
-    for m in models:
-        fname = _dxnn_filename(m)
-        tasks.append(("dxnn", m["name"], internal_path / fname, output_dir / fname))
-        if with_json and m.get("json_url"):
-            jname = Path(urlparse(m["json_url"]).path).name
-            tasks.append(("json", m["name"], internal_path / jname, output_dir / jname))
-
-    total = len(tasks)
-    head(f"\n{'─'*60}")
-    head(f"  Starting copy: {total} files")
-    head(f"  From: {internal_path}")
-    head(f"  To  : {output_dir}")
-    head(f"{'─'*60}")
-
-    counters = {"ok": 0, "skip": 0, "err": 0, "err_403": 0, "pending": 0,
-                "first_err_url": None, "failures": [], "total": total}
-    t0 = time.time()
-
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {
-            pool.submit(copy_file, src, dest, force): (kind, name)
-            for kind, name, src, dest in tasks
-        }
-        done = 0
-        for fut in as_completed(futures):
-            done += 1
-            kind, name = futures[fut]
-            res = fut.result()
-            pct = done * 100 // total
-            bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
-            _handle_download_result(res, name, kind, bar, pct, counters)
-
-    elapsed = time.time() - t0
-    head(f"\n{'─'*60}")
-    head(f"  Done: {counters['ok']} copied, {counters['skip']} skipped, {counters['err']} errors  ({elapsed:.1f}s)")
-    head(f"  Saved to: {output_dir.resolve()}")
-    head(f"{'─'*60}\n")
-    return counters
-
-
 def _report_failures(counters: dict | None, missing: list[str]) -> bool:
     """Print a summary of what the run could not provide; True if anything failed."""
     failures = (counters or {}).get("failures", [])
@@ -643,18 +574,11 @@ environment:
                       metavar="FILE",    help="save parsed model list to a JSON file")
     misc.add_argument("--manifest", type=str, default=None, metavar="FILE",
                       help=f"path to manifest JSON file (default: {DEFAULT_MANIFEST})")
-
-    src = parser.add_argument_group("source")
-    src.add_argument("--internal", action="store_true",
-                     help="use local mount instead of S3 (internal/air-gapped network)")
-    src.add_argument("--internal-path", type=str, default=None, metavar="DIR",
-                     help="local model directory to copy from (required with --internal)")
-    args = parser.parse_args()
-    if args.internal and not args.internal_path:
-        parser.error("--internal requires --internal-path=<model directory>")
-    if args.internal_path and not args.internal:
-        parser.error("--internal-path requires --internal")
-    return args
+    # The --internal local-copy mode is gone. Its options still parse so existing
+    # command lines (CI jobs) keep working; main() ignores them with a warning.
+    misc.add_argument("--internal", action="store_true", help=argparse.SUPPRESS)
+    misc.add_argument("--internal-path", type=str, default=None, help=argparse.SUPPRESS)
+    return parser.parse_args()
 
 
 def _resolve_ca_bundle(environ=None, system_bundles=None) -> str | None:
@@ -830,6 +754,12 @@ def _print_filtered_model_list(models: list[dict], output_dir: Path):
 
 def main():
     args = parse_args()
+    ignored = [opt for opt, given in (("--internal", args.internal),
+                                      ("--internal-path", args.internal_path is not None))
+               if given]
+    if ignored:
+        warn(f"Ignoring {' '.join(ignored)}: the --internal local-copy mode was removed "
+             "(the options go in a future release); models come from S3.")
 
     # --no-force overrides --force default
     if args.no_force:
@@ -847,10 +777,7 @@ def main():
     print(f"  Manifest : {manifest_path}")
     print(f"  Output   : {output_dir.resolve()}")
     print(f"  Workers  : {args.workers}  |  Force : {args.force}  |  Dry-run : {args.dry_run}")
-    if args.internal:
-        print(f"  Source   : {_C}internal{_RST} ({args.internal_path})")
-    else:
-        print(f"  Source   : {_C}S3 / public{_RST}")
+    print(f"  Source   : {_C}S3 / public{_RST}")
     head(f"{_DOUBLE_LINE}\n")
 
     # Third-party license notice
@@ -895,25 +822,15 @@ def main():
             sys.exit(1)
         return
 
-    if args.internal:
-        counters = copy_all(
-            models=models,
-            output_dir=output_dir,
-            internal_path=Path(args.internal_path),
-            workers=args.workers,
-            force=args.force,
-            with_json=not args.no_json,
-        )
-    else:
-        session = _setup_session()
-        counters = download_all(
-            models=models,
-            output_dir=output_dir,
-            session=session,
-            workers=args.workers,
-            force=args.force,
-            with_json=not args.no_json,
-        )
+    session = _setup_session()
+    counters = download_all(
+        models=models,
+        output_dir=output_dir,
+        session=session,
+        workers=args.workers,
+        force=args.force,
+        with_json=not args.no_json,
+    )
 
     if _report_failures(counters, missing):
         sys.exit(1)

@@ -30,7 +30,7 @@ This section describes the software requirements and installation steps for sett
 
 To run **DX-APP** on Linux, the following components **must** be installed.  
 
-- **OS**: Ubuntu 18.04 / 20.04 / 22.04 / 24.04 (x64) and Debian 12 / 13 (x64)  
+- **OS**: Ubuntu 20.04 / 22.04 / 24.04 (x64) and Debian 12 / 13 (x64)  
 - **DEEPX M1 Runtime Lib Version (DX-RT)**: v3.5.0 or higher  
 - **NPU Device Driver**: v2.7.0 or higher (RT and PCIe driver). The runtime's own minimum driver, firmware and `.dxnn` versions are printed by `dxrt-cli --version`.  
 - **dx_engine** (Python): 3.5.x, matching the runtime's major.minor. `import dx_engine` raises `dx_engine and DX-RT versions do not match` otherwise.  
@@ -41,7 +41,7 @@ All required components are included in the **DXNN All Suite (DX-AS)** package.
 
     `./setup.sh` downloads DX Model Zoo 2_5_0. Those `.dxnn` files are container format **v9**, which DX-RT 3.5.0 is the first runtime to load (DX-RT 3.4.2 refuses them: `Model file format version 9 is not supported`). The C++ examples check the floor when they start and stop with `DXRT library version is too low. (required: >= 3.5.0, current: <version>)`; the check runs after the engine is created, so an older runtime may report its own error on the `.dxnn` first. The Python examples check for DX-RT 3.0.0 or later only. The multi-model graph reads the container version before it creates an engine and names the problem (see the multi_model_graph README, *Model files*).
 
-    Tested with DX-RT 3.5.0 (build 1.6fdc543), NPU driver 2.7.0 (RT and PCIe), firmware 2.7.4 and `dx_engine` 3.5.0 on a DX-M1 M.2 card (x86_64, Ubuntu 24.04).
+    Tested with DX-RT 3.5.0, NPU driver 2.7.0 (RT and PCIe), firmware 2.7.4 and `dx_engine` 3.5.0 on a DX-M1 M.2 card (x86_64, Ubuntu 24.04).
 
 
 ### Prerequisites Setup
@@ -147,12 +147,7 @@ Assets are downloaded and placed in the `assets/` directory.
 | `--force-remove-videos` | Force remove videos if they exist |
 | `--verbose` | Show detailed progress output |
 
-In internal-network environments, the setup flow can use the internal [DX-ModelZoo](https://developer.deepx.ai/modelzoo/) source automatically when the intranet mode is enabled by the surrounding environment.
-
 For most users, running only `./setup.sh` is sufficient. Contributor-facing setup details are documented separately in the developer guides.
-
-!!! note "Internal-Network Setup"
-    In internal environments, DX-APP can use the internal DX-ModelZoo source to prepare model assets without requiring manual model-by-model input during the standard setup flow.
 
 **Post-Processing Unit (PPU) Acceleration Integration**  
 
@@ -209,7 +204,7 @@ certificate verify failed: Missing Authority Key Identifier
 3. `../venv-dx-runtime`;
 4. `python3`.
 
-Before this choice, the downloader always ran with `python3`. The script prints its choice:
+The script prints its choice:
 
 ```text
 [DXAPP] [INFO] Downloader Python: /usr/bin/python3 (Python 3.12.3, OpenSSL 3.0.13 30 Jan 2024)
@@ -245,10 +240,10 @@ or opt in with DXAPP_TLS_RELAX_X509_STRICT=1 ./setup.sh, which turns off only X.
   dx_graph Python module skipped: cross build (host x86_64, target aarch64): the module would be built against the host's Python. To build it for the target, pass -DDXAPP_CROSS_PYTHON_GRAPH=ON and -DPython_INCLUDE_DIR=<the target Python's include/python3.X> (not validated here: no target Python on the development host)
   ```
 
-  The opt-in is `-DDXAPP_CROSS_PYTHON_GRAPH=ON -DPython_INCLUDE_DIR=<target include/python3.X>`. Both are needed. This path is not validated here.
+  The opt-in is `-DDXAPP_CROSS_PYTHON_GRAPH=ON -DPython_INCLUDE_DIR=<target include/python3.X>`. Both are needed. This path is not covered by the release tests.
 - **dx_postprocess skipped.** `pip` would build it for the host and install it into the host's interpreter, so `build.sh` prints `Cross build (aarch64): dx_postprocess skipped - build it on the target with ./build.sh there.` and runs no `pip`.
 - **Compile check.** `bash scripts/check_cross_compile.sh` compile-checks the graph engine and the graph CLI for aarch64 (`-fsyntax-only`, C++14, the graph targets' `-Werror` flags). `--with-registry` adds the generated registry sources (about 100 s). It needs `aarch64-linux-gnu-g++` (`DXAPP_CROSS_CXX`), the dxrt headers and the OpenCV headers; it prints `check_cross_compile OK: <n> sources compile for aarch64 (aarch64-linux-gnu-g++, -fsyntax-only)`. Nothing is linked or run on aarch64.
-- **What was validated.** Concurrency (the graph engine's pipelining, `--max-inflight`, default 16) was validated with x86_64 dxrt only, on a DX-M1. aarch64 is compile-checked only.
+- **Validation scope.** Concurrency (the graph engine's pipelining, `--max-inflight`, default 16) is validated on x86_64 with a DX-M1. aarch64 is compile-checked only.
 
 ---
 
@@ -454,7 +449,7 @@ dx_app/
 
 ### Graph engine on Windows
 
-The graph engine, the `multi_model_graph_{sync,async}` CLI and the generated model registry are **not built on Windows here**: the development host has no MSVC. What was prepared, each piece checked on Linux only:
+The graph engine, the `multi_model_graph_{sync,async}` CLI and the generated model registry are **not built or tested on Windows in this release**. The Windows support below is prepared and verified on Linux only:
 
 - **MSVC stays C++17.** Under `/std:c++14` the tree's own filesystem switch picks `<experimental/filesystem>`, which current MSVC STL rejects, and the Windows build has only ever been C++17. C++14 is enforced where it can be checked: GCC/Clang `-Werror=c++17-extensions` and `scripts/check_cross_compile.sh`.
 - **Graph targets get `/bigobj` and two warnings as errors.** `/bigobj` (a generated registry source holds up to 64 factories), `/w15038 /we5038` (C5038, members initialized out of order) and, for targets with a `switch` over an enum, `/w14062 /we4062` (C4062, an enumerator not handled). Tests check that the flags are emitted, not that MSVC accepts them.

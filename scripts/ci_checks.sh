@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every dx_app repository check that needs no NPU, in one place (U-16).
-# .github/workflows/dxapp-checks.yml runs exactly this; so do developers:
+# Developers and any CI job run exactly this:
 #
 #   bash scripts/ci_checks.sh                 # every check
 #   bash scripts/ci_checks.sh --list          # the check names, in order

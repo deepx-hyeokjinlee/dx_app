@@ -1,6 +1,6 @@
 # dx_app tests
 
-Six independent test suites live here. They have different prerequisites, so
+Five independent test suites live here. They have different prerequisites, so
 pick the one that matches what you want to check before running anything.
 
 | Suite | What it checks | Needs NPU? | Needs `./build.sh`? | Entry point |
@@ -10,7 +10,6 @@ pick the one that matches what you want to check before running anything.
 | [`cpp_example/`](cpp_example/) | `bin/` executables: CLI contract + end-to-end inference | E2E only | yes | `cd tests/cpp_example && pytest -m <marker>` |
 | [`scripts/`](scripts/) | Repo tooling (`scripts/*.py`, `build.bat` generation, docs) | no | no | `pytest tests/scripts` |
 | [`windows/`](windows/) | Windows-specific argument handling and pybind11 bindings | E2E only | yes | `tests\windows\run_tests.bat` |
-| [`req_test/`](req_test/) | SDKREQ requirement verification (static + runtime) | optional | optional | `tests/req_test/run_all.sh` |
 
 Run each suite in its own pytest session, as `run_tc.sh` does (it runs
 pytest inside each suite's directory). One session over `tests/cpp_example` and `tests/python_example`
@@ -19,16 +18,10 @@ together is not supported: 11 test modules have the same file name in both
 `from conftest import ...` then finds the Python suite's `conftest.py`, so
 collection stops with 18 errors.
 
-Two helper directories are not test suites:
+One helper directory is not a test suite:
 
 - [`test_helpers/`](test_helpers/) — shared constants, discovery utilities, and
-  the pytest wiring both example suites use. Also a public API for `req_test`
-  (see below).
-- [`compare_e2e_report/`](compare_e2e_report/) — compares two E2E performance
-  reports against `default_threshold.json`.
-
-`tests/.local/` is a scratch area for machine-specific tests and is not part of
-any suite.
+  the pytest wiring both example suites use.
 
 ## The usual entry point: `run_tc.sh`
 
@@ -94,38 +87,22 @@ and re-exported by both `conftest.py` files:
 `wait_for_temperature` fixture waits for the NPU to cool below 70 °C before
 each `e2e` test and is a no-op everywhere else.
 
-## req_test contract surface
+## Contract surface
 
-[`req_test/`](req_test/) verifies each SDKREQ requirement twice — statically
-(the option or module exists in the source) and at runtime (an example actually
-runs). For the runtime half it **drives these pytest suites directly**, so the
-following are a contract, not an implementation detail. Renaming any of them
-breaks requirement coverage silently:
+External automation may drive these pytest suites directly, so the following
+are a contract, not an implementation detail:
 
 1. The directory names `tests/cpp_example` and `tests/python_example`, each
    runnable as `pytest -m <marker>` from inside it.
 2. The marker names, and which tests each marker selects.
 3. The file name `test_e2e_camera_rtsp.py` in both suites, plus the
    `--camera-index` and `--rtsp-url` option names.
-4. `cpp_example/conftest.py::resolve_bin_dir()` — `req_test/_dxenv.bat`
-   documents itself as kept in sync with it.
+4. `cpp_example/conftest.py::resolve_bin_dir()`.
 5. The `test_helpers` symbols listed in
    [`test_helpers/__init__.py`](test_helpers/__init__.py).
 6. `run_tc.sh`'s option surface.
-7. pytest's exit code 5 ("no tests collected"), which `req_test` treats as SKIP
-   rather than as failure.
-
-Which suite covers which requirement:
-
-| SDKREQ | Covered by | How |
-|--------|-----------|-----|
-| 517 / 518 | both example suites | `pytest -m e2e_image`, `-m e2e_stream`, and `test_e2e_camera_rtsp.py -m e2e_camera / -m e2e_rtsp` |
-| 525 / 526 | `python_example/` | `pytest -m e2e_image` (`req_test/test_526.bat`) |
-| 536 / 537 | both example suites | `pytest -m help` |
-| all others | `test_helpers/` | via `req_test/_rt_resolve.py`, which reuses the discovery and launch logic these suites use |
-
-The modules that serve a requirement directly say so in their docstring.
-`req_test/README.md` documents every requirement script in detail.
+7. pytest's exit code 5 ("no tests collected"), which means no model was
+   installed rather than a failure.
 
 ## Running without an NPU
 
@@ -137,10 +114,6 @@ pytest tests/scripts                             # repo tooling tests
 cd tests/cpp_example && pytest -m contract       # source-level guards
 cd tests/python_example && pytest --collect-only # what would run
 ```
-
-On a machine without an NPU, `req_test/run_all.sh` reports the static checks as
-PASS and the runtime checks as SKIP; the same run on real hardware turns those
-SKIPs into PASSes.
 
 ## Adding a test
 
@@ -178,13 +151,12 @@ So running `tests/scripts` never needs a reinstall of `bin/` afterwards.
 
 `scripts/ci_checks.sh` is the one entry point for the repository checks
 that need no NPU (those needing the dxrt headers SKIP where they are
-missing), and it includes `pytest tests/scripts`. GitHub Actions runs it
-(`.github/workflows/dxapp-checks.yml`). See *Repository checks (GitHub
-Actions)* in `docs/source/docs/04_DX-APP_CPP_Example_Test.md`.
+missing), and it includes `pytest tests/scripts`. See *Repository checks*
+in `docs/source/docs/04_DX-APP_CPP_Example_Test.md`.
 
 There, `tests/scripts` runs with
 `--known-failures tests/scripts/known_target_failures.txt`: each test listed
-in that file (one `<test id> | <reason>` per line) already fails on the
+in that file (one `<test id> | <reason>` per line) is known to fail on the
 release base and runs as a strict xfail, so the check stays green while it
 fails and turns red the day it passes, until its line is deleted. A plain
 `pytest tests/scripts` reads no list and shows those tests failing.
@@ -194,5 +166,5 @@ fails and turns red the day it passes, until its line is deleted. A plain
 The tests find the binaries with `tests/test_helpers/platform_paths.py`:
 `bin/Release` (or `bin/RelWithDebInfo`, `bin/Debug`) when it exists, else
 `bin/`, with `.exe` names. The Linux side of those rules is tested in
-`tests/scripts/test_platform_paths.py`. Nothing in `tests/windows` is run on
-Windows here.
+`tests/scripts/test_platform_paths.py`. The `tests/windows` suite runs only on
+Windows (`tests\windows\run_tests.bat`).

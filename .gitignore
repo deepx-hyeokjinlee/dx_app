@@ -151,6 +151,10 @@ docs/superpowers/
 dx-agent-dev/
 # END output of dx-agent-dev
 
+# BEGIN dx-agent-dev harness bootstrap cache
+# Acquired dx-all-suite harness for standalone checkouts — never committed.
+.dx-harness/
+# END dx-agent-dev harness bootstrap cache
 scripts/__pycache__/
 
 # Local planning/spec work (never committed)

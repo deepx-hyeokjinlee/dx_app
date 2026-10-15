@@ -183,7 +183,7 @@ mapping, joined from a committed snapshot of the dx-modelzoo CV tree.
 | `alias_of` | Set when an entry shares another entry's variant. Alias entries are **retained, never deleted**. |
 
 - Snapshot: `tests/data/modelzoo_cv_tree.json` — refresh with
-  `python scripts/harvest_modelzoo_tree.py`. Migration: `scripts/migrate_registry_modelzoo.py`.
+  `python scripts/harvest_modelzoo_tree.py`.
 - Family assignment is **data, not an algorithm**: dx-modelzoo folds depth/width
   into the family (`resnet50` → `resnet`, `vgg16-bn` → `vgg`). Never derive it —
   a best-effort heuristic yields 211 families against the authoritative 89.

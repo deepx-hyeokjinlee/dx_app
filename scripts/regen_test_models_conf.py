@@ -36,15 +36,11 @@ def main() -> None:
                     help="output path (default: config/test_models.conf)")
     args = ap.parse_args()
     reg = json.loads((ROOT / "config" / "model_registry.json").read_text(encoding="utf-8"))
-    # One row per VARIANT. Alias entries (alias_of set, e.g. deit_base384_distilled ->
-    # deit_base_distilled_2) share their target's variant; emitting both made consumers run
-    # the model twice. The non-alias entry wins.
-    by_variant = {}
-    for e in sorted(reg, key=lambda x: (x["task"], x["family"], x["variant"], bool(x.get("alias_of")))):
-        by_variant.setdefault(e["variant"], e)
+    # An alias row shares another row's variant and .dxnn, so it would be a duplicate line.
     rows = [
         f"{e['family']}\t{e['task']}\tassets/models/{e['dxnn_file']}\t{e['variant']}"
-        for e in sorted(by_variant.values(), key=lambda x: (x["task"], x["family"], x["variant"]))
+        for e in sorted(reg, key=lambda x: (x["task"], x["family"], x["variant"]))
+        if e.get("alias_of") is None
     ]
     out = args.out
     out.write_text(HEADER + "\n".join(rows) + "\n", encoding="utf-8")

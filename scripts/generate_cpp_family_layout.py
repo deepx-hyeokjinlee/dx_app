@@ -2,7 +2,7 @@
 # Copyright (C) 2018- DEEPX Ltd. All rights reserved.
 """Generate the dx-modelzoo family/variant layout for src/cpp_example.
 
-Mirrors scripts/generate_family_layout.py on the C++ side, emitting per
+The C++ side of the family/variant layout, emitting per
 ``<task>/<family>/``::
 
     <variant>/config.json          the same variant config the python tree uses
@@ -676,8 +676,8 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(a.out)
     if a.sync_configs:
         return sync_configs(py_root, out)
-    # Refuse to wipe a real source tree. This script rmtree's its output, and unlike
-    # generate_family_layout.py it has no --in-place mode, so pointing --out at
+    # Refuse to wipe a real source tree. This script rmtree's its output, and it
+    # has no --in-place mode, so pointing --out at
     # src/cpp_example would delete common/ and CMakeLists.txt -- neither of which it
     # regenerates. Stage, then copy.
     if (out / "common").is_dir() or (out / "CMakeLists.txt").is_file():

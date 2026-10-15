@@ -109,7 +109,7 @@ def registry_entry(row: dict) -> dict:
 
 
 def spec_entry(row: dict) -> dict:
-    """The shape scripts/generate_family_layout.py reads.
+    """The processor-spec entry for one new variant.
 
     'factory_class' is informational for a new family -- the generator derives the
     class name from the family itself -- but 'factory_bases' and the matching import

@@ -73,7 +73,8 @@ What `./build.sh` does with the module:
 
 A cross build (`--arch aarch64`) skips the module (`dx_graph Python module
 skipped: cross build ...`) unless `-DDXAPP_CROSS_PYTHON_GRAPH=ON` and the
-target Python's `-DPython_INCLUDE_DIR` are given - not validated here.
+target Python's `-DPython_INCLUDE_DIR` are given; that path is not covered
+by the release tests.
 
 The configure step names what it chose:
 
@@ -101,9 +102,9 @@ rm -rf bin/python/dx_graph bin/python/dx_graph_examples && mkdir -p bin/python
 cp -r build_x86_64/python/dx_graph build_x86_64/python/dx_graph_examples bin/python/
 ```
 
-The DEEPX project targets the dx-runtime virtualenv,
-`dx-runtime/venv-dx-runtime/bin/python`; the system `python3` of the same
-version (3.12) imports the same module.
+The module is built for the interpreter given at build time
+(`-DDXAPP_PYTHON`, or `./build.sh --python_exec`); any interpreter of the same
+Python version imports it.
 
 ---
 
@@ -267,8 +268,8 @@ numpy copy of the data it summarizes (`d["nodes"]["seg"]["payload"]["labels_arra
 exactly when the CLI's report does, on a graph with several sources.
 
 A result with **output ports** (`yolopv2_384x640`, `superpoint_480x640`, the two 3DDFA
-models, `mediapipe-hands-lite_224x224`; see *Output ports* in the multi_model_graph
-README) has a `"ports"` entry next to its `"payload"`, as in the CLI's
+models, `mediapipe-hands-lite_224x224`, the two `ppmatting` models and the five
+gallery models; see *Output ports* in the multi_model_graph README) has a `"ports"` entry next to its `"payload"`, as in the CLI's
 report, and each dense port payload gets its `<key>_array` too:
 
 - `d["nodes"]["drive"]["ports"]["lane"]["labels_array"]` is the lane mask:
@@ -308,7 +309,7 @@ file. `.code` is `"MODEL_LOAD"` when the runtime cannot load a model whose
 *Device memory*), or because the file is a `.dxnn` container v9 and this
 DX-RT is older than 3.5.0 (the message is the CLI's: `... .dxnn container v9
 needs DX-RT >= 3.5.0, but this runtime is 3.4.1. Use the v8 file (dxnn/2_4_0)
-or upgrade DX-RT.`); before, that was a `RuntimeError`. Other engine failures,
+or upgrade DX-RT.`). Other engine failures,
 such as a `stall_timeout_ms` stall, are `RuntimeError`.
 
 ---
@@ -432,8 +433,8 @@ after the file.
 Pipelining survives the binding: an `executor="async"` Graph runs the CLI's
 own asynchronous executor (`consumer::AsyncFrameExecutor`, the one
 `multi_model_graph_async` uses), with up to `max_frames_in_flight` frames in
-flight. This release publishes no throughput figure: the one measured
-during development was not re-measured on the release tree.
+flight. No throughput figure is published for the binding; measure it on
+your own graph and hardware.
 
 ## Limitations
 

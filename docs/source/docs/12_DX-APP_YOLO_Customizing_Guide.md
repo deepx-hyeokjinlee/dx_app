@@ -43,18 +43,16 @@ Use `scripts/add_model.sh` to create the C++ and Python example trees from the c
 
 ```bash
 # YOLOv8-style detection model
-./scripts/add_model.sh yolo_custom object_detection --postprocessor yolov8 --lang both
+./scripts/add_model.sh yolo-custom_640x640 object_detection --postprocessor yolov8 --lang both
 
 # YOLOv7-style anchor-based model
-./scripts/add_model.sh yolov7_w6 object_detection --base-model yolov7 --postprocessor yolov7 --lang both
+./scripts/add_model.sh yolov7-w6_1280x1280 object_detection --base-model yolov7_640x640 --input-size 1280x1280 --lang both
 
 # YOLOX-style model
-./scripts/add_model.sh custom_yolox object_detection --postprocessor yolox --lang both
+./scripts/add_model.sh custom-yolox_640x640 object_detection --postprocessor yolox --lang both
 ```
 
-> **Known issue (this release).** `add_model.sh` still targets the old flat `<task>/<model>/` layout, and it copies the reference model's C++ factory with its `namespace v_<reference variant>` unchanged, so `python3 scripts/generate_cpp_family_layout.py --variant-scope src/cpp_example --check` refuses the new example. Rename by hand the factory's namespace to `v_<new variant>` (every character other than a letter or digit becomes `_`) and the `dxapp::v_<...>::` qualifier in the new `<variant>_sync.cpp` / `<variant>_async.cpp`. Per-variant support in `add_model.sh` is a follow-up.
-
-An example lives in the family/variant layout (until `add_model.sh` supports it, move what it generates there; see the note above). `<family>` groups related models. `<variant>` is the `.dxnn` stem, and that folder holds the factory, `config.json`, and the entry files.
+An example lives in the family/variant layout, which is where `add_model.sh` writes it. `<family>` groups related models. `<variant>` is the `.dxnn` stem, and that folder holds the factory, `config.json`, and the entry files.
 
 ```text
 src/cpp_example/object_detection/<family>/<variant>/
@@ -285,7 +283,7 @@ A registry entry should identify:
 - support status,
 - any required config metadata.
 
-Do not add registry entries for local experiments or customer-only artifacts unless the release explicitly includes them.
+Do not add registry entries for local experiments or project-specific artifacts unless the release explicitly includes them.
 
 ---
 

@@ -3,8 +3,7 @@
  * @brief Stateful embedding comparison visualizer
  *
  * First image/frame is captured as a reference. Subsequent calls
- * produce a side-by-side comparison canvas with cosine similarity,
- * matching the demo_embedding_compare / demo_reid_compare output.
+ * produce a side-by-side comparison canvas with cosine similarity.
  */
 
 #ifndef EMBEDDING_VISUALIZER_HPP

@@ -36,7 +36,7 @@ The SDK follows a **Single Source of Truth** strategy to ensure reliability acro
 
 ### Supported Models & Tasks
 
-The library wraps **48 C++ post-processing classes** with pybind11 bindings, ensuring consistent results between C++ and Python implementations.  
+The library wraps **50 C++ post-processing classes** with pybind11 bindings, ensuring consistent results between C++ and Python implementations.  
 
 - **Object Detection:** YOLOv5, YOLOv7, YOLOv8, YOLOv9, YOLOv10, YOLOv11, YOLOv12, YOLOv26, YOLOX, NanoDet, DAMOYOLO, SSD, CenterPose, EfficientDet, YOLACT  
 - **Face Detection:** SCRFD, YOLOv5Face, RetinaFace, ULFGFD, Face3D  
@@ -70,8 +70,8 @@ The library wraps **48 C++ post-processing classes** with pybind11 bindings, ens
 Before building, ensure the following are installed on your system  
 
 - **Python:** 3.8 or higher  
-- **Compiler:** GCC 4.8+ or Clang 3.3+  
-- **Build Tool:** CMake 3.16 or higher  
+- **Compiler:** C++14-compatible (GCC 7.5+, Clang, etc.)  
+- **Build Tool:** CMake 3.14 or higher  
 
 During the installation, `pybind11` is automatically cloned from GitHub to `extern/pybind11` if it is not already present.  
 

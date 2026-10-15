@@ -219,8 +219,7 @@ set(GRAPH_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 # scripts/check_model_registry.py enforces the 1:1 with the factory tree), so
 # watching that file catches every new model; a factory header edited without
 # a registry change is a rename in flight, which `gen_model_registry.py
-# --strict` catches in the codegen-strict check of scripts/ci_checks.sh, run
-# by .github/workflows/dxapp-checks.yml on every push and pull request.
+# --strict` catches in the codegen-strict check of scripts/ci_checks.sh.
 # The model-zoo manifest supplies each model's download name
 # (ModelInfo::download_name), so a manifest update re-runs the codegen too.
 #
