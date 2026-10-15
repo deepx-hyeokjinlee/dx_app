@@ -46,6 +46,8 @@ MODEL_DIR = PROJECT_ROOT / "assets" / "models"
 
 # The two-source sample (SP2): cam1 and cam2 feed one tracked od -> reid.
 MULTISTREAM = "multistream_od_two_sources.json"
+# Every sample with more than one source node: --check lists their streams.
+MULTI_SOURCE = (MULTISTREAM, "multistream_people_count.json")
 
 # Every sample graph this example ships. --check uses the full list.
 # Hardware tiers use RUNNABLE_SAMPLE_GRAPHS.
@@ -70,6 +72,7 @@ SAMPLE_GRAPHS = [
     "zone_people_count.json",
     "gallery_known_person.json",
     "driver_attention.json",
+    "multistream_people_count.json",
 ]
 # DX-M1 cannot load these together: realesrgan-x2 plus yolov8-n plus a third model.
 NPU_WEIGHT_EXCLUDED = (
@@ -77,7 +80,7 @@ NPU_WEIGHT_EXCLUDED = (
     "chain_sr_od_pose.json",
 )
 RUNNABLE_SAMPLE_GRAPHS = [g for g in SAMPLE_GRAPHS if g not in NPU_WEIGHT_EXCLUDED]
-ONE_SOURCE_SAMPLES = [g for g in SAMPLE_GRAPHS if g != MULTISTREAM]
+ONE_SOURCE_SAMPLES = [g for g in SAMPLE_GRAPHS if g not in MULTI_SOURCE]
 
 
 # Two realesrgan_x2 engines next to yolov8n and resnet50: more than DX-M1's
@@ -919,6 +922,15 @@ def test_check_lists_the_two_source_samples_streams():
     assert "\nstreams: 2 - one per source node, read in turn, one frame from each\n" \
         in result.stdout, result.stdout
     assert "  cam1      -> od, reid\n  cam2      -> od, reid\n" in result.stdout
+
+
+@pytest.mark.graph
+def test_check_lists_the_people_count_samples_streams():
+    result = run(BINARIES[0], "--check", "{}/multistream_people_count.json".format(GRAPHS))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert ("\nstreams: 2 - one per source node, read in turn, one frame from each\n"
+            "  cam1      -> od, count, crowded\n"
+            "  cam2      -> od, count, crowded\n") in result.stdout, result.stdout
 
 
 @pytest.mark.graph
@@ -1852,6 +1864,33 @@ def test_driver_attention_conditions_read_the_head_pose_of_their_frame(tmp_path)
     assert not any(frame["nodes"][n]["payload"]["items"][0]["numbers"]["active"]
                    for n in ("yaw_high", "yaw_low", "head_down"))
     assert "events" not in frame
+
+
+@pytest.mark.graph_e2e
+def test_people_count_counts_and_decides_per_stream(tmp_path):
+    """count and condition keep their state per stream: each camera has its own total, and a crowded event names
+    the stream it happened in."""
+    graph = "multistream_people_count.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    report, events = tmp_path / "report.json", tmp_path / "events.jsonl"
+    result = run("multi_model_graph_sync", "--graph", "{}/{}".format(GRAPHS, graph),
+                 "--report", str(report), "--events", str(events))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frames = json.loads(report.read_text(encoding="utf-8"))["frames"]
+    assert [f["stream"] for f in frames] == ["cam1", "cam2"]
+    crowded = []
+    for f in frames:
+        people = [b for b in f["nodes"]["od"]["payload"]["items"] if b["class_name"] == "person"]
+        total = f["nodes"]["count"]["payload"]["items"][0]["numbers"]["total"]
+        value = f["nodes"]["crowded"]["payload"]["items"][0]["numbers"]["value"]
+        assert total == len(people) and value == total, f["stream"]
+        if total >= 5:
+            crowded.append(f["stream"])
+    lines = [json.loads(line) for line in events.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert [(e["stream"], e["node"], e["event"]) for e in lines] == [(s, "crowded", "crowded") for s in crowded]
+    assert "cam2" in crowded, "sample_crowd.jpg holds more than five people"
 
 
 # ---------------------------------------------------------------- tier 3
