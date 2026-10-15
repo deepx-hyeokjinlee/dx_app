@@ -31,6 +31,25 @@ static const std::vector<std::pair<int, int>> BBOX3D_SKELETON = {
     {0, 4}, {1, 5}, {2, 6}, {3, 7}   // Connecting edges
 };
 
+// MediaPipe hand skeleton (21 keypoints, 23 bones): 0 wrist, then four
+// joints per digit from base to tip - thumb 1-4, index 5-8, middle 9-12,
+// ring 13-16, pinky 17-20 - plus the palm's knuckle line.
+static const size_t HAND_KEYPOINT_COUNT = 21;
+static const std::vector<std::pair<int, int>> HAND_SKELETON = {
+    {0, 1}, {1, 2}, {2, 3}, {3, 4},          // Thumb
+    {0, 5}, {5, 6}, {6, 7}, {7, 8},          // Index
+    {0, 9}, {9, 10}, {10, 11}, {11, 12},     // Middle
+    {0, 13}, {13, 14}, {14, 15}, {15, 16},   // Ring
+    {0, 17}, {17, 18}, {18, 19}, {19, 20},   // Pinky
+    {5, 9}, {9, 13}, {13, 17}                // Palm
+};
+
+// One BGR color per digit, then the palm (HandLandmarkVisualizer's colors).
+static const std::vector<cv::Scalar> HAND_BONE_COLORS = {
+    cv::Scalar(255, 0, 0), cv::Scalar(0, 255, 0), cv::Scalar(0, 0, 255),
+    cv::Scalar(255, 255, 0), cv::Scalar(255, 0, 255), cv::Scalar(200, 200, 200)
+};
+
 // Limb colors (matching original: blue/magenta/orange/green pattern)
 static const std::vector<cv::Scalar> POSE_LIMB_COLORS = {
     cv::Scalar(51, 153, 255), cv::Scalar(51, 153, 255), cv::Scalar(51, 153, 255),
@@ -117,7 +136,9 @@ private:
 
     // Draw skeleton connections for one pose
     void drawSkeleton(cv::Mat& output, const PoseResult& pose, float disp_scale, float x_off, float y_off) const {
-        const auto& skeleton = (pose.keypoints.size() <= 8) ? BBOX3D_SKELETON : POSE_SKELETON;
+        const bool hand = pose.keypoints.size() == HAND_KEYPOINT_COUNT;
+        const auto& skeleton = hand ? HAND_SKELETON
+            : (pose.keypoints.size() <= 8) ? BBOX3D_SKELETON : POSE_SKELETON;
         cv::Scalar bbox3d_color(0, 255, 128);
 
         for (size_t i = 0; i < skeleton.size(); ++i) {
@@ -132,7 +153,8 @@ private:
 
             cv::Point pt1(static_cast<int>(kp1.x * disp_scale + x_off), static_cast<int>(kp1.y * disp_scale + y_off));
             cv::Point pt2(static_cast<int>(kp2.x * disp_scale + x_off), static_cast<int>(kp2.y * disp_scale + y_off));
-            cv::Scalar color = (pose.keypoints.size() <= 8) ? bbox3d_color
+            cv::Scalar color = hand ? HAND_BONE_COLORS[std::min<size_t>(i / 4, HAND_BONE_COLORS.size() - 1)]
+                : (pose.keypoints.size() <= 8) ? bbox3d_color
                 : (i < POSE_LIMB_COLORS.size() ? POSE_LIMB_COLORS[i] : bbox3d_color);
             cv::line(output, pt1, pt2, color, line_thickness_, cv::LINE_AA);
         }

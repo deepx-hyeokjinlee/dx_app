@@ -198,6 +198,7 @@ struct FaceDetectionResult {
     std::vector<float> box;  // x1, y1, x2, y2
     float confidence{0.0f};
     std::vector<Keypoint> landmarks;  // 5 facial landmarks (left eye, right eye, nose, left mouth, right mouth)
+    std::string class_name{"face"};   // what the box holds: "hand" for the MediaPipe palm detector
 
     FaceDetectionResult() = default;
     

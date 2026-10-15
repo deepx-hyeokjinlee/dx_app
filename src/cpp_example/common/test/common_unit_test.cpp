@@ -66,6 +66,7 @@
 #include "common/config/model_config.hpp"
 #include "common/processors/anchor_face_postprocessor.hpp"
 #include "common/processors/classification_postprocessor.hpp"
+#include "common/processors/hand_landmark_postprocessor.hpp"
 #include "common/processors/pose_postprocessor.hpp"
 #include "common/processors/serialized_postprocessor.hpp"
 #include "common/third_party/nlohmann_json.hpp"
@@ -2437,6 +2438,95 @@ void TestCameraOffAPiOpensLikeVideoCapture() {
     COMMON_CHECK(!video.isOpened());
 }
 
+// =====================================================================
+// MediaPipe hand landmark: a keypoint's confidence is the hand presence
+// score, never the landmark's relative depth (z), which is negative for
+// most points and made every consumer that thresholds on confidence (the
+// graph's keypoint drawing) drop all 21 points.
+// =====================================================================
+
+/// HandLandmarkLite's four outputs: [1,63] landmarks in input pixels with a
+/// negative z each, [1,1] presence, [1,1] handedness, [1,63] world landmarks.
+dxrt::TensorPtrs HandLandmarkOutputs(std::vector<std::vector<float> >& storage,
+                                     float presence, std::size_t count) {
+    storage.assign(4, std::vector<float>());
+    for (int i = 0; i < 21; ++i) {
+        storage[0].push_back(20.f + static_cast<float>(i) * 8.f);   // x
+        storage[0].push_back(200.f - static_cast<float>(i) * 7.f);  // y
+        storage[0].push_back(-0.5f - static_cast<float>(i));        // z (relative depth)
+    }
+    storage[1].push_back(presence);
+    storage[2].push_back(0.9f);
+    storage[3].assign(63, 0.01f);
+    const int64_t sizes[] = {63, 1, 1, 63};
+    const char* names[] = {"Identity", "Identity_1", "Identity_2", "Identity_3"};
+    dxrt::TensorPtrs outputs;
+    for (std::size_t t = 0; t < count; ++t) {
+        std::vector<int64_t> shape;
+        shape.push_back(1);
+        shape.push_back(sizes[t]);
+        outputs.push_back(std::make_shared<dxrt::Tensor>(
+            names[t], shape, dxrt::DataType::FLOAT, storage[t].data()));
+    }
+    return outputs;
+}
+
+dxapp::PreprocessContext HandContext() {
+    dxapp::PreprocessContext ctx;
+    ctx.original_width = 224;
+    ctx.original_height = 224;
+    return ctx;
+}
+
+void TestHandLandmarkKeypointsCarryPresenceNotDepth() {
+    std::vector<std::vector<float> > storage;
+    const dxrt::TensorPtrs outputs = HandLandmarkOutputs(storage, 0.93f, 4);
+    dxapp::HandLandmarkPostprocessor post(224, 224);
+    const std::vector<dxapp::HandLandmarkResult> hands = post.process(outputs, HandContext());
+    COMMON_CHECK(hands.size() == 1);
+    if (hands.size() != 1) return;
+    COMMON_CHECK(hands[0].landmarks.size() == 21);
+    COMMON_CHECK(hands[0].confidence == 0.93f);
+    COMMON_CHECK(hands[0].handedness == "Right");
+    for (std::size_t i = 0; i < hands[0].landmarks.size(); ++i) {
+        const dxapp::Keypoint& kp = hands[0].landmarks[i];
+        COMMON_CHECK(kp.confidence >= 0.f && kp.confidence <= 1.f);
+        COMMON_CHECK(kp.confidence == 0.93f);
+    }
+    COMMON_CHECK(hands[0].landmarks[20].x == 180.f);
+    COMMON_CHECK(hands[0].landmarks[20].y == 60.f);
+}
+
+/// Landmarks alone (no presence output): nothing scores the points, so each
+/// one is fully confident rather than carrying its depth.
+void TestHandLandmarkKeypointsWithoutPresenceAreFullyConfident() {
+    std::vector<std::vector<float> > storage;
+    const dxrt::TensorPtrs outputs = HandLandmarkOutputs(storage, 0.f, 1);
+    dxapp::HandLandmarkPostprocessor post(224, 224);
+    const std::vector<dxapp::HandLandmarkResult> hands = post.process(outputs, HandContext());
+    COMMON_CHECK(hands.size() == 1);
+    if (hands.size() != 1) return;
+    COMMON_CHECK(hands[0].confidence == 1.f);
+    for (std::size_t i = 0; i < hands[0].landmarks.size(); ++i) {
+        COMMON_CHECK(hands[0].landmarks[i].confidence == 1.f);
+    }
+}
+
+/// The C++ result has no depth field, so the verify dump does not invent one
+/// from the keypoint's confidence.
+void TestHandLandmarkDumpDoesNotReportConfidenceAsDepth() {
+    std::vector<std::vector<float> > storage;
+    const dxrt::TensorPtrs outputs = HandLandmarkOutputs(storage, 0.93f, 4);
+    dxapp::HandLandmarkPostprocessor post(224, 224);
+    const std::vector<dxapp::HandLandmarkResult> hands = post.process(outputs, HandContext());
+    const nlohmann::json dump = dxapp::verify::serializeHandLandmark(hands, 224, 224);
+    COMMON_CHECK(dump["detections"].size() == 1);
+    if (dump["detections"].size() != 1) return;
+    const nlohmann::json& point = dump["detections"][0]["landmarks"][0];
+    COMMON_CHECK(point.contains("x") && point.contains("y"));
+    COMMON_CHECK(!point.contains("z"));
+}
+
 }  // namespace
 
 int main() {
@@ -2515,6 +2605,10 @@ int main() {
     TestCameraGStreamerFromBuildInformation();
     TestCameraListingNeedsTheToolToFinish();
     TestCameraOffAPiOpensLikeVideoCapture();
+
+    TestHandLandmarkKeypointsCarryPresenceNotDepth();
+    TestHandLandmarkKeypointsWithoutPresenceAreFullyConfident();
+    TestHandLandmarkDumpDoesNotReportConfidenceAsDepth();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
