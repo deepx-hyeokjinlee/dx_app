@@ -12167,6 +12167,43 @@ void TestVolumeRefusesARasterThatDoesNotCoverTheFrame() {
     GRAPH_CHECK(crop.error == "volume reads full-frame results, and its instances input is not one");
 }
 
+/// The five face landmarks of a real face (nose toward the camera, mouth below it), 600 mm in front of a 640x480
+/// pinhole camera of focal 640, after the head turns `down_deg` about the camera's x axis (positive: the chin goes
+/// to the chest, the nose tip moves down in the image).
+std::shared_ptr<BoxesData> FaceTurnedDown(double down_deg) {
+    const double kFace[5][3] = {{-30, -30, 0}, {30, -30, 0}, {0, 0, -30}, {-25, 30, -10}, {25, 30, -10}};
+    const double a = down_deg * 3.14159265358979323846 / 180.0;
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    BoxItem face;
+    face.box = cv::Rect2f(250.f, 170.f, 140.f, 140.f);
+    for (int i = 0; i < 5; ++i) {
+        const double y = kFace[i][1] * std::cos(a) - kFace[i][2] * std::sin(a);
+        const double z = kFace[i][1] * std::sin(a) + kFace[i][2] * std::cos(a) + 600.0;
+        face.landmarks.push_back(Keypoint(static_cast<float>(640.0 * kFace[i][0] / z + 320.0),
+                                          static_cast<float>(640.0 * y / z + 240.0), 1.f));
+    }
+    boxes->items.push_back(face);
+    return boxes;
+}
+
+// driver_attention.json raises head_down on pitch < -20: headpose's pitch is negative for a head turned down.
+void TestHeadPosePitchIsNegativeForAHeadTurnedDown() {
+    double pitch[3] = {0.0, 0.0, 0.0};
+    const double turns[3] = {0.0, 25.0, -25.0};
+    for (int i = 0; i < 3; ++i) {
+        std::vector<StageResult> inputs;
+        inputs.push_back(CpuInputOf(FaceTurnedDown(turns[i]), 1.f));
+        const CpuReduction out = ReduceCpu("headpose", StageParams(), inputs, cv::Size(640, 480));
+        const RecordsData* records = static_cast<const RecordsData*>(out.result.data.get());
+        GRAPH_CHECK(out.error.empty() && records != NULL && records->items.size() == 1);
+        if (records == NULL || records->items.size() != 1) return;
+        GRAPH_CHECK(NamedNumber(records->items[0], "pitch", &pitch[i]));
+    }
+    GRAPH_CHECK(std::fabs(pitch[0]) < 5.0);   // looking at the camera
+    GRAPH_CHECK(pitch[1] < -20.0);            // head down: driver_attention's head_down fires
+    GRAPH_CHECK(pitch[2] > 20.0);             // head up
+}
+
 // Graph Composer P1: every non-source node's time in this frame, sync.
 void TestSyncExecutorTimesEveryNode() {
     FakeModelRegistry registry = BuildCascadeRegistry();
@@ -15847,6 +15884,7 @@ int main() {
     TestVolumeSamplesADepthMapOfAnotherSize();
     TestVolumeMapsAHandedOffSegmenterToSourcePixels();
     TestVolumeRefusesARasterThatDoesNotCoverTheFrame();
+    TestHeadPosePitchIsNegativeForAHeadTurnedDown();
     TestSyncExecutorTimesEveryNode();
     TestAsyncExecutorTimesEveryNode();
     TestReportToJsonWritesNodeMsOnlyWhenAsked();
