@@ -57,6 +57,7 @@
 #include "multi_model_graph/graph_cli_output.hpp"
 #include "multi_model_graph/graph_consumer.hpp"
 #include "multi_model_graph/graph_report_writer.hpp"
+#include "common/graph/user_logic.hpp"
 
 namespace {
 
@@ -14892,6 +14893,79 @@ void TestUserNodesSharingANameTakeOneKind() {
     GRAPH_CHECK(LogicError(one_kind).empty());
 }
 
+// ---------------------------------------------------------------------
+// Phase 3: the user-logic hook (common/graph/user_logic.hpp)
+// ---------------------------------------------------------------------
+
+namespace {
+
+/// A user node's class for the tests: names every box "tagged", counts its
+/// frames, raises one "seen" event and writes one panel line per frame.
+struct TagBoxes {
+    int frames;
+    TagBoxes() : frames(0) {}
+    BoxesData Run(const BoxesData& input, UserContext& ctx) {
+        ++frames;
+        BoxesData out = input;
+        for (std::size_t i = 0; i < out.items.size(); ++i) out.items[i].class_name = "tagged";
+        RecordItem data;
+        data.numbers.push_back(std::make_pair(std::string("frames"), static_cast<double>(frames)));
+        ctx.Raise("seen", out.items.empty() ? -1 : out.items[0].track_id, data);
+        ctx.Label("frames " + std::to_string(frames));
+        return out;
+    }
+};
+
+/// Takes scores: given boxes, TypedUserLogic refuses the input.
+struct WantsScores {
+    ScoresData Run(const ScoresData& input, UserContext&) { return input; }
+};
+
+}  // namespace
+
+void TestUserLogicRegistryMakesOneObjectPerCall() {
+    ClearUserLogic();
+    GRAPH_CHECK(!MakeUserLogic("tag_boxes"));
+    RegisterUserLogic<BoxesData, TagBoxes>("tag_boxes");
+    RegisterUserLogic<ScoresData, WantsScores>("wants_scores");
+    const std::vector<std::string> names = RegisteredUserLogicNames();
+    GRAPH_CHECK(names.size() == 2 && names[0] == "tag_boxes" && names[1] == "wants_scores");
+
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(10.f, 10.f, 20.f, 20.f, 0.9f, "person"));
+    UserContext ctx("u", 1.5, cv::Size(640, 480));
+    GRAPH_CHECK(ctx.node() == "u" && ctx.time_s() == 1.5 && ctx.frame_size() == cv::Size(640, 480));
+    std::unique_ptr<UserLogic> first = MakeUserLogic("tag_boxes");
+    std::unique_ptr<UserLogic> second = MakeUserLogic("tag_boxes");
+    GRAPH_CHECK(first && second && first.get() != second.get());
+    if (!first || !second) return;
+    first->Run(boxes, ctx);
+    const StageDataPtr out = first->Run(boxes, ctx);
+    const BoxesData* tagged = dynamic_cast<const BoxesData*>(out.get());
+    GRAPH_CHECK(tagged != NULL && tagged->items.size() == 1 && tagged->items[0].class_name == "tagged");
+    GRAPH_CHECK(boxes->items[0].class_name == "person");  // the input is not changed
+    GRAPH_CHECK(ctx.events().size() == 2 && ctx.events()[1].node == "u" &&
+                ctx.events()[1].event == "seen" && ctx.events()[1].time_s == 1.5);
+    GRAPH_CHECK(NumberOf(ctx.events()[1].data, "frames") == 2.0);  // one object keeps its count
+    GRAPH_CHECK(ctx.labels().size() == 2 && ctx.labels()[1].text == "frames 2" &&
+                ctx.labels()[1].at.x < 0.f);  // the top-left panel
+    UserContext fresh("u", 0.0, cv::Size(1, 1));
+    second->Run(boxes, fresh);
+    GRAPH_CHECK(fresh.events().size() == 1 && NumberOf(fresh.events()[0].data, "frames") == 1.0);
+    fresh.LabelAt("here", cv::Point2f(5.f, 6.f), true);
+    GRAPH_CHECK(fresh.labels().back().at == cv::Point2f(5.f, 6.f) && fresh.labels().back().alert);
+
+    bool refused = false;
+    try {
+        MakeUserLogic("wants_scores")->Run(boxes, ctx);
+    } catch (const std::exception& e) {
+        refused = std::string(e.what()).find("boxes") != std::string::npos;
+    }
+    GRAPH_CHECK(refused);
+    ClearUserLogic();
+    GRAPH_CHECK(RegisteredUserLogicNames().empty() && !MakeUserLogic("tag_boxes"));
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -15307,6 +15381,7 @@ int main() {
     TestFindMarkedRootWalksUpToTheMarker();
     TestUserNodeNamesAreCppNamesThatAreNotKeywords();
     TestUserNodesSharingANameTakeOneKind();
+    TestUserLogicRegistryMakesOneObjectPerCall();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

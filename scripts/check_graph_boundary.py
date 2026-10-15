@@ -224,6 +224,12 @@ ENGINE_INCLUDE_ALLOWLIST = frozenset([
     # (--check reads the gallery file). Names no concrete registry and no
     # task string.
     "logic_ops.hpp",
+    # The user-logic hook ("op": "user"): the class a program registers under
+    # a user node's name (an exported project's user_logic/), run by
+    # logic_ops.cpp's RunUser. It includes only logic_ops.hpp and shape.hpp
+    # from the graph surface and names no concrete registry and no task
+    # string.
+    "user_logic.hpp",
 ])
 ENGINE_INCLUDE_PREFIXES = (
     "common/base/",

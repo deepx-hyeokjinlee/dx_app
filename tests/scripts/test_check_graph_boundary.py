@@ -72,3 +72,10 @@ def test_the_logic_ops_header_is_an_engine_header():
     guard = load_guard()
     engine_file = ROOT / "src" / "cpp_example" / "common" / "graph" / "graph_config.cpp"
     assert guard._include_violation(engine_file, "common/graph/logic_ops.hpp") is None
+
+
+def test_the_user_logic_header_is_an_engine_header():
+    """A "user" node runs a class registered in common/graph/user_logic.hpp; logic_ops.cpp includes it."""
+    guard = load_guard()
+    engine_file = ROOT / "src" / "cpp_example" / "common" / "graph" / "logic_ops.cpp"
+    assert guard._include_violation(engine_file, "common/graph/user_logic.hpp") is None
