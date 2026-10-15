@@ -74,6 +74,13 @@ struct RenderOptions {
     /// which writes the name it found under each crop itself, so the
     /// node's own "vec[N]" and top matches would only cover the person.
     std::set<std::string> quiet_text;
+    /// The only nodes drawn (the CLI's --draw); empty draws every node. A
+    /// logic node's id draws its overlay. A node left out still ran and
+    /// still reports: it only draws nothing, and its labels are not areas
+    /// the others keep off.
+    std::set<std::string> draw;
+
+    bool Draws(const std::string& node) const { return draw.empty() || draw.count(node) != 0; }
 };
 
 /// The options `spec`'s edges call for: every node an edge carries into a
@@ -116,7 +123,9 @@ RenderOptions RenderOptionsFor(const GraphSpec& spec);
  * is not drawn by the shape passes: a zone's boxes are its detector's
  * boxes, already drawn.
  *
- * A node in `options.quiet_text` draws no scores or vector text.
+ * A node in `options.quiet_text` draws no scores or vector text. With
+ * `options.draw` set, only the nodes in it draw anything (passes 1-5), and
+ * only their labels are areas a later label keeps off.
  *
  * `labels`, when given, receives every text area drawn: box label rows,
  * scores and vector lines, logic labels and the top-left panel - what a
@@ -128,6 +137,42 @@ RenderOptions RenderOptionsFor(const GraphSpec& spec);
 cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report,
                      const RenderOptions& options = RenderOptions(),
                      std::vector<cv::Rect>* labels = NULL);
+
+/// One node's drawing alone (RenderLayers): `rgba` is CV_8UC4 in OpenCV's
+/// channel order (B, G, R, A - cv::imwrite stores it as an RGBA PNG), the
+/// size of the source frame, transparent wherever the node drew nothing.
+struct RenderLayer {
+    std::string node;
+    cv::Mat rgba;
+};
+
+/**
+ * @brief Every drawn node's drawing on its own transparent layer.
+ *
+ * The layers come in RenderReport's pass order - each node at the first
+ * pass it draws in, nodes in one pass in RenderReport's order, logic nodes
+ * last in id order - so stacking them over the clean source frame
+ * (CompositeLayers) gives RenderReport's image: within a pixel or two of
+ * rounding, and exactly so unless one node draws in two passes over a
+ * pixel another node drew in between (an instance node's masks, pass 2,
+ * and its boxes, pass 3, over a detector's boxes). Each layer is laid out
+ * as in RenderReport with `options` (labels keep off the same areas). A
+ * node that drew no pixel has no layer; `options.draw` leaves nodes out.
+ *
+ * Each layer is RenderReport painting that node alone over black and over
+ * white (LayerFromBackdrops): every draw blends a colour that does not
+ * depend on the canvas at an alpha that does not either.
+ */
+std::vector<RenderLayer> RenderLayers(const cv::Size& size, const FrameReport& report,
+                                      const RenderOptions& options = RenderOptions());
+
+/// The RGBA layer (RenderLayer::rgba) of a drawing made once over black
+/// (`on_black`) and once over white (`on_white`), both CV_8UC3.
+cv::Mat LayerFromBackdrops(const cv::Mat& on_black, const cv::Mat& on_white);
+
+/// `base` (CV_8UC3) with every layer (CV_8UC4, RenderLayer::rgba) blended
+/// over it in order: what a front end does when it stacks the files.
+cv::Mat CompositeLayers(const cv::Mat& base, const std::vector<cv::Mat>& layers);
 
 /// The CLI's recent-events panel: `lines` oldest first, the newest at the
 /// bottom, in the first corner of bottom-left, bottom-right, top-right and

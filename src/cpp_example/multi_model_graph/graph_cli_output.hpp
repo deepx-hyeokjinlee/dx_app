@@ -68,6 +68,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -161,6 +162,106 @@ inline std::string StreamImagePath(const std::string& output, const std::string&
 /// "multi_model_graph" with one source; "multi_model_graph: <source>" with several.
 inline std::string WindowName(const std::string& source, bool several) {
     return several ? "multi_model_graph: " + source : std::string("multi_model_graph");
+}
+
+/// --display with several sources: the grid's columns (width) and rows
+/// (height) for `count` cells. 2 side by side, 3-4 in 2x2, more in
+/// ceil(sqrt(count)) columns and as many rows as they need.
+inline cv::Size GridShape(std::size_t count) {
+    if (count <= 1) return cv::Size(1, 1);
+    int columns = 1;
+    while (static_cast<std::size_t>(columns) * columns < count) ++columns;
+    const int rows = static_cast<int>((count + columns - 1) / columns);
+    return cv::Size(columns, rows);
+}
+
+/// The cells of GridShape(count), left to right then top to bottom, each
+/// `cell` in size - all scaled down alike (aspect kept) when the grid
+/// would be wider or taller than `max_canvas`. *canvas: the grid's size.
+inline std::vector<cv::Rect> GridCells(std::size_t count, cv::Size cell, cv::Size max_canvas,
+                                       cv::Size* canvas) {
+    const cv::Size shape = GridShape(count);
+    double scale = 1.0;
+    if (cell.width * shape.width > max_canvas.width) {
+        scale = static_cast<double>(max_canvas.width) / (cell.width * shape.width);
+    }
+    if (cell.height * shape.height * scale > max_canvas.height) {
+        scale = static_cast<double>(max_canvas.height) / (cell.height * shape.height);
+    }
+    const cv::Size scaled(std::max(1, static_cast<int>(cell.width * scale)),
+                          std::max(1, static_cast<int>(cell.height * scale)));
+    std::vector<cv::Rect> cells;
+    for (std::size_t i = 0; i < count; ++i) {
+        const int column = static_cast<int>(i % shape.width);
+        const int row = static_cast<int>(i / shape.width);
+        cells.push_back(cv::Rect(column * scaled.width, row * scaled.height, scaled.width,
+                                 scaled.height));
+    }
+    if (canvas != NULL) *canvas = cv::Size(scaled.width * shape.width, scaled.height * shape.height);
+    return cells;
+}
+
+/// The window's image with several sources: frame i (each stream's latest
+/// rendered frame) fitted into cell i of GridCells(frames.size(), cell,
+/// max_canvas), letterboxed in black when its aspect differs, and names[i]
+/// (its source id) written at the cell's top left. An empty frame (a
+/// stream with no frame yet) leaves its cell dark grey, still labelled.
+inline cv::Mat TileFrames(const std::vector<cv::Mat>& frames,
+                          const std::vector<std::string>& names, cv::Size cell,
+                          cv::Size max_canvas = cv::Size(1920, 1080)) {
+    cv::Size size;
+    const std::vector<cv::Rect> cells = GridCells(frames.size(), cell, max_canvas, &size);
+    cv::Mat canvas = cv::Mat::zeros(size, CV_8UC3);
+    for (std::size_t i = 0; i < frames.size(); ++i) {
+        const cv::Rect& box = cells[i];
+        cv::Mat target = canvas(box);
+        if (frames[i].empty()) {
+            target.setTo(cv::Scalar(48, 48, 48));
+        } else {
+            const double scale = std::min(static_cast<double>(box.width) / frames[i].cols,
+                                          static_cast<double>(box.height) / frames[i].rows);
+            const cv::Size fitted(
+                std::max(1, std::min(box.width, static_cast<int>(frames[i].cols * scale + 0.5))),
+                std::max(1, std::min(box.height, static_cast<int>(frames[i].rows * scale + 0.5))));
+            cv::Mat resized;
+            cv::resize(frames[i], resized, fitted, 0, 0, cv::INTER_AREA);
+            resized.copyTo(target(cv::Rect((box.width - fitted.width) / 2,
+                                           (box.height - fitted.height) / 2, fitted.width,
+                                           fitted.height)));
+        }
+        if (i < names.size()) {
+            int baseline = 0;
+            const cv::Size text =
+                cv::getTextSize(names[i], cv::FONT_HERSHEY_SIMPLEX, 0.6, 1, &baseline);
+            cv::rectangle(target, cv::Rect(0, 0, std::min(box.width, text.width + 12),
+                                           std::min(box.height, text.height + baseline + 10)),
+                          cv::Scalar(0, 0, 0), cv::FILLED);
+            cv::putText(target, names[i], cv::Point(6, text.height + 5), cv::FONT_HERSHEY_SIMPLEX,
+                        0.6, cv::Scalar(255, 255, 255), 1);
+        }
+    }
+    return canvas;
+}
+
+/// One --output-layers file: <stem>[_<source>]_<frame, 6 digits>_<part>.png,
+/// `part` a node id, "base" (the clean frame) or "events" (the panel).
+inline std::string LayerFileName(const std::string& stem, const std::string& source,
+                                 bool several, std::size_t frame, const std::string& part) {
+    std::ostringstream name;
+    name << stem << (several ? "_" + source : std::string()) << "_" << std::setw(6)
+         << std::setfill('0') << frame << "_" << part << ".png";
+    return name.str();
+}
+
+/// The <stem> of --output-layers' files: --output's file name without its
+/// extension, or the graph file's when there is no --output.
+inline std::string LayersStem(const std::string& output, const std::string& graph_path) {
+    const std::string& path = output.empty() ? graph_path : output;
+    const std::size_t slash = path.find_last_of("/\\");
+    std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    const std::size_t dot = name.rfind('.');
+    if (dot != std::string::npos && dot > 0) name = name.substr(0, dot);
+    return name.empty() ? std::string("frame") : name;
 }
 
 /// The prefixes consumer::OpenInput dispatches on.

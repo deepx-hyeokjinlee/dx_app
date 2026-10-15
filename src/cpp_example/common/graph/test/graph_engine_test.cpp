@@ -14449,6 +14449,257 @@ void TestEventLogKeepsOffTheLabelsRenderReportDrew() {
     }
 }
 
+// ---------------------------------------------------------------------
+// Results for front ends (spec 16): --draw, --output-layers, the grid.
+// ---------------------------------------------------------------------
+
+namespace {
+
+/// A frame that is not one colour, so a blend shows against it.
+cv::Mat GradientFrame(int rows, int cols) {
+    cv::Mat frame(rows, cols, CV_8UC3);
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
+            frame.at<cv::Vec3b>(y, x) = cv::Vec3b(static_cast<uchar>((x * 255) / cols),
+                                                  static_cast<uchar>((y * 255) / rows),
+                                                  static_cast<uchar>(((x + y) * 7) % 256));
+        }
+    }
+    return frame;
+}
+
+/// seg (a full-frame labelmap), od (two boxes), cls (scores on od's first
+/// crop) and zone (a logic node: a polygon and a label) - every pass.
+FrameReport FourNodeReport() {
+    FrameReport report;
+    std::shared_ptr<LabelMapData> seg(new LabelMapData());
+    seg->labels = cv::Mat(30, 40, CV_8UC1, cv::Scalar(0));
+    seg->labels(cv::Rect(0, 15, 40, 15)).setTo(cv::Scalar(2));
+    report.node_results["seg"].data = seg;
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(MakeItem(200, 60, 80, 120, 0.9f, "person"));
+    boxes->items.push_back(MakeItem(30, 140, 60, 60, 0.8f, "car"));
+    report.node_results["od"].data = boxes;
+    std::shared_ptr<ScoresData> scores(new ScoresData());
+    ClassificationResult hat;
+    hat.class_name = "Hat";
+    hat.confidence = 0.7f;
+    scores->items.push_back(hat);
+    StageResult cls;
+    cls.data = scores;
+    cls.origin.from_roi = true;
+    cls.origin.src_box = cv::Rect2f(200.f, 60.f, 80.f, 120.f);
+    report.roi_results["cls"].push_back(cls);
+    LogicOverlay zone;
+    std::vector<cv::Point2f> square;
+    square.push_back(cv::Point2f(20.f, 20.f));
+    square.push_back(cv::Point2f(150.f, 20.f));
+    square.push_back(cv::Point2f(150.f, 120.f));
+    square.push_back(cv::Point2f(20.f, 120.f));
+    zone.polygons.push_back(square);
+    OverlayText count;
+    count.text = "zone: 1";
+    zone.texts.push_back(count);
+    report.overlays["zone"] = zone;
+    report.logic_nodes.insert("zone");
+    report.node_results["zone"].data = boxes;  // a zone's payload is its detector's boxes
+    return report;
+}
+
+/// `report` with only the nodes in `keep`.
+FrameReport KeepNodes(FrameReport report, const std::set<std::string>& keep) {
+    for (std::map<std::string, StageResult>::iterator it = report.node_results.begin();
+         it != report.node_results.end();) {
+        if (keep.count(it->first) == 0) it = report.node_results.erase(it); else ++it;
+    }
+    for (std::map<std::string, std::vector<StageResult> >::iterator it =
+             report.roi_results.begin(); it != report.roi_results.end();) {
+        if (keep.count(it->first) == 0) it = report.roi_results.erase(it); else ++it;
+    }
+    for (std::map<std::string, LogicOverlay>::iterator it = report.overlays.begin();
+         it != report.overlays.end();) {
+        if (keep.count(it->first) == 0) it = report.overlays.erase(it); else ++it;
+    }
+    return report;
+}
+
+int MaxDifference(const cv::Mat& a, const cv::Mat& b) {
+    cv::Mat diff;
+    cv::absdiff(a, b, diff);
+    double most = 0.0;
+    cv::minMaxLoc(diff.reshape(1), NULL, &most);
+    return static_cast<int>(most);
+}
+
+std::vector<std::string> LayerNodes(const std::vector<RenderLayer>& layers) {
+    std::vector<std::string> nodes;
+    for (std::size_t i = 0; i < layers.size(); ++i) nodes.push_back(layers[i].node);
+    return nodes;
+}
+
+}  // namespace
+
+// --draw: the named nodes alone, as if the others had not reported; a
+// logic node's id draws its overlay; the label areas are the drawn ones'.
+void TestDrawFilterDrawsOnlyTheNamedNodes() {
+    GRAPH_CHECK(RenderOptions().Draws("anything"));
+    RenderOptions od_only;
+    od_only.draw.insert("od");
+    GRAPH_CHECK(od_only.Draws("od") && !od_only.Draws("seg"));
+
+    const cv::Mat source = GradientFrame(240, 320);
+    const FrameReport report = FourNodeReport();
+    const cv::Mat everything = RenderReport(source, report);
+    GRAPH_CHECK(MaxDifference(everything, source) > 0);
+    std::vector<cv::Rect> labels;
+    const cv::Mat od = RenderReport(source, report, od_only, &labels);
+    std::vector<cv::Rect> od_labels;
+    const cv::Mat alone = RenderReport(source, KeepNodes(report, {"od"}), RenderOptions(),
+                                       &od_labels);
+    GRAPH_CHECK(MaxDifference(od, alone) == 0);
+    GRAPH_CHECK(labels == od_labels);
+    GRAPH_CHECK(MaxDifference(od(cv::Rect(0, 230, 320, 10)), source(cv::Rect(0, 230, 320, 10))) ==
+                0);  // seg's lower half is not blended
+
+    RenderOptions zone_and_cls;
+    zone_and_cls.draw = {"zone", "cls"};
+    const cv::Mat logic = RenderReport(source, report, zone_and_cls);
+    GRAPH_CHECK(MaxDifference(logic,
+                              RenderReport(source, KeepNodes(report, {"zone", "cls"}))) == 0);
+    GRAPH_CHECK(MaxDifference(logic(cv::Rect(40, 40, 60, 60)), source(cv::Rect(40, 40, 60, 60))) >
+                0);  // the zone's tint
+    // A node that is not in the report draws nothing and fails nothing.
+    RenderOptions absent;
+    absent.draw.insert("nobody");
+    GRAPH_CHECK(MaxDifference(RenderReport(source, report, absent), source) == 0);
+}
+
+// Two renderings, on black and on white, give a layer's colour and alpha
+// exactly for every draw that blends a fixed colour at a fixed alpha.
+void TestLayerFromBackdropsRecoversColourAndAlpha() {
+    cv::Mat black = cv::Mat::zeros(1, 3, CV_8UC3);
+    cv::Mat white(1, 3, CV_8UC3, cv::Scalar(255, 255, 255));
+    // pixel 0: opaque (10, 20, 30); pixel 1: half of (200, 100, 0); pixel 2: nothing.
+    black.at<cv::Vec3b>(0, 0) = cv::Vec3b(10, 20, 30);
+    white.at<cv::Vec3b>(0, 0) = cv::Vec3b(10, 20, 30);
+    black.at<cv::Vec3b>(0, 1) = cv::Vec3b(100, 50, 0);
+    white.at<cv::Vec3b>(0, 1) = cv::Vec3b(228, 178, 128);
+    const cv::Mat layer = LayerFromBackdrops(black, white);
+    GRAPH_CHECK(layer.type() == CV_8UC4);
+    GRAPH_CHECK(layer.at<cv::Vec4b>(0, 0) == cv::Vec4b(10, 20, 30, 255));
+    const cv::Vec4b half = layer.at<cv::Vec4b>(0, 1);
+    GRAPH_CHECK(std::abs(half[3] - 128) <= 1 && std::abs(half[0] - 200) <= 2 &&
+                std::abs(half[1] - 100) <= 2 && half[2] <= 1);
+    GRAPH_CHECK(layer.at<cv::Vec4b>(0, 2)[3] == 0);
+    // CompositeLayers puts it back over any base.
+    const cv::Mat grey(1, 3, CV_8UC3, cv::Scalar(60, 60, 60));
+    const cv::Mat stacked = CompositeLayers(grey, std::vector<cv::Mat>(1, layer));
+    GRAPH_CHECK(stacked.at<cv::Vec3b>(0, 0) == cv::Vec3b(10, 20, 30));
+    GRAPH_CHECK(std::abs(stacked.at<cv::Vec3b>(0, 1)[0] - 130) <= 2);
+    GRAPH_CHECK(stacked.at<cv::Vec3b>(0, 2) == cv::Vec3b(60, 60, 60));
+}
+
+// --output-layers: one RGBA layer per node that drew, in RenderReport's
+// pass order, so base + every layer stacked is the merged image.
+void TestLayersStackBackToTheMergedImage() {
+    const cv::Mat source = GradientFrame(240, 320);
+    const FrameReport report = FourNodeReport();
+    const std::vector<RenderLayer> layers = RenderLayers(source.size(), report);
+    // seg in pass 1, od in pass 3, cls in pass 4, the zone in pass 5.
+    GRAPH_CHECK(LayerNodes(layers) == std::vector<std::string>({"seg", "od", "cls", "zone"}));
+    std::vector<cv::Mat> rgba;
+    for (std::size_t i = 0; i < layers.size(); ++i) {
+        GRAPH_CHECK(layers[i].rgba.type() == CV_8UC4 && layers[i].rgba.size() == source.size());
+        rgba.push_back(layers[i].rgba);
+    }
+    const cv::Mat merged = RenderReport(source, report);
+    const cv::Mat stacked = CompositeLayers(source, rgba);
+    GRAPH_CHECK(MaxDifference(stacked, merged) <= 3);
+    // A layer is transparent where its node drew nothing: od's far from its boxes.
+    std::vector<cv::Mat> channels;
+    cv::split(layers[1].rgba, channels);
+    GRAPH_CHECK(cv::countNonZero(channels[3](cv::Rect(120, 200, 60, 40))) == 0);
+    GRAPH_CHECK(cv::countNonZero(channels[3]) > 0);
+    // seg's layer is half transparent where it blends.
+    cv::split(layers[0].rgba, channels);
+    GRAPH_CHECK(std::abs(channels[3].at<uchar>(200, 300) - 128) <= 1);
+
+    // With --draw, only the drawn nodes have layers, stacking to that image.
+    RenderOptions some;
+    some.draw = {"od", "zone"};
+    const std::vector<RenderLayer> drawn = RenderLayers(source.size(), report, some);
+    GRAPH_CHECK(LayerNodes(drawn) == std::vector<std::string>({"od", "zone"}));
+    std::vector<cv::Mat> drawn_rgba;
+    for (std::size_t i = 0; i < drawn.size(); ++i) drawn_rgba.push_back(drawn[i].rgba);
+    GRAPH_CHECK(MaxDifference(CompositeLayers(source, drawn_rgba),
+                              RenderReport(source, report, some)) <= 3);
+    // A node that drew no pixel has no layer; an empty report has none.
+    GRAPH_CHECK(RenderLayers(source.size(), FrameReport()).empty());
+}
+
+// --display with several sources: one window, a grid of labelled cells.
+void TestDisplayGridTilesTheStreams() {
+    GRAPH_CHECK(cli::GridShape(1) == cv::Size(1, 1));
+    GRAPH_CHECK(cli::GridShape(2) == cv::Size(2, 1));
+    GRAPH_CHECK(cli::GridShape(3) == cv::Size(2, 2));
+    GRAPH_CHECK(cli::GridShape(4) == cv::Size(2, 2));
+    GRAPH_CHECK(cli::GridShape(5) == cv::Size(3, 2));
+    GRAPH_CHECK(cli::GridShape(9) == cv::Size(3, 3));
+    GRAPH_CHECK(cli::GridShape(10) == cv::Size(4, 3));
+
+    cv::Size canvas;
+    std::vector<cv::Rect> cells = cli::GridCells(2, cv::Size(640, 360), cv::Size(1920, 1080),
+                                                 &canvas);
+    GRAPH_CHECK(canvas == cv::Size(1280, 360));
+    GRAPH_CHECK(cells.size() == 2 && cells[0] == cv::Rect(0, 0, 640, 360) &&
+                cells[1] == cv::Rect(640, 0, 640, 360));
+    cells = cli::GridCells(3, cv::Size(640, 360), cv::Size(1920, 1080), &canvas);
+    GRAPH_CHECK(canvas == cv::Size(1280, 720));
+    GRAPH_CHECK(cells.size() == 3 && cells[2] == cv::Rect(0, 360, 640, 360));
+    // Too big for the bound: every cell shrinks alike, aspect kept.
+    cells = cli::GridCells(2, cv::Size(1920, 1080), cv::Size(1920, 1080), &canvas);
+    GRAPH_CHECK(canvas == cv::Size(1920, 540));
+    GRAPH_CHECK(cells[1] == cv::Rect(960, 0, 960, 540));
+
+    // The tiled image: each frame fills its cell (letterboxed when its
+    // aspect differs), and its source id is written at the cell's top left.
+    std::vector<cv::Mat> frames;
+    frames.push_back(cv::Mat(360, 640, CV_8UC3, cv::Scalar(0, 0, 200)));
+    frames.push_back(cv::Mat(720, 640, CV_8UC3, cv::Scalar(0, 200, 0)));  // taller
+    frames.push_back(cv::Mat());                                          // no frame yet
+    const std::vector<std::string> names = {"cam1", "cam2", "cam3"};
+    const cv::Mat grid = cli::TileFrames(frames, names, cv::Size(640, 360));
+    GRAPH_CHECK(grid.size() == cv::Size(1280, 720) && grid.type() == CV_8UC3);
+    GRAPH_CHECK(grid.at<cv::Vec3b>(300, 600) == cv::Vec3b(0, 0, 200));
+    GRAPH_CHECK(grid.at<cv::Vec3b>(300, 960) == cv::Vec3b(0, 200, 0));    // centre of cell 2
+    GRAPH_CHECK(grid.at<cv::Vec3b>(300, 650) == cv::Vec3b(0, 0, 0));      // its letterbox
+    GRAPH_CHECK(grid.at<cv::Vec3b>(600, 320) != cv::Vec3b(0, 0, 200));   // cell 3: empty
+    // The labels: white text on the cell's top left.
+    cv::Mat label_area = grid(cv::Rect(0, 0, 120, 30)), white;
+    cv::inRange(label_area, cv::Scalar(250, 250, 250), cv::Scalar(255, 255, 255), white);
+    GRAPH_CHECK(cv::countNonZero(white) > 0);
+    cv::inRange(grid(cv::Rect(640, 0, 120, 30)), cv::Scalar(250, 250, 250),
+                cv::Scalar(255, 255, 255), white);
+    GRAPH_CHECK(cv::countNonZero(white) > 0);
+    cv::inRange(grid(cv::Rect(0, 360, 120, 30)), cv::Scalar(250, 250, 250),
+                cv::Scalar(255, 255, 255), white);
+    GRAPH_CHECK(cv::countNonZero(white) > 0);
+    // Nothing is labelled mid-cell.
+    cv::inRange(grid(cv::Rect(200, 150, 200, 100)), cv::Scalar(250, 250, 250),
+                cv::Scalar(255, 255, 255), white);
+    GRAPH_CHECK(cv::countNonZero(white) == 0);
+}
+
+// --output-layers' file names: <dir>/<stem>[_<source>]_<frame6>_<part>.png.
+void TestLayerFileNames() {
+    GRAPH_CHECK(cli::LayerFileName("result", "cam", false, 3, "od") == "result_000003_od.png");
+    GRAPH_CHECK(cli::LayerFileName("result", "cam2", true, 0, "base") ==
+                "result_cam2_000000_base.png");
+    GRAPH_CHECK(cli::LayersStem("out/run.v1/result.png", "g/fanout.json") == "result");
+    GRAPH_CHECK(cli::LayersStem("out/result", "g/fanout.json") == "result");
+    GRAPH_CHECK(cli::LayersStem("", "g/fanout_od_seg_depth.json") == "fanout_od_seg_depth");
+}
+
 }  // namespace graph
 }  // namespace dxapp
 
@@ -14853,6 +15104,11 @@ int main() {
     TestSecondsAreWrittenRoundedLikeTime();
     TestAGalleryNodeQuietsTheTextOfTheNodeItReads();
     TestEventLogKeepsOffTheLabelsRenderReportDrew();
+    TestDrawFilterDrawsOnlyTheNamedNodes();
+    TestLayerFromBackdropsRecoversColourAndAlpha();
+    TestLayersStackBackToTheMergedImage();
+    TestDisplayGridTilesTheStreams();
+    TestLayerFileNames();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);

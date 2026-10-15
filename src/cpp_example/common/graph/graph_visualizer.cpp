@@ -756,17 +756,33 @@ void DrawLogicShapes(cv::Mat* canvas, const LogicOverlay& overlay, cv::Mat* tint
     }
 }
 
-/// Every overlay's labels: first the top-left panel (one line under the
-/// other, each moved down past the box labels in `taken`), then the
-/// labels anchored in the picture, each kept off everything drawn before.
+/// Which nodes one rendering lays out (`options.draw`) and which of them
+/// it paints: all of them, or `only` (one RenderLayers layer).
+struct Painting {
+    const RenderOptions* options;
+    const std::string* only;  ///< NULL: every node laid out is painted
+
+    bool Lays(const std::string& node) const { return options->Draws(node); }
+    bool Paints(const std::string& node) const {
+        return Lays(node) && (only == NULL || *only == node);
+    }
+};
+
+/// Every laid-out overlay's labels: first the top-left panel (one line
+/// under the other, each moved down past the box labels in `taken`), then
+/// the labels anchored in the picture, each kept off everything laid out
+/// before. Only a painted overlay's labels are drawn; every laid-out one
+/// takes its place, so a layer's labels land where the merged image's do.
 void DrawLogicLabels(cv::Mat* canvas, const std::map<std::string, LogicOverlay>& overlays,
-                     std::vector<cv::Rect>* taken) {
+                     const Painting& painting, std::vector<cv::Rect>* taken) {
     const cv::Size size = canvas->size();
     std::vector<cv::Rect> panel;
     int next_baseline = 24;
     for (int pass = 0; pass < 2; ++pass) {
         for (std::map<std::string, LogicOverlay>::const_iterator it = overlays.begin();
              it != overlays.end(); ++it) {
+            if (!painting.Lays(it->first)) continue;
+            const bool paint = painting.Paints(it->first);
             for (std::size_t i = 0; i < it->second.texts.size(); ++i) {
                 const OverlayText& text = it->second.texts[i];
                 const bool in_panel = text.at.x < 0.f;
@@ -783,7 +799,7 @@ void DrawLogicLabels(cv::Mat* canvas, const std::map<std::string, LogicOverlay>&
                 } else {
                     box = BesideAnchor(text, size, *taken);
                 }
-                DrawLabelIn(canvas, text.text, box, text.alert);
+                if (paint) DrawLabelIn(canvas, text.text, box, text.alert);
                 if (!in_panel) taken->push_back(box);
             }
         }
@@ -817,9 +833,21 @@ void DrawResultAndPorts(const StageResult& result, cv::Mat* canvas, Shape shape,
     }
 }
 
-/// `skip`: nodes left out of this pass (RenderOptions::quiet_text in pass 4).
-void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, DrawFn fn,
-                   const std::set<std::string>& skip = std::set<std::string>()) {
+/// True when `result`'s primary payload or one of its ports has `shape`.
+bool HasShape(const StageResult& result, Shape shape) {
+    if (result.data && result.data->shape() == shape) return true;
+    for (StagePorts::const_iterator it = result.ports.begin(); it != result.ports.end(); ++it) {
+        if (it->second && it->second->shape() == shape) return true;
+    }
+    return false;
+}
+
+/// Every result a shape pass draws, with the id of its node, in
+/// report.node_results then report.roi_results order; a logic node's
+/// payload is skipped (its overlay is pass 5), and so is a node `keep`
+/// says no to.
+template <typename Keep, typename Visit>
+void ForEachDrawn(const FrameReport& report, Keep keep, Visit visit) {
     for (std::map<std::string, StageResult>::const_iterator it =
              report.node_results.begin();
          it != report.node_results.end(); ++it) {
@@ -827,21 +855,57 @@ void ForEachResult(const FrameReport& report, cv::Mat* canvas, Shape shape, Draw
         if (report.logic_nodes.count(it->first) != 0 || report.overlays.count(it->first) != 0) {
             continue;
         }
-        if (skip.count(it->first) != 0) continue;
-        DrawResultAndPorts(it->second, canvas, shape, fn);
+        if (!keep(it->first)) continue;
+        visit(it->first, it->second);
     }
     for (std::map<std::string, std::vector<StageResult> >::const_iterator it =
              report.roi_results.begin();
          it != report.roi_results.end(); ++it) {
-        if (skip.count(it->first) != 0) continue;
+        if (!keep(it->first)) continue;
         const std::vector<StageResult>& results = it->second;
-        for (std::size_t i = 0; i < results.size(); ++i) {
-            DrawResultAndPorts(results[i], canvas, shape, fn);
-        }
+        for (std::size_t i = 0; i < results.size(); ++i) visit(it->first, results[i]);
     }
 }
 
-/// Every result ForEachResult draws, ports as results of their own, in its
+/// One shape pass of RenderReport: draw `fn` over every result of `shape`.
+/// `text`: a scores/vector pass, which RenderOptions::quiet_text skips.
+struct Step {
+    Shape shape;
+    DrawFn fn;
+    bool text;
+};
+
+/// Passes 1-4 in order (pass 5, logic nodes, is RenderReport's own).
+const Step kSteps[] = {
+    // Pass 1: dense layers. Images first, as the backdrop: DrawImage copies
+    // opaquely, and a hand-off graph always reports its image producer's
+    // output, so drawing it after the maps would paint over the very
+    // segmentation or depth that ran on it. Label and dense maps then blend
+    // over it.
+    {Shape::kImage, &DrawImage, false},
+    {Shape::kLabelMap, &DrawLabelMap, false},
+    {Shape::kDenseMap, &DrawDenseMap, false},
+    // Pass 2: instance masks.
+    {Shape::kInstances, &DrawInstances, false},
+    // Pass 3: boxes (a detector's and each instance's), obboxes,
+    // keypoints - restored to source coordinates.
+    {Shape::kBoxes, &DrawBoxes, false},
+    {Shape::kInstances, &DrawBoxes, false},
+    {Shape::kObBoxes, &DrawObBoxes, false},
+    {Shape::kKeypoints, &DrawKeypoints, false},
+    // Pass 4: scores and vectors as text anchored to their parent box,
+    // except a quiet node's (a gallery node names its crops instead).
+    {Shape::kScores, &DrawScores, true},
+    {Shape::kVector, &DrawVector, true},
+};
+
+/// Whether `step` draws `node` at all in a rendering laid out by `painting`.
+bool StepKeeps(const Step& step, const Painting& painting, const std::string& node) {
+    return painting.Lays(node) &&
+           !(step.text && painting.options->quiet_text.count(node) != 0);
+}
+
+/// Every result ForEachDrawn visits, ports as results of their own, in its
 /// order, each with the id of the node that produced it.
 template <typename Visit>
 void VisitResults(const FrameReport& report, Visit visit) {
@@ -915,43 +979,35 @@ RenderOptions RenderOptionsFor(const GraphSpec& spec) {
     return options;
 }
 
-cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report,
-                     const RenderOptions& options, std::vector<cv::Rect>* labels) {
+namespace {
+
+/// RenderReport, painting only what `painting` paints.
+cv::Mat Paint(const cv::Mat& source, const FrameReport& report, const Painting& painting,
+              std::vector<cv::Rect>* labels) {
     if (labels != NULL) labels->clear();
     cv::Mat canvas = source.clone();
     if (canvas.empty()) return canvas;
 
-    // Pass 1: dense layers. Images first, as the backdrop: DrawImage copies
-    // opaquely, and a hand-off graph always reports its image producer's
-    // output, so drawing it after the maps would paint over the very
-    // segmentation or depth that ran on it. Label and dense maps then blend
-    // over it.
-    ForEachResult(report, &canvas, Shape::kImage, &DrawImage);
-    ForEachResult(report, &canvas, Shape::kLabelMap, &DrawLabelMap);
-    ForEachResult(report, &canvas, Shape::kDenseMap, &DrawDenseMap);
-
-    // Pass 2: instance masks.
-    ForEachResult(report, &canvas, Shape::kInstances, &DrawInstances);
-
-    // Pass 3: boxes (a detector's and each instance's), obboxes,
-    // keypoints - restored to source coordinates.
-    ForEachResult(report, &canvas, Shape::kBoxes, &DrawBoxes);
-    ForEachResult(report, &canvas, Shape::kInstances, &DrawBoxes);
-    ForEachResult(report, &canvas, Shape::kObBoxes, &DrawObBoxes);
-    ForEachResult(report, &canvas, Shape::kKeypoints, &DrawKeypoints);
-
-    // Pass 4: scores and vectors as text anchored to their parent box,
-    // except a quiet node's (a gallery node names its crops instead).
-    ForEachResult(report, &canvas, Shape::kScores, &DrawScores, options.quiet_text);
-    ForEachResult(report, &canvas, Shape::kVector, &DrawVector, options.quiet_text);
+    // Passes 1-4 (kSteps).
+    for (std::size_t s = 0; s < sizeof(kSteps) / sizeof(kSteps[0]); ++s) {
+        const Step& step = kSteps[s];
+        ForEachDrawn(report,
+                     [&step, &painting](const std::string& node) {
+                         return StepKeeps(step, painting, node) && painting.Paints(node);
+                     },
+                     [&canvas, &step](const std::string&, const StageResult& result) {
+                         DrawResultAndPorts(result, &canvas, step.shape, step.fn);
+                     });
+    }
 
     // Pass 5: logic nodes, over everything else, in node-id order. A label
     // laid beside its anchor keeps off the box labels of pass 3 and off
-    // the labels drawn before it.
+    // the labels drawn before it - every laid-out node's, painted or not.
     std::vector<cv::Rect> taken;
+    const RenderOptions& options = *painting.options;
     VisitResults(report, [&canvas, &taken, &options](const std::string& node,
                                                      const StageResult& result) {
-        if (!result.data) return;
+        if (!result.data || !options.Draws(node)) return;
         const Shape shape = result.data->shape();
         if (shape == Shape::kBoxes || shape == Shape::kInstances) {
             AddBoxLabelRows(result, canvas.size(), &taken);
@@ -961,11 +1017,108 @@ cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report,
     cv::Mat tint;
     for (std::map<std::string, LogicOverlay>::const_iterator it = report.overlays.begin();
          it != report.overlays.end(); ++it) {
-        DrawLogicShapes(&canvas, it->second, &tint);
+        if (painting.Paints(it->first)) DrawLogicShapes(&canvas, it->second, &tint);
     }
-    DrawLogicLabels(&canvas, report.overlays, &taken);
+    DrawLogicLabels(&canvas, report.overlays, painting, &taken);
     if (labels != NULL) labels->swap(taken);
     return canvas;
+}
+
+/// The nodes RenderLayers gives a layer, in stacking order: each at the
+/// first step it draws in, then the logic nodes in id order.
+std::vector<std::string> LayerOrder(const FrameReport& report, const RenderOptions& options) {
+    const Painting painting = {&options, NULL};
+    std::vector<std::string> order;
+    std::set<std::string> seen;
+    for (std::size_t s = 0; s < sizeof(kSteps) / sizeof(kSteps[0]); ++s) {
+        const Step& step = kSteps[s];
+        ForEachDrawn(report,
+                     [&step, &painting](const std::string& node) {
+                         return StepKeeps(step, painting, node);
+                     },
+                     [&step, &order, &seen](const std::string& node, const StageResult& result) {
+                         if (HasShape(result, step.shape) && seen.insert(node).second) {
+                             order.push_back(node);
+                         }
+                     });
+    }
+    for (std::map<std::string, LogicOverlay>::const_iterator it = report.overlays.begin();
+         it != report.overlays.end(); ++it) {
+        if (painting.Lays(it->first) && seen.insert(it->first).second) order.push_back(it->first);
+    }
+    return order;
+}
+
+}  // namespace
+
+cv::Mat RenderReport(const cv::Mat& source, const FrameReport& report,
+                     const RenderOptions& options, std::vector<cv::Rect>* labels) {
+    const Painting painting = {&options, NULL};
+    return Paint(source, report, painting, labels);
+}
+
+std::vector<RenderLayer> RenderLayers(const cv::Size& size, const FrameReport& report,
+                                      const RenderOptions& options) {
+    std::vector<RenderLayer> layers;
+    if (size.area() <= 0) return layers;
+    const cv::Mat black = cv::Mat::zeros(size, CV_8UC3);
+    const cv::Mat white(size, CV_8UC3, cv::Scalar(255, 255, 255));
+    const std::vector<std::string> order = LayerOrder(report, options);
+    for (std::size_t i = 0; i < order.size(); ++i) {
+        const Painting painting = {&options, &order[i]};
+        RenderLayer layer;
+        layer.node = order[i];
+        layer.rgba = LayerFromBackdrops(Paint(black, report, painting, NULL),
+                                        Paint(white, report, painting, NULL));
+        std::vector<cv::Mat> channels;
+        cv::split(layer.rgba, channels);
+        if (cv::countNonZero(channels[3]) != 0) layers.push_back(layer);
+    }
+    return layers;
+}
+
+cv::Mat LayerFromBackdrops(const cv::Mat& on_black, const cv::Mat& on_white) {
+    CV_Assert(on_black.type() == CV_8UC3 && on_white.type() == CV_8UC3 &&
+              on_black.size() == on_white.size());
+    cv::Mat layer(on_black.size(), CV_8UC4);
+    for (int y = 0; y < layer.rows; ++y) {
+        const cv::Vec3b* b = on_black.ptr<cv::Vec3b>(y);
+        const cv::Vec3b* w = on_white.ptr<cv::Vec3b>(y);
+        cv::Vec4b* out = layer.ptr<cv::Vec4b>(y);
+        for (int x = 0; x < layer.cols; ++x) {
+            // Over black a pixel is a*c; over white a*c + (1-a)*255.
+            int through = 0;
+            for (int c = 0; c < 3; ++c) through += static_cast<int>(w[x][c]) - b[x][c];
+            const int alpha = std::max(0, std::min(255, 255 - (through + 1) / 3));
+            out[x][3] = static_cast<uchar>(alpha);
+            for (int c = 0; c < 3; ++c) {
+                out[x][c] = alpha == 0 ? 0
+                    : static_cast<uchar>(std::min(255, (b[x][c] * 255 + alpha / 2) / alpha));
+            }
+        }
+    }
+    return layer;
+}
+
+cv::Mat CompositeLayers(const cv::Mat& base, const std::vector<cv::Mat>& layers) {
+    cv::Mat out = base.clone();
+    for (std::size_t i = 0; i < layers.size(); ++i) {
+        const cv::Mat& layer = layers[i];
+        CV_Assert(layer.type() == CV_8UC4 && layer.size() == out.size() &&
+                  out.type() == CV_8UC3);
+        for (int y = 0; y < out.rows; ++y) {
+            const cv::Vec4b* l = layer.ptr<cv::Vec4b>(y);
+            cv::Vec3b* o = out.ptr<cv::Vec3b>(y);
+            for (int x = 0; x < out.cols; ++x) {
+                const int a = l[x][3];
+                if (a == 0) continue;
+                for (int c = 0; c < 3; ++c) {
+                    o[x][c] = static_cast<uchar>((l[x][c] * a + o[x][c] * (255 - a) + 127) / 255);
+                }
+            }
+        }
+    }
+    return out;
 }
 
 void DrawEventLog(cv::Mat* canvas, const std::vector<std::string>& lines,
