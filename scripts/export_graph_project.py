@@ -95,6 +95,9 @@ KINDS = {
                "input.items[i]: one ClassificationResult each: .class_id, .class_name, .confidence, "
                ".top_k"),
     "vector": ("VectorData", "input.values: the vector (std::vector<float>), e.g. an embedding"),
+    "boxes3d": ("Boxes3dData",
+                "input.items[i]: one Detection3DResult per object: .class_id, .class_name, .confidence, "
+                ".x3d, .y3d, .z3d, .dim_h, .dim_w, .dim_l, .yaw (and the bird's-eye box .bev_x/y/w/h)"),
     "records": ("RecordsData",
                 "input.items[i]: one RecordItem each: .numbers and .text, lists of (name, value)"),
 }
@@ -339,6 +342,7 @@ def localize_files(graph: dict, out, write: bool):
         if node.get("type") == "source":
             uri = node.get("uri") or ""
             if not uri:
+                node["uri"] = ""  # the engine requires the key; --input fills it at run time
                 warnings.append("source {!r} has no input: run it with --input {}=<file>".format(
                     node.get("id"), node.get("id")))
                 inputs.append({"source": node.get("id"), "uri": "", "copied": False})
@@ -523,7 +527,7 @@ def stub_files(users: dict) -> dict:
                   "doc": doc, "doc_short": doc.split(".")[0]}
         fields["input_doc"] = textwrap.fill("Input: {} - {}".format(info["input"], doc), width=96,
                                             initial_indent=" * ", subsequent_indent=" *   ")
-        fields["example"] = BOX_EXAMPLE if info["input"] in BOX_KINDS else OTHER_EXAMPLE.format(name=name)
+        fields["example"] = BOX_EXAMPLE if info["input"] in BOX_KINDS else OTHER_EXAMPLE.replace("{name}", name)
         files["user_logic/{}.hpp".format(name)] = STUB_HPP.format(**fields)
         files["user_logic/{}.cpp".format(name)] = STUB_CPP.format(**fields)
         includes.append('#include "user_logic/{}.hpp"'.format(name))
@@ -570,8 +574,11 @@ while [ $# -gt 0 ]; do
 done
 
 # 1. The DEEPX runtime (dx_rt): the one prerequisite outside the usual build tools.
+# (ldconfig's list is read into a variable: piped into an early-exiting grep, it fails under
+# pipefail.)
+DXRT_LIBS="$( (ldconfig -p || /sbin/ldconfig -p) 2>/dev/null || true)"
 if [ -z "${{DXRT_INSTALLED_DIR:-}}" ] && [ ! -f /usr/local/lib/cmake/dxrt/dxrtConfig.cmake ] \
-   && ! ldconfig -p 2>/dev/null | grep -q 'libdxrt\.so'; then
+   && [[ "$DXRT_LIBS" != *libdxrt.so* ]]; then
     echo "ERROR: the DEEPX runtime (dx_rt) is not installed. Install it first, or set" >&2
     echo "       DXRT_INSTALLED_DIR to where it is installed." >&2
     exit 1
@@ -588,6 +595,10 @@ fi
 
 # 3. Models: models/models.tsv lists each .dxnn and where to download it.
 mkdir -p "$SCRIPT_DIR/models"
+if [ ! -f "$SCRIPT_DIR/models/models.tsv" ]; then
+    echo "ERROR: models/models.tsv is missing; export the project again" >&2
+    exit 1
+fi
 while IFS=$'\t' read -r file url; do
     [ -n "$file" ] || continue
     target="$SCRIPT_DIR/models/$file"
@@ -902,6 +913,13 @@ def export(graph_path, out=None, name=None, include_models=True, model_dir=None,
         except BaseException:
             if created:
                 shutil.rmtree(out, ignore_errors=True)
+            elif not dry_run:
+                # The folder was given empty: it is left empty, so a retry is not refused (out_exists).
+                for child in list(out.iterdir()):
+                    if child.is_dir() and not child.is_symlink():
+                        shutil.rmtree(child, ignore_errors=True)
+                    else:
+                        child.unlink()
             raise
 
 

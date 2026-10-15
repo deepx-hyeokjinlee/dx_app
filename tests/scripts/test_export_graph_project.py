@@ -252,3 +252,92 @@ def test_the_keyword_list_is_the_engines():
     sys.path.insert(0, str(ROOT / "scripts"))
     import export_graph_project
     assert engine == set(export_graph_project.CPP_KEYWORDS)
+
+
+# ---------------------------------------------------------------------------
+# Review fixes: every kind, cleanup of a given empty folder, sources, setup.sh's model loop
+# ---------------------------------------------------------------------------
+
+def test_every_kind_a_user_node_takes_gets_a_stub(tmp_path):
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import export_graph_project
+    g = user_zone()
+    for kind in export_graph_project.KINDS:
+        g["nodes"].append({"id": "n_" + kind, "type": "logic", "op": "user",
+                           "params": {"name": "rule_" + kind, "input": kind, "output": kind}})
+    out = tmp_path / "p"
+    r = run("--graph", write_graph(tmp_path, g), "--out", out, "--no-models", "--json")
+    assert r.returncode == 0, r.stderr
+    reg = (out / "user_logic/register.cpp").read_text()
+    for kind, (cpp, _doc) in export_graph_project.KINDS.items():
+        hpp = (out / "user_logic/rule_{}.hpp".format(kind)).read_text()
+        assert "dxapp::graph::{} Run(const dxapp::graph::{}& input".format(cpp, cpp) in hpp
+        assert "RegisterUserLogic<dxapp::graph::{}, user_logic::rule_{}>".format(cpp, kind) in reg
+    assert "next_s_" in (out / "user_logic/rule_records.cpp").read_text()
+    assert "Boxes3dData" in (out / "user_logic/rule_boxes3d.hpp").read_text()
+
+
+def test_a_failed_export_into_a_given_empty_folder_leaves_it_empty(tmp_path):
+    g = user_zone()
+    g["nodes"][0]["uri"] = "sample/img/no_such.jpg"
+    out = tmp_path / "p"
+    out.mkdir()
+    r = run("--graph", write_graph(tmp_path, g), "--out", out, "--no-models", "--json")
+    assert r.returncode == 1 and json.loads(r.stdout)["error_key"] == "input_missing"
+    assert out.is_dir() and not any(out.iterdir())
+
+
+def test_a_source_without_a_uri_gets_an_empty_one(tmp_path):
+    g = user_zone()
+    del g["nodes"][0]["uri"]
+    out = tmp_path / "p"
+    r = run("--graph", write_graph(tmp_path, g), "--out", out, "--no-models", "--json")
+    assert r.returncode == 0, r.stderr
+    assert json.loads((out / "graph.json").read_text())["nodes"][0]["uri"] == ""
+    assert json.loads(r.stdout)["warnings"]
+
+
+@pytest.fixture(scope="module")
+def no_models(tmp_path_factory):
+    """user_zone.json exported without its model files."""
+    tmp = tmp_path_factory.mktemp("nomodels")
+    r = run("--graph", USER_ZONE, "--out", tmp / "p", "--no-models", "--json")
+    assert r.returncode == 0, r.stderr
+    return tmp / "p"
+
+
+def _setup(project, *args):
+    env = {"HOME": os.environ.get("HOME", "/tmp"), "PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8"}
+    r = subprocess.run(["bash", str(project / "setup.sh"), "--no-build"] + [str(a) for a in args],
+                       capture_output=True, text=True, env=env, timeout=120)
+    if "the DEEPX runtime (dx_rt) is not installed" in r.stderr:
+        pytest.skip("dx_rt is not installed here")
+    return r
+
+
+def test_setup_copies_the_left_out_models_from_a_folder(no_models, tmp_path):
+    fake_models(tmp_path, "yolov8-n_640x640.dxnn")
+    r = _setup(no_models, "--models-from", tmp_path / "models")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert (no_models / "models/yolov8-n_640x640.dxnn").read_bytes() == b"not a real model yolov8-n_640x640.dxnn"
+    (no_models / "models/yolov8-n_640x640.dxnn").unlink()
+
+
+def test_setup_says_what_it_cannot_fetch(no_models):
+    tsv = no_models / "models/models.tsv"
+    kept = tsv.read_text()
+    try:
+        tsv.write_text("yolov8-n_640x640.dxnn\t\n")
+        r = _setup(no_models)
+        assert r.returncode == 1 and "has no download address" in r.stderr
+        tsv.unlink()
+        r = _setup(no_models)
+        assert r.returncode == 1 and "models/models.tsv is missing" in r.stderr
+    finally:
+        tsv.write_text(kept)
+
+
+def test_setup_finds_dx_rt_without_a_pipe_that_can_break(no_models):
+    """`ldconfig -p | grep -q` fails under pipefail when grep stops early (SIGPIPE)."""
+    text = (no_models / "setup.sh").read_text()
+    assert "| grep -q" not in text and "/sbin/ldconfig" in text
