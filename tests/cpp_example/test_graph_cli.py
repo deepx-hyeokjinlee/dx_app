@@ -1893,6 +1893,26 @@ def test_people_count_counts_and_decides_per_stream(tmp_path):
     assert "cam2" in crowded, "sample_crowd.jpg holds more than five people"
 
 
+@pytest.mark.graph_e2e
+def test_logistics_volume_measures_the_package_on_its_sample(tmp_path):
+    """The segmenter's 500x333 masks and the depth model's 768x768 map both cover the frame: volume gives a median
+    depth and a volume_proxy (it gave none before Phase 4)."""
+    graph = "logistics_volume.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    report = tmp_path / "report.json"
+    result = run("multi_model_graph_sync", "--graph", "{}/{}".format(GRAPHS, graph), "--report", str(report))
+    assert result.returncode == 0, result.stdout + result.stderr
+    rows = json.loads(report.read_text(encoding="utf-8"))["frames"][0]["nodes"]["volume"]["payload"]["items"]
+    assert rows, "sample_baggage_cart_airport.jpg holds a suitcase"
+    for row in rows:
+        n = row["numbers"]
+        assert n["mask_area_px"] > 0, n
+        assert 0.0 <= n["median_depth"] <= 1.0, n          # the depth map is normalized per frame
+        assert n["volume_proxy"] == pytest.approx(n["mask_area_px"] * n["median_depth"]), n
+
+
 # ---------------------------------------------------------------- tier 3
 
 

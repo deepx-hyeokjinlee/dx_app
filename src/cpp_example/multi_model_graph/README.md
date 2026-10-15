@@ -99,7 +99,7 @@ Shipped samples, next to the CLI sources in `src/cpp_example/multi_model_graph/`
 | `chain_zerodce_od_pose_emb.json` | low-light enhancement, then detect on the enhanced image → per-person crop → top-down pose, and an embedding per person | `zerodce_400x600` → `yolov8-n_640x640` → `vitpose-s_256x192` + `casvit-t_224x224` |
 | `hand_cascade.json` | palm detector → per-palm crop → 21 hand landmarks | `mediapipe-hand-detector_192x192` → `mediapipe-hands-lite_224x224` |
 | `dms_headpose.json` | face detector → head pose (pitch, yaw, roll) on a cpu node | `scrfd-500m_640x640` → `headpose` |
-| `logistics_volume.json` | detector, instance mask and depth in parallel → package volume proxy on a cpu node | `yolo26-n_640x640` + `yolo26-n-seg_640x640` + `yolo26-depth-n_768x768` → `volume` |
+| `logistics_volume.json` | detector, instance mask and depth in parallel → package volume proxy on a cpu node (mask area × median depth, in source pixels; the depth map is normalized per frame, so the proxy is relative) | `yolo26-n_640x640` + `yolo26-n-seg_640x640` + `yolo26-depth-n_768x768` → `volume` |
 | `zone_intrusion.json` | people in a restricted zone raise an `intrusion` event (filter → zone → condition, cooldown 10 s) | `yolov8-n_640x640` → logic |
 | `line_counting.json` | tracked people crossing a line, counted per direction, a `cross` event each | `yolov8-n_640x640` → logic |
 | `ppe_zone_check.json` | people in a zone are cropped for attributes; one without a hat raises `no_hat` (zone → ROI → classifier → condition) | `yolov8-n_640x640` → `deepmar_resnet18_224x224` → logic |
@@ -142,7 +142,7 @@ the corner and the size once.
 |---|---|---|
 | frame | `{ "from": "cam", "to": "od" }` | the consumer gets the whole frame: the source frame, or the image the producer made (see below) |
 | ROI | `{ "from": "od", "to": "reid", "roi": { ... } }` | the consumer gets one cropped region per box the producer found, and runs once per crop |
-| result | `{ "from": "face", "to": "headpose", "carry": "result" }` | the consumer, which must be a cpu or a logic node, receives the producer payload. Not a crop and not a frame. `headpose` needs one `boxes` result. `volume` needs one `boxes`, one `instances` and one `densemap`. A node fed by an ROI edge hands a logic node every crop's result (see *Logic nodes*) |
+| result | `{ "from": "face", "to": "headpose", "carry": "result" }` | the consumer, which must be a cpu or a logic node, receives the producer payload. Not a crop and not a frame. `headpose` needs one `boxes` result. `volume` needs one `boxes`, one `instances` and one `densemap`; it works in source-frame pixels: boxes are mapped back through their origin, and the instance mask and the depth map may differ in size (each covers the frame, as the overlay draws them; the depth is read at each mask pixel's place, never resized). A node fed by an ROI edge hands a logic node every crop's result (see *Logic nodes*) |
 | `port` | `{ "from": "drive", "to": "x", "port": "lane" }` | reads one named output of the producer; without it, the primary output (this example is refused today: no shipped port has an edge-carryable shape; see *Output ports*). A result edge cannot also name a port |
 
 A model node accepts a frame edge only if it `consumes` `frame` or `either`,
