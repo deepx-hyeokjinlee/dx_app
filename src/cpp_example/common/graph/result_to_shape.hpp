@@ -59,7 +59,7 @@ inline StageDataPtr ToStageData(const std::vector<FaceDetectionResult>& results)
         item.box = detail::ToRect(results[i].box);
         item.score = results[i].confidence;
         item.class_id = 0;
-        item.class_name = "face";
+        item.class_name = results[i].class_name;
         item.landmarks = results[i].landmarks;
         data->items.push_back(item);
     }

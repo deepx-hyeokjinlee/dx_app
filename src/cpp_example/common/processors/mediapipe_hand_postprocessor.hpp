@@ -273,6 +273,7 @@ private:
             FaceDetectionResult face;
             face.box        = {bx1, by1, bx2, by2};
             face.confidence = sv[k];
+            face.class_name = "hand";  // the palm box expanded to the whole hand
             results.push_back(face);
         }
         return results;
