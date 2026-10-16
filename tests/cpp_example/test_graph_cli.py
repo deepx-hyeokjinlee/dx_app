@@ -4011,6 +4011,31 @@ def test_layers_of_an_event_frame_end_with_the_event_panel(tmp_path):
 
 
 @pytest.mark.graph_e2e
+@pytest.mark.parametrize("binary", ["multi_model_graph_sync", "multi_model_graph_async"])
+def test_driver_attention_draws_the_head_pose_on_the_face(tmp_path, binary):
+    """The headpose node has a layer of its own: the head's axes from the nose, inside the face box, and its
+    angles beside it. Before, the overlay was the face box alone."""
+    graph = "driver_attention.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    report, layers = tmp_path / "report.json", tmp_path / "layers"
+    result = run(binary, "--graph", "{}/{}".format(GRAPHS, graph), "--report", str(report),
+                 "--output-layers", str(layers))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frame = json.loads((layers / "layers.json").read_text())["frames"][0]
+    entry = [e for e in frame["layers"] if e.get("node") == "headpose"]
+    assert entry == [{"node": "headpose", "op": "headpose", "file": entry[0]["file"] if entry else ""}]
+    x, y, w, h = json.loads(report.read_text())["frames"][0]["nodes"]["face"]["payload"]["items"][0]["box"]
+    rgba = _read_rgba(layers / entry[0]["file"])
+    face = rgba[int(y):int(y + h), int(x):int(x + w)]
+    drawn = face[..., 3] > 0
+    red = drawn & (face[..., 2] > 200) & (face[..., 1] < 80) & (face[..., 0] < 80)
+    green = drawn & (face[..., 1] > 150) & (face[..., 2] < 80) & (face[..., 0] < 80)
+    assert red.sum() > 200 and green.sum() > 200, (red.sum(), green.sum())   # thick axes, not a dot
+
+
+@pytest.mark.graph_e2e
 def test_layers_of_several_streams_name_their_source(tmp_path):
     absent = missing_artifacts(MULTISTREAM)
     if absent:

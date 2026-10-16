@@ -315,7 +315,9 @@ bool SameEvents(const std::vector<GraphEvent>& a, const std::vector<GraphEvent>&
 
 bool SameOverlay(const LogicOverlay& a, const LogicOverlay& b) {
     if (a.alert != b.alert || a.polygons != b.polygons || a.lines != b.lines) return false;
-    if (a.highlights != b.highlights || a.texts.size() != b.texts.size()) return false;
+    if (a.highlights != b.highlights || a.axes != b.axes || a.texts.size() != b.texts.size()) {
+        return false;
+    }
     for (std::size_t i = 0; i < a.texts.size(); ++i) {
         if (a.texts[i].at != b.texts[i].at || a.texts[i].text != b.texts[i].text ||
             a.texts[i].alert != b.texts[i].alert || a.texts[i].away != b.texts[i].away) {

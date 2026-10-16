@@ -15,6 +15,7 @@
 #include <opencv2/core.hpp>
 
 #include "common/graph/i_registry.hpp"
+#include "common/graph/logic_ops.hpp"
 #include "common/graph/shape.hpp"
 
 namespace dxapp {
@@ -25,6 +26,9 @@ namespace graph {
 struct CpuReduction {
     StageResult result;
     std::string error;
+    /// What the node draws (headpose: the head's axes and its angles); the
+    /// runners put it in FrameReport::overlays under the node's id.
+    LogicOverlay overlay;
 };
 
 /**

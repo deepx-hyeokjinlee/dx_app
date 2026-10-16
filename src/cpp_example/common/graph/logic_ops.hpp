@@ -116,21 +116,36 @@ struct OverlayText {
     OverlayText() : at(-1.f, -1.f), alert(false), away(0.f, 0.f) {}
 };
 
-/// What one logic node asks the visualizer to draw for one frame, in
-/// source-frame pixels (RenderReport's pass 5).
+/// A head's pose: its x (red), y (green) and z (blue, where the face points)
+/// axes, drawn from `origin` to each end. Source-frame pixels.
+struct OverlayAxes {
+    cv::Point2f origin;
+    cv::Point2f x;
+    cv::Point2f y;
+    cv::Point2f z;
+};
+
+inline bool operator==(const OverlayAxes& a, const OverlayAxes& b) {
+    return a.origin == b.origin && a.x == b.x && a.y == b.y && a.z == b.z;
+}
+inline bool operator!=(const OverlayAxes& a, const OverlayAxes& b) { return !(a == b); }
+
+/// What one logic node (or a cpu node: headpose) asks the visualizer to draw
+/// for one frame, in source-frame pixels (RenderReport's pass 5).
 struct LogicOverlay {
     std::vector<std::vector<cv::Point2f> > polygons;
     std::vector<std::pair<cv::Point2f, cv::Point2f> > lines;  ///< A -> B; "in" is to its right
     std::vector<cv::Rect2f> highlights;                        ///< boxes outlined
+    std::vector<OverlayAxes> axes;                             ///< in their own colours
     std::vector<OverlayText> texts;
     bool alert;  ///< polygons, lines and highlights in the alert colour
     LogicOverlay() : alert(false) {}
 };
 
-/// Nothing to draw: no polygon, line, highlight or label.
+/// Nothing to draw: no polygon, line, highlight, axes or label.
 inline bool IsEmpty(const LogicOverlay& overlay) {
     return overlay.polygons.empty() && overlay.lines.empty() && overlay.highlights.empty() &&
-           overlay.texts.empty();
+           overlay.axes.empty() && overlay.texts.empty();
 }
 
 /// One event a logic node raised in one frame.

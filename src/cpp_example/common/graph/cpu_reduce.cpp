@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <vector>
@@ -258,6 +259,36 @@ CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Si
     std::shared_ptr<RecordsData> records(new RecordsData());
     records->items.push_back(item);
     out.result.data = records;
+
+    // The overlay: the model's axes projected from the nose, 50 model units
+    // long (the eyes are 60 apart), and the angles beside the face box.
+    std::vector<cv::Point3d> axis_points;
+    axis_points.push_back(cv::Point3d(0.0, 0.0, 0.0));
+    axis_points.push_back(cv::Point3d(50.0, 0.0, 0.0));
+    axis_points.push_back(cv::Point3d(0.0, 50.0, 0.0));
+    axis_points.push_back(cv::Point3d(0.0, 0.0, 50.0));  // out of the face, as the nose
+    std::vector<cv::Point2d> projected;
+    cv::projectPoints(axis_points, rotation, translation, camera, no_distortion, projected);
+    bool finite = projected.size() == 4;
+    for (std::size_t i = 0; finite && i < projected.size(); ++i) {
+        finite = std::isfinite(projected[i].x) && std::isfinite(projected[i].y);
+    }
+    if (finite) {
+        OverlayAxes axes;
+        axes.origin = cv::Point2f(projected[0]);
+        axes.x = cv::Point2f(projected[1]);
+        axes.y = cv::Point2f(projected[2]);
+        axes.z = cv::Point2f(projected[3]);
+        out.overlay.axes.push_back(axes);
+    }
+    char label[96];
+    std::snprintf(label, sizeof(label), "yaw %.0f pitch %.0f roll %.0f",
+                  yaw * kRadToDeg, pitch * kRadToDeg, roll * kRadToDeg);
+    OverlayText text;
+    text.text = label;
+    text.at = cv::Point2f(face->box.x + face->box.width, face->box.y + face->box.height / 2.f);
+    text.away = cv::Point2f(1.f, 0.f);
+    out.overlay.texts.push_back(text);
     return out;
 }
 

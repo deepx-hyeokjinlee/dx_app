@@ -79,6 +79,7 @@ FrameReport SyncExecutor::RunFrame(StageGraph& graph, std::size_t stream,
             const CpuReduction reduced = ReduceCpu(node.op, node.params, inputs, frame.size());
             report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
             report.node_results[node.id] = reduced.result;
+            if (!IsEmpty(reduced.overlay)) report.overlays[node.id] = reduced.overlay;
             if (!reduced.error.empty() && report.error.empty()) {
                 report.error = std::string("node \"") + node.id + "\": " + reduced.error;
             }

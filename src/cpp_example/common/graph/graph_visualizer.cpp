@@ -755,6 +755,22 @@ void DrawLogicShapes(cv::Mat* canvas, const LogicOverlay& overlay, cv::Mat* tint
                                cvRound(box.height)),
                       color, 3);
     }
+    for (std::size_t i = 0; i < overlay.axes.size(); ++i) {
+        const OverlayAxes& axes = overlay.axes[i];
+        // As thick as the head is large, so the axes read on a small preview.
+        const float length = std::max(static_cast<float>(cv::norm(axes.x - axes.origin)),
+                                      static_cast<float>(cv::norm(axes.y - axes.origin)));
+        const int thickness = std::max(2, std::min(16, cvRound(length / 12.f)));
+        const cv::Point2f ends[3] = {axes.x, axes.y, axes.z};
+        const cv::Scalar colors[3] = {cv::Scalar(0, 0, 255), cv::Scalar(0, 200, 0),
+                                      cv::Scalar(255, 80, 0)};  // BGR: red, green, blue
+        for (int k = 0; k < 3; ++k) {
+            const double reach = cv::norm(ends[k] - axes.origin);
+            if (reach < 1.0) continue;
+            cv::arrowedLine(*canvas, Pixel(axes.origin), Pixel(ends[k]), colors[k], thickness,
+                            cv::LINE_AA, 0, std::min(0.3, 3.0 * thickness / reach));
+        }
+    }
 }
 
 /// Which nodes one rendering lays out (`options.draw`) and which of them

@@ -503,6 +503,7 @@ struct AsyncExecutor::Engine {
                     ReduceCpu(node.op, node.params, ctx->result_in[index], ctx->frame.size());
                 ctx->report.node_ms[node.id] = ElapsedMs(started, std::chrono::steady_clock::now());
                 ctx->report.node_results[node.id] = reduced.result;
+                if (!IsEmpty(reduced.overlay)) ctx->report.overlays[node.id] = reduced.overlay;
                 if (!reduced.error.empty() && !HasEarlierError(*ctx, index)) {
                     ctx->node_errors[index] =
                         std::string("node \"") + node.id + "\": " + reduced.error;

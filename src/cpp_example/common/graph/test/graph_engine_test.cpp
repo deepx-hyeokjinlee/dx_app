@@ -12271,6 +12271,80 @@ void TestHeadPosePitchIsNegativeForAHeadTurnedDown() {
     GRAPH_CHECK(pitch[2] > 20.0);             // head up
 }
 
+// driver_attention's thumbnail showed only a small face box: headpose now draws the head's axes from the nose
+// (x red, y green, z blue - where the face points) and labels its yaw, pitch and roll beside the face box.
+void TestHeadPoseDrawsItsAxesAndItsAngles() {
+    const double turns[2] = {0.0, 25.0};
+    for (int t = 0; t < 2; ++t) {
+        std::shared_ptr<BoxesData> face = FaceTurnedDown(turns[t]);
+        std::vector<StageResult> inputs;
+        inputs.push_back(CpuInputOf(face, 1.f));
+        const CpuReduction out = ReduceCpu("headpose", StageParams(), inputs, cv::Size(640, 480));
+        GRAPH_CHECK(out.error.empty() && out.overlay.axes.size() == 1);
+        if (out.overlay.axes.size() != 1) return;
+        const OverlayAxes& axes = out.overlay.axes[0];
+        const Keypoint& nose = face->items[0].landmarks[2];
+        GRAPH_CHECK(std::fabs(axes.origin.x - nose.x) < 2.f && std::fabs(axes.origin.y - nose.y) < 2.f);
+        GRAPH_CHECK(axes.x.x > axes.origin.x + 20.f);   // x: toward the face's left eye, image right
+        GRAPH_CHECK(axes.y.y > axes.origin.y + 20.f);   // y: toward the chin
+        if (turns[t] == 0.0) {
+            // Facing the camera: the z axis points at the viewer and is foreshortened to (almost) a dot.
+            GRAPH_CHECK(cv::norm(axes.z - axes.origin) < 10.0);
+        } else {
+            GRAPH_CHECK(axes.z.y > axes.origin.y + 10.f);  // the face points down
+        }
+        GRAPH_CHECK(out.overlay.texts.size() == 1);
+        if (out.overlay.texts.size() != 1) return;
+        const OverlayText& label = out.overlay.texts[0];
+        GRAPH_CHECK(label.text.find("yaw ") == 0 && label.text.find("pitch ") != std::string::npos &&
+                    label.text.find("roll ") != std::string::npos);
+        const cv::Rect2f& box = face->items[0].box;
+        GRAPH_CHECK(label.at.x >= box.x + box.width && label.away.x > 0.f);  // beside the face box
+        GRAPH_CHECK(!out.overlay.alert);
+
+        FrameReport report;
+        report.overlays["headpose"] = out.overlay;
+        const cv::Mat canvas = RenderReport(cv::Mat::zeros(480, 640, CV_8UC3), report);
+        const cv::Point2f x_mid = (axes.origin + axes.x) * 0.5f;
+        const cv::Point2f y_mid = (axes.origin + axes.y) * 0.5f;
+        const cv::Vec3b red = canvas.at<cv::Vec3b>(cvRound(x_mid.y), cvRound(x_mid.x));
+        GRAPH_CHECK(red[2] > 150 && red[0] < 100 && red[1] < 100);
+        if (turns[t] == 0.0) {
+            const cv::Vec3b green = canvas.at<cv::Vec3b>(cvRound(y_mid.y), cvRound(y_mid.x));
+            GRAPH_CHECK(green[1] > 150 && green[0] < 100 && green[2] < 100);
+        } else {
+            // Turned down, the z axis runs down over the y axis, drawn on top of it.
+            const cv::Point2f z_mid = (axes.origin + axes.z) * 0.5f;
+            const cv::Vec3b blue = canvas.at<cv::Vec3b>(cvRound(z_mid.y), cvRound(z_mid.x));
+            GRAPH_CHECK(blue[0] > 150 && blue[2] < 100);
+        }
+    }
+    // No face, no overlay.
+    std::vector<StageResult> none;
+    none.push_back(CpuInputOf(StageDataPtr(new BoxesData(Shape::kBoxes)), 1.f));
+    GRAPH_CHECK(IsEmpty(ReduceCpu("headpose", StageParams(), none, cv::Size(640, 480)).overlay));
+}
+
+// Both executors put the cpu node's overlay in the report, under the node's id, as a logic node's is.
+void TestHeadPoseOverlayReachesTheReportInBothExecutors() {
+    FakeModelRegistry registry;
+    registry.AddModel(CpuFixtureModel("face", Shape::kBoxes), FaceTurnedDown(25.0));
+    const std::string graph =
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"face\",\"model\":\"face\"},{\"id\":\"pose\",\"type\":\"cpu\",\"op\":\"headpose\"}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"face\"},"
+        "{\"from\":\"face\",\"to\":\"pose\",\"carry\":\"result\"}]}";
+    const FrameReport sync = RunSync(graph, &registry, cv::Mat::zeros(480, 640, CV_8UC3));
+    const FrameReport async = RunAsync(graph, &registry, cv::Mat::zeros(480, 640, CV_8UC3));
+    GRAPH_CHECK(sync.error.empty() && async.error.empty());
+    GRAPH_CHECK(sync.overlays.count("pose") == 1 && sync.overlays.at("pose").axes.size() == 1);
+    GRAPH_CHECK(sync.logic_nodes.count("pose") == 0);
+    GRAPH_CHECK(sync == async);
+    FrameReport moved = async;
+    moved.overlays["pose"].axes[0].z.x += 1.f;
+    GRAPH_CHECK(!(moved == sync));
+}
+
 // Graph Composer P1: every non-source node's time in this frame, sync.
 void TestSyncExecutorTimesEveryNode() {
     FakeModelRegistry registry = BuildCascadeRegistry();
@@ -15954,6 +16028,8 @@ int main() {
     TestVolumeMapsAHandedOffSegmenterToSourcePixels();
     TestVolumeRefusesARasterThatDoesNotCoverTheFrame();
     TestHeadPosePitchIsNegativeForAHeadTurnedDown();
+    TestHeadPoseDrawsItsAxesAndItsAngles();
+    TestHeadPoseOverlayReachesTheReportInBothExecutors();
     TestSyncExecutorTimesEveryNode();
     TestAsyncExecutorTimesEveryNode();
     TestReportToJsonWritesNodeMsOnlyWhenAsked();
