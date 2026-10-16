@@ -212,7 +212,7 @@ private:
     // Draw individual keypoints for one pose
     void drawKeypoints(cv::Mat& output, const PoseResult& pose, float disp_scale, float x_off, float y_off) const {
         const KeypointLayout layout = layoutOf(pose);
-        const bool small = layout == KeypointLayout::kFace68 || layout == KeypointLayout::kPoints;
+        const bool fine_marks = layout == KeypointLayout::kFace68 || layout == KeypointLayout::kPoints;
         for (size_t i = 0; i < pose.keypoints.size(); ++i) {
             const auto& kp = pose.keypoints[i];
             // Unordered points (SuperPoint) are each a detection that already
@@ -224,7 +224,7 @@ private:
                 layout == KeypointLayout::kFace68 ? cv::Scalar(0, 255, 255)
                 : layout == KeypointLayout::kPoints ? cv::Scalar(0, 255, 0)
                 : POSE_KPT_COLORS[i % POSE_KPT_COLORS.size()];
-            cv::circle(output, pt, small ? 2 : 3, color, -1, cv::LINE_AA);
+            cv::circle(output, pt, fine_marks ? 2 : 3, color, -1, cv::LINE_AA);
         }
     }
 
