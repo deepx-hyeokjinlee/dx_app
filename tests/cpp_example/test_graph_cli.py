@@ -1882,6 +1882,25 @@ def test_driver_attention_conditions_read_the_head_pose_of_their_frame(tmp_path)
 
 
 @pytest.mark.graph_e2e
+def test_dms_headpose_gives_every_face_its_pose(tmp_path):
+    """sample_face.jpg shows five faces, and headpose wrote one pose (the largest face's). It writes one record
+    per face, each naming its face by index, and draws every head's axes and angles."""
+    graph = "dms_headpose.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    report = tmp_path / "report.json"
+    result = run("multi_model_graph_sync", "--graph", "{}/{}".format(GRAPHS, graph), "--report", str(report))
+    assert result.returncode == 0, result.stdout + result.stderr
+    frame = json.loads(report.read_text(encoding="utf-8"))["frames"][0]
+    faces = frame["nodes"]["face"]["payload"]["items"]
+    poses = [item["numbers"] for item in frame["nodes"]["headpose"]["payload"]["items"]]
+    assert len(faces) == 5, faces
+    assert [pose["face_index"] for pose in poses] == [0, 1, 2, 3, 4], poses
+    assert all(-90 < pose[name] < 90 for pose in poses for name in ("yaw", "pitch", "roll")), poses
+
+
+@pytest.mark.graph_e2e
 def test_people_count_counts_and_decides_per_stream(tmp_path):
     """count and condition keep their state per stream: each camera has its own total, and a crowded event names
     the stream it happened in."""

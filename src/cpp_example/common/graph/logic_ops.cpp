@@ -288,11 +288,11 @@ std::vector<LogicOpInfo> BuildCpuOps() {
 
     LogicOpInfo headpose;
     headpose.op = "headpose";
-    headpose.summary = "head pitch, yaw and roll (degrees) from the largest face's five "
-                       "landmarks";
+    headpose.summary = "head pitch, yaw and roll (degrees) of each face from its five "
+                       "landmarks, one record per face";
     headpose.accepts.push_back(Port(Shape::kBoxes, false));
-    const char* const angles[] = {"pitch", "yaw", "roll"};
-    headpose.numbers = Names(angles, 3);
+    const char* const angles[] = {"pitch", "yaw", "roll", "face_index", "track_id"};
+    headpose.numbers = Names(angles, 5);
     ops.push_back(headpose);
 
     LogicOpInfo volume;

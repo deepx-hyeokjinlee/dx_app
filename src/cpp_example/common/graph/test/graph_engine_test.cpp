@@ -12272,7 +12272,7 @@ void TestHeadPosePitchIsNegativeForAHeadTurnedDown() {
 }
 
 // driver_attention's thumbnail showed only a small face box: headpose now draws the head's axes from the nose
-// (x red, y green, z blue - where the face points) and labels its yaw, pitch and roll beside the face box.
+// (x red, y green, z blue - where the face points) and labels its yaw, pitch and roll under the face box.
 void TestHeadPoseDrawsItsAxesAndItsAngles() {
     const double turns[2] = {0.0, 25.0};
     for (int t = 0; t < 2; ++t) {
@@ -12299,7 +12299,7 @@ void TestHeadPoseDrawsItsAxesAndItsAngles() {
         GRAPH_CHECK(label.text.find("yaw ") == 0 && label.text.find("pitch ") != std::string::npos &&
                     label.text.find("roll ") != std::string::npos);
         const cv::Rect2f& box = face->items[0].box;
-        GRAPH_CHECK(label.at.x >= box.x + box.width && label.away.x > 0.f);  // beside the face box
+        GRAPH_CHECK(label.at.y >= box.y + box.height && label.away.y > 0.f);  // under the face box
         GRAPH_CHECK(!out.overlay.alert);
 
         FrameReport report;
@@ -12343,6 +12343,86 @@ void TestHeadPoseOverlayReachesTheReportInBothExecutors() {
     FrameReport moved = async;
     moved.overlays["pose"].axes[0].z.x += 1.f;
     GRAPH_CHECK(!(moved == sync));
+}
+
+/// FaceTurnedDown(down_deg), moved `dx` pixels right: its box and its landmarks.
+BoxItem FaceTurnedDownAt(double down_deg, float dx) {
+    BoxItem face = FaceTurnedDown(down_deg)->items[0];
+    face.box.x += dx;
+    for (std::size_t i = 0; i < face.landmarks.size(); ++i) face.landmarks[i].x += dx;
+    return face;
+}
+
+// dms_headpose on sample_face.jpg drew one head of five: headpose read the largest face only. It writes one
+// record per face with five landmarks, in the faces' order, each naming its face (face_index, and track_id when
+// the face is tracked), and draws every head's axes with its angles under that face's box.
+void TestHeadPoseWritesOneRecordPerFace() {
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    const double turns[5] = {0.0, 25.0, -25.0, 0.0, 25.0};
+    for (int i = 0; i < 5; ++i) {
+        boxes->items.push_back(FaceTurnedDownAt(turns[i], -200.f + 100.f * static_cast<float>(i)));
+    }
+    boxes->items[3].track_id = 7;
+    BoxItem bare;  // a face without landmarks has no pose: no record, and the others keep their index
+    bare.box = cv::Rect2f(10.f, 10.f, 30.f, 30.f);
+    boxes->items.insert(boxes->items.begin() + 2, bare);
+    std::vector<StageResult> inputs;
+    inputs.push_back(CpuInputOf(boxes, 1.f));
+    const CpuReduction out = ReduceCpu("headpose", StageParams(), inputs, cv::Size(640, 480));
+    const RecordsData* records = static_cast<const RecordsData*>(out.result.data.get());
+    GRAPH_CHECK(out.error.empty() && records != NULL && records->items.size() == 5);
+    GRAPH_CHECK(out.overlay.axes.size() == 5 && out.overlay.texts.size() == 5);
+    if (records == NULL || records->items.size() != 5 || out.overlay.axes.size() != 5 ||
+        out.overlay.texts.size() != 5) {
+        return;
+    }
+    const int faces[5] = {0, 1, 3, 4, 5};
+    for (int i = 0; i < 5; ++i) {
+        const BoxItem& face = boxes->items[faces[i]];
+        double index = -1.0;
+        double pitch = 0.0;
+        double track = -1.0;
+        GRAPH_CHECK(NamedNumber(records->items[i], "face_index", &index) && index == faces[i]);
+        GRAPH_CHECK(NamedNumber(records->items[i], "pitch", &pitch));
+        GRAPH_CHECK(NamedNumber(records->items[i], "track_id", &track) == (faces[i] == 4));
+        if (faces[i] == 4) GRAPH_CHECK(track == 7.0);
+        const double turn = turns[i];
+        if (turn > 0.0) GRAPH_CHECK(pitch < -15.0);
+        if (turn < 0.0) GRAPH_CHECK(pitch > 15.0);
+        const Keypoint& nose = face.landmarks[2];
+        GRAPH_CHECK(std::fabs(out.overlay.axes[i].origin.x - nose.x) < 2.f &&
+                    std::fabs(out.overlay.axes[i].origin.y - nose.y) < 2.f);
+        // Under its own face box, centred: a label beside a box runs over the next face in a row of faces.
+        const OverlayText& label = out.overlay.texts[i];
+        GRAPH_CHECK(label.text.find("yaw ") == 0);
+        GRAPH_CHECK(std::fabs(label.at.x - (face.box.x + face.box.width / 2.f)) < 0.5f &&
+                    std::fabs(label.at.y - (face.box.y + face.box.height)) < 0.5f);
+        GRAPH_CHECK(label.away.x == 0.f && label.away.y > 0.f);
+    }
+}
+
+// driver_attention reads several heads as condition reads several records: "yaw > 30" takes their max (any head
+// turned right), "yaw < -30" and "pitch < -20" their min ("reduce": "min": any head turned left, any head down).
+void TestDriverAttentionFiresWhenAnyHeadIsDown() {
+    std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
+    boxes->items.push_back(FaceTurnedDownAt(0.0, -150.f));
+    boxes->items.push_back(FaceTurnedDownAt(25.0, 150.f));
+    FakeModelRegistry registry;
+    registry.AddModel(CpuFixtureModel("face", Shape::kBoxes), boxes);
+    const std::string graph =
+        "{\"version\":1,\"nodes\":[{\"id\":\"cam\",\"type\":\"source\",\"uri\":\"a.jpg\"},"
+        "{\"id\":\"face\",\"model\":\"face\"},{\"id\":\"pose\",\"type\":\"cpu\",\"op\":\"headpose\"},"
+        "{\"id\":\"down\",\"type\":\"logic\",\"op\":\"condition\",\"params\":{\"value\":\"pitch\","
+        "\"comparator\":\"<\",\"threshold\":-20,\"reduce\":\"min\",\"event\":\"head_down\"}}],"
+        "\"edges\":[{\"from\":\"cam\",\"to\":\"face\"},"
+        "{\"from\":\"face\",\"to\":\"pose\",\"carry\":\"result\"},"
+        "{\"from\":\"pose\",\"to\":\"down\",\"carry\":\"result\"}]}";
+    const FrameReport sync = RunSync(graph, &registry, cv::Mat::zeros(480, 640, CV_8UC3));
+    const FrameReport async = RunAsync(graph, &registry, cv::Mat::zeros(480, 640, CV_8UC3));
+    GRAPH_CHECK(sync.error.empty() && sync == async);
+    const RecordsData* poses = RecordsOf(sync, "pose");
+    GRAPH_CHECK(poses != NULL && poses->items.size() == 2);
+    GRAPH_CHECK(sync.events.size() == 1 && sync.events[0].event == "head_down");
 }
 
 // Graph Composer P1: every non-source node's time in this frame, sync.
@@ -12843,7 +12923,7 @@ void TestLogicOpCatalogDescribesEveryOp() {
     GRAPH_CHECK(FindLogicOp("count")->max_inputs == 8);
     GRAPH_CHECK(CpuOpInfos().size() == 2);
     GRAPH_CHECK(FindCpuOpInfo("volume") != NULL && FindCpuOpInfo("volume")->min_inputs == 3);
-    GRAPH_CHECK(FindCpuOpInfo("headpose") != NULL && FindCpuOpInfo("headpose")->numbers.size() == 3);
+    GRAPH_CHECK(FindCpuOpInfo("headpose") != NULL && FindCpuOpInfo("headpose")->numbers.size() == 5);
     GRAPH_CHECK(std::string(ToString(LogicParamInfo::kPolygon)) == "polygon");
     GRAPH_CHECK(std::string(ToString(LogicParamInfo::kTextList)) == "text_list");
 }
@@ -13536,8 +13616,8 @@ void TestAsyncListsEventsInNodeOrder() {
 
 // A logic node's boxes reach a cpu node on a "carry": "result" edge, in both
 // executors, as a model's would: headpose behind a filter sees only the
-// filter's boxes. Unfiltered, the larger landmark-less "car" wins
-// LargestBox and headpose writes no row.
+// filter's boxes, so the face is face 0. Unfiltered, the landmark-less "car"
+// comes first and writes no row: the face is face 1.
 void TestCpuNodeBehindAFilterGetsOnlyTheFilteredBoxes() {
     std::shared_ptr<BoxesData> boxes(new BoxesData(Shape::kBoxes));
     boxes->items.push_back(MakeItem(0.f, 0.f, 300.f, 300.f, 0.9f, "car"));
@@ -13577,15 +13657,20 @@ void TestCpuNodeBehindAFilterGetsOnlyTheFilteredBoxes() {
     GRAPH_CHECK(kept != NULL && kept->items.size() == 1);
     const RecordsData* records = RecordsOf(expected, "pose");
     GRAPH_CHECK(records != NULL && records->items.size() == 1);
+    double index = -1.0;
     if (records != NULL && records->items.size() == 1) {
         double yaw = 0.0;
         GRAPH_CHECK(NamedNumber(records->items[0], "yaw", &yaw) && std::isfinite(yaw));
+        GRAPH_CHECK(NamedNumber(records->items[0], "face_index", &index) && index == 0.0);
     }
     FakeModelRegistry direct_registry;
     direct_registry.AddModel(CpuFixtureModel("face", Shape::kBoxes), boxes);
     const FrameReport unfiltered = RunSync(direct, &direct_registry, frame);
-    const RecordsData* none = RecordsOf(unfiltered, "pose");
-    GRAPH_CHECK(none != NULL && none->items.empty());
+    const RecordsData* direct_records = RecordsOf(unfiltered, "pose");
+    GRAPH_CHECK(direct_records != NULL && direct_records->items.size() == 1);
+    if (direct_records != NULL && direct_records->items.size() == 1) {
+        GRAPH_CHECK(NamedNumber(direct_records->items[0], "face_index", &index) && index == 1.0);
+    }
 }
 
 // An event's "data" is one JSON object: numbers then text. A key used twice
@@ -16030,6 +16115,8 @@ int main() {
     TestHeadPosePitchIsNegativeForAHeadTurnedDown();
     TestHeadPoseDrawsItsAxesAndItsAngles();
     TestHeadPoseOverlayReachesTheReportInBothExecutors();
+    TestHeadPoseWritesOneRecordPerFace();
+    TestDriverAttentionFiresWhenAnyHeadIsDown();
     TestSyncExecutorTimesEveryNode();
     TestAsyncExecutorTimesEveryNode();
     TestReportToJsonWritesNodeMsOnlyWhenAsked();

@@ -38,8 +38,10 @@ struct CpuReduction {
  * focal length equal to the frame width; volume counts mask areas in it. `inputs` are
  * matched by shape, not by order.
  *
- * headpose records: numbers pitch, yaw, roll (degrees). Empty when the
- * largest face has fewer than five landmarks or solvePnP fails.
+ * headpose records, one per face in the boxes' order: numbers pitch, yaw,
+ * roll (degrees), face_index (the face's index in the boxes input) and
+ * track_id when the face is tracked. A face with fewer than five landmarks,
+ * or whose solvePnP fails, has no record.
  *
  * volume records, one per package box, all in source-frame pixels: numbers
  * box_x, box_y, box_w, box_h, class_id, mask_area_px (fractional when the

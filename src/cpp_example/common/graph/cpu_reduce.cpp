@@ -156,19 +156,6 @@ bool MedianUnderMask(const cv::Mat& depth, const cv::Mat& mask, double* median) 
     return true;
 }
 
-const BoxItem* LargestBox(const std::vector<BoxItem>& items) {
-    const BoxItem* best = NULL;
-    float best_area = 0.0f;
-    for (std::size_t i = 0; i < items.size(); ++i) {
-        const float area = items[i].box.width * items[i].box.height;
-        if (area > best_area) {
-            best = &items[i];
-            best_area = area;
-        }
-    }
-    return best;
-}
-
 void AddNumber(RecordItem* item, const std::string& name, double value) {
     item->numbers.push_back(std::make_pair(name, value));
 }
@@ -185,16 +172,11 @@ CpuReduction Missing(const std::string& what) {
     return out;
 }
 
-CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Size& frame_size) {
-    const StageResult* boxes_in = FindShape(inputs, Shape::kBoxes);
-    if (boxes_in == NULL) return Missing("boxes");
-    const BoxesData* boxes = static_cast<const BoxesData*>(boxes_in->data.get());
-    const BoxItem* face = LargestBox(boxes->items);
-    CpuReduction out = EmptyRecords();
-    if (face == NULL || face->landmarks.size() < 5 || frame_size.width <= 0 ||
-        frame_size.height <= 0) {
-        return out;
-    }
+/// One head's pose from its five landmarks, appended to `out` (its record and its overlay); nothing when the
+/// face has fewer than five landmarks or solvePnP fails. `index` is the face's place in the boxes input.
+void AddHeadPose(const BoxItem& face, std::size_t index, const cv::Size& frame_size, RecordsData* records,
+                 LogicOverlay* overlay) {
+    if (face.landmarks.size() < 5) return;
     // Face landmark order: left eye, right eye, nose, left mouth, right mouth.
     const float kModel[5][3] = {
         {-30.0f, -30.0f, -30.0f},
@@ -207,7 +189,7 @@ CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Si
     std::vector<cv::Point2d> image_points;
     for (int i = 0; i < 5; ++i) {
         object_points.push_back(cv::Point3d(kModel[i][0], kModel[i][1], kModel[i][2]));
-        image_points.push_back(cv::Point2d(face->landmarks[i].x, face->landmarks[i].y));
+        image_points.push_back(cv::Point2d(face.landmarks[i].x, face.landmarks[i].y));
     }
     const double focal = static_cast<double>(frame_size.width);
     const cv::Mat camera = (cv::Mat_<double>(3, 3) <<
@@ -233,7 +215,7 @@ CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Si
             rotation, translation, true, cv::SOLVEPNP_ITERATIVE);
     }
 #endif
-    if (!solved) return out;
+    if (!solved) return;
     cv::Mat matrix;
     cv::Rodrigues(rotation, matrix);
     const double sy = std::sqrt(
@@ -256,12 +238,14 @@ CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Si
     AddNumber(&item, "pitch", pitch * kRadToDeg);
     AddNumber(&item, "yaw", yaw * kRadToDeg);
     AddNumber(&item, "roll", roll * kRadToDeg);
-    std::shared_ptr<RecordsData> records(new RecordsData());
+    // Which face the record is about: its index in the boxes input, and its track when the face is tracked.
+    AddNumber(&item, "face_index", static_cast<double>(index));
+    if (face.track_id >= 0) AddNumber(&item, "track_id", static_cast<double>(face.track_id));
     records->items.push_back(item);
-    out.result.data = records;
 
     // The overlay: the model's axes projected from the nose, 50 model units
-    // long (the eyes are 60 apart), and the angles beside the face box.
+    // long (the eyes are 60 apart), and the angles under the face box (beside
+    // it, a label runs over the next face in a row of faces).
     std::vector<cv::Point3d> axis_points;
     axis_points.push_back(cv::Point3d(0.0, 0.0, 0.0));
     axis_points.push_back(cv::Point3d(50.0, 0.0, 0.0));
@@ -279,16 +263,29 @@ CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Si
         axes.x = cv::Point2f(projected[1]);
         axes.y = cv::Point2f(projected[2]);
         axes.z = cv::Point2f(projected[3]);
-        out.overlay.axes.push_back(axes);
+        overlay->axes.push_back(axes);
     }
     char label[96];
     std::snprintf(label, sizeof(label), "yaw %.0f pitch %.0f roll %.0f",
                   yaw * kRadToDeg, pitch * kRadToDeg, roll * kRadToDeg);
     OverlayText text;
     text.text = label;
-    text.at = cv::Point2f(face->box.x + face->box.width, face->box.y + face->box.height / 2.f);
-    text.away = cv::Point2f(1.f, 0.f);
-    out.overlay.texts.push_back(text);
+    text.at = cv::Point2f(face.box.x + face.box.width / 2.f, face.box.y + face.box.height);
+    text.away = cv::Point2f(0.f, 1.f);
+    overlay->texts.push_back(text);
+}
+
+CpuReduction ReduceHeadPose(const std::vector<StageResult>& inputs, const cv::Size& frame_size) {
+    const StageResult* boxes_in = FindShape(inputs, Shape::kBoxes);
+    if (boxes_in == NULL) return Missing("boxes");
+    const BoxesData* boxes = static_cast<const BoxesData*>(boxes_in->data.get());
+    CpuReduction out = EmptyRecords();
+    if (frame_size.width <= 0 || frame_size.height <= 0) return out;
+    std::shared_ptr<RecordsData> records(new RecordsData());
+    for (std::size_t i = 0; i < boxes->items.size(); ++i) {
+        AddHeadPose(boxes->items[i], i, frame_size, records.get(), &out.overlay);
+    }
+    out.result.data = records;
     return out;
 }
 
