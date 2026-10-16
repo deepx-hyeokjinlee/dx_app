@@ -693,9 +693,10 @@ GROUPS: list[dict] = [
                   "pp-shituv2-mainbody-detection_640x640"],
         preprocessor=LETTERBOX,
         postprocessor=_proc("PicoDetPostprocessor", WHC),
-        visualizer=_proc("DetectionVisualizer", []),
+        visualizer=_proc("DetectionVisualizer", [], custom_labels=["mainbody"]),
         base="IDetectionFactory", reference=REF_PADDLECLAS,
-        config={"num_classes": 1, "conf_threshold": 0.4, "nms_threshold": 0.5},
+        config={"num_classes": 1, "conf_threshold": 0.4, "nms_threshold": 0.5,
+                "class_names": ["mainbody"]},
     ),
 
     # ============================ DarkPose (1) ==================================

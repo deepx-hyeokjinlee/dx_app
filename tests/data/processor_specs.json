@@ -8661,7 +8661,10 @@
     "dir_config": {
       "num_classes": 1,
       "conf_threshold": 0.4,
-      "nms_threshold": 0.5
+      "nms_threshold": 0.5,
+      "class_names": [
+        "mainbody"
+      ]
     },
     "extra_methods": [],
     "factory_bases": [
@@ -8707,7 +8710,10 @@
     "registry_config": {
       "num_classes": 1,
       "conf_threshold": 0.4,
-      "nms_threshold": 0.5
+      "nms_threshold": 0.5,
+      "class_names": [
+        "mainbody"
+      ]
     },
     "source_dir": "pp_shitu",
     "source_task": "mainbody_detection",
@@ -8716,7 +8722,11 @@
     "visualizer": {
       "class": "DetectionVisualizer",
       "args": [],
-      "kwargs": {},
+      "kwargs": {
+        "custom_labels": [
+          "mainbody"
+        ]
+      },
       "config_overrides": {}
     }
   },
@@ -8796,7 +8806,10 @@
     "dir_config": {
       "num_classes": 1,
       "conf_threshold": 0.4,
-      "nms_threshold": 0.5
+      "nms_threshold": 0.5,
+      "class_names": [
+        "mainbody"
+      ]
     },
     "extra_methods": [],
     "factory_bases": [
@@ -8842,7 +8855,10 @@
     "registry_config": {
       "num_classes": 1,
       "conf_threshold": 0.4,
-      "nms_threshold": 0.5
+      "nms_threshold": 0.5,
+      "class_names": [
+        "mainbody"
+      ]
     },
     "source_dir": "pp_shitu",
     "source_task": "mainbody_detection",
@@ -8851,7 +8867,11 @@
     "visualizer": {
       "class": "DetectionVisualizer",
       "args": [],
-      "kwargs": {},
+      "kwargs": {
+        "custom_labels": [
+          "mainbody"
+        ]
+      },
       "config_overrides": {}
     }
   },

@@ -14,12 +14,18 @@
   "config": {
     "num_classes": 1,
     "conf_threshold": 0.4,
-    "nms_threshold": 0.5
+    "nms_threshold": 0.5,
+    "class_names": [
+      "mainbody"
+    ]
   },
   "registry_config": {
     "num_classes": 1,
     "conf_threshold": 0.4,
-    "nms_threshold": 0.5
+    "nms_threshold": 0.5,
+    "class_names": [
+      "mainbody"
+    ]
   },
   "cli": {
     "include_kitti_paths": false,
@@ -58,7 +64,11 @@
   "visualizer": {
     "class": "DetectionVisualizer",
     "args": [],
-    "kwargs": {},
+    "kwargs": {
+      "custom_labels": [
+        "mainbody"
+      ]
+    },
     "config_overrides": {}
   }
 }

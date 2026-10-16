@@ -320,6 +320,7 @@ option(DXAPP_BUILD_COMMON_TESTS "Build the common/ unit test binary" ON)
 if(DXAPP_BUILD_COMMON_TESTS)
     add_executable(common_unit_test
         ${COMMON_DIR}/test/common_unit_test.cpp
+        ${PROJECT_ROOT}/src/utility/common_util.cpp
         ${PROJECT_ROOT}/src/postprocess/yolopv2/yolopv2_postprocess.cpp
         ${PROJECT_ROOT}/src/postprocess/superpoint/superpoint_postprocess.cpp
     )

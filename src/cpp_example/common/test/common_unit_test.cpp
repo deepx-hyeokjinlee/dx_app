@@ -67,6 +67,7 @@
 #include "common/processors/anchor_face_postprocessor.hpp"
 #include "common/processors/classification_postprocessor.hpp"
 #include "common/processors/hand_landmark_postprocessor.hpp"
+#include "common/processors/picodet_postprocessor.hpp"
 #include "common/processors/pose_postprocessor.hpp"
 #include "common/processors/serialized_postprocessor.hpp"
 #include "common/third_party/nlohmann_json.hpp"
@@ -2640,9 +2641,78 @@ void TestPoseVisualizerDrawsUnorderedPointsOnly() {
 }
 }  // namespace
 
+
+// ---------------------------------------------------------------------------
+// PicoDetPostprocessor: PP-PicoDet's per-level score and box tensors.
+// ---------------------------------------------------------------------------
+
+dxrt::TensorPtr PicoTensor(const char* name, int anchors, int cols, std::vector<float>& storage) {
+    std::vector<int64_t> shape;
+    shape.push_back(1);
+    shape.push_back(anchors);
+    shape.push_back(cols);
+    return std::make_shared<dxrt::Tensor>(name, shape, dxrt::DataType::FLOAT, storage.data());
+}
+
+/// 64x64 input, strides 8/16/32/64 (grids 8/4/2/1), one object on the stride-16 level at
+/// row 1, column 2 whose four sides all peak at bin 2 (reg_max 7): centre (40, 24), each
+/// side 2 x 16 = 32 px away, so x1y1x2y2 (8, -8, 72, 56) before clipping to the 64x64 frame.
+/// The tensors arrive boxes first and out of level order: they are paired by anchor count.
+void TestPicoDetDecodesPerLevelTensors() {
+    const int grids[4] = {8, 4, 2, 1};
+    std::vector<std::vector<float> > scores(4), boxes(4);
+    for (int l = 0; l < 4; ++l) {
+        const int anchors = grids[l] * grids[l];
+        scores[l].assign(anchors, 0.01f);
+        boxes[l].assign(static_cast<std::size_t>(anchors) * 32, 0.f);
+    }
+    const int anchor = 1 * 4 + 2;              // stride-16 level, row 1, column 2
+    scores[1][anchor] = 0.9f;                  // already sigmoid, as the export emits it
+    for (int side = 0; side < 4; ++side) boxes[1][anchor * 32 + side * 8 + 2] = 12.f;
+
+    dxrt::TensorPtrs outputs;
+    outputs.push_back(PicoTensor("box16", 16, 32, boxes[1]));
+    outputs.push_back(PicoTensor("score8", 64, 1, scores[0]));
+    outputs.push_back(PicoTensor("box64", 1, 32, boxes[3]));
+    outputs.push_back(PicoTensor("score16", 16, 1, scores[1]));
+    outputs.push_back(PicoTensor("box8", 64, 32, boxes[0]));
+    outputs.push_back(PicoTensor("score64", 1, 1, scores[3]));
+    outputs.push_back(PicoTensor("score32", 4, 1, scores[2]));
+    outputs.push_back(PicoTensor("box32", 4, 32, boxes[2]));
+
+    dxapp::PreprocessContext ctx;
+    ctx.original_width = 64;
+    ctx.original_height = 64;
+    std::vector<std::string> names(1, "mainbody");
+    dxapp::PicoDetPostprocessor post(64, 64, 0.4f, 0.5f, 1, names);
+    const std::vector<dxapp::DetectionResult> found = post.process(outputs, ctx);
+    COMMON_CHECK(found.size() == 1);
+    if (found.size() != 1) return;
+    COMMON_CHECK(std::fabs(found[0].confidence - 0.9f) < 1e-6f);
+    COMMON_CHECK(found[0].class_id == 0 && found[0].class_name == "mainbody");
+    COMMON_CHECK(std::fabs(found[0].box[0] - 8.f) < 0.05f);
+    COMMON_CHECK(found[0].box[1] == 0.f);                 // -8 clipped to the frame
+    COMMON_CHECK(std::fabs(found[0].box[2] - 63.f) < 1e-4f);  // 72 clipped to width - 1
+    COMMON_CHECK(std::fabs(found[0].box[3] - 56.f) < 0.05f);
+}
+
+/// NanoDet's single concatenated tensor is not PicoDet's packaging: no level pairs, no boxes.
+void TestPicoDetIgnoresASingleConcatenatedTensor() {
+    std::vector<float> storage(static_cast<std::size_t>(64) * 33, 0.9f);
+    dxrt::TensorPtrs outputs;
+    outputs.push_back(PicoTensor("nanodet", 64, 33, storage));
+    dxapp::PreprocessContext ctx;
+    ctx.original_width = 64;
+    ctx.original_height = 64;
+    dxapp::PicoDetPostprocessor post(64, 64);
+    COMMON_CHECK(post.process(outputs, ctx).empty());
+}
+
 int main() {
     // Must stay first: see the ORDER NOTE on this test.
     TestAnchorFaceDebugHeaderOncePerInstance();
+    TestPicoDetDecodesPerLevelTensors();
+    TestPicoDetIgnoresASingleConcatenatedTensor();
 
     TestUnserializedProbeSeesOverlap();
     TestSerializedPostprocessorAdmitsOneCallAtATime();
