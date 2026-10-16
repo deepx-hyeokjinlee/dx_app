@@ -255,9 +255,6 @@ def test_release_sources_do_not_keep_model_specific_fast_postprocess_names():
         for path in (ROOT / root_name).rglob("*"):
             if path.is_dir() or path.suffix in {".pyc", ".so", ".dll", ".pyd"}:
                 continue
-            # The generated card index carries upstream model names by design.
-            if path.name == "model_cards.json" and root_name == "config":
-                continue
             try:
                 source = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:

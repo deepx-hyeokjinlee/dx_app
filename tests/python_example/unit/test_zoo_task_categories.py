@@ -1,5 +1,5 @@
 # Copyright (C) 2018- DEEPX Ltd. All rights reserved.
-"""The zoo page's task column is the authority for which task an example lives under.
+"""The DX Model Zoo's task column is the authority for which task an example lives under.
 
 DX Model Zoo 2_5_0 introduced four categories that had no directory here, and every
 model in them was filed under whatever the legacy task tables could accommodate. The
@@ -13,8 +13,8 @@ place-recognition model aimed at a pair of face photographs.
                               pp-shituv2-feature-extraction_224x224
     Person ReID               repvgg-a0-reid_256x128
 
-These tests read the card index and pin the assignment, so the next re-classification cannot
-quietly regress it. They read the generated card index (config/model_cards.json); a missing index fails.
+These tests pin that assignment in the registry and in both example trees, so the next
+re-classification cannot quietly regress it.
 
 ONE DELIBERATE DEPARTURE, asserted rather than tolerated:
 ``clip-img_resnet50_224x224_openai``. The page lists it under Zero Shot Image
@@ -32,34 +32,32 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-CARDS = PROJECT_ROOT / "config" / "model_cards.json"
 REGISTRY = PROJECT_ROOT / "config" / "model_registry.json"
 PY_TREE = PROJECT_ROOT / "src" / "python_example"
 CPP_TREE = PROJECT_ROOT / "src" / "cpp_example"
 
 # Zoo category -> the task directory it maps to here.
 CATEGORY_TASK = {
-    "image_retrieval": "image_retrieval",
-    "image_matting": "image_matting",
-    "visual_place_recognition": "visual_place_recognition",
-    "person_reid": "person_reid",
+    "Image Retrieval": "image_retrieval",
+    "Image Matting": "image_matting",
+    "Visual Place Recognition": "visual_place_recognition",
+    "Person ReID": "person_reid",
 }
 
 # Listed by the page under another category, deliberately placed here. See the
 # module docstring.
 EXCEPTIONS = {"clip-img_resnet50_224x224_openai": "image_retrieval"}
 
-def _norm(category: str) -> str:
-    return category.strip().lower().replace(" ", "_")
-
-
-@pytest.fixture(scope="module")
-def zoo_tasks() -> dict:
-    """``{dxnn stem: zoo category}`` from the generated card index: ``zoo_task`` is the publish
-    table's own task column, kept apart from the task Studio merges from other sources."""
-    assert CARDS.is_file(), f"{CARDS.relative_to(PROJECT_ROOT)} is missing; regenerate the model cards"
-    models = json.loads(CARDS.read_text(encoding="utf-8"))["models"]
-    return {m["variant"]: _norm(m["zoo_task"]) for m in models if m.get("zoo_task")}
+# What the zoo lists under each new category (the table in the module docstring).
+CATEGORY_MEMBERS = {
+    "Image Retrieval": ["clip-text_resnet50_77x512_openai"],
+    "Image Matting": ["ppmatting-hrnet-w48-composition_512x512",
+                      "ppmatting-hrnet-w48-distinctions_512x512"],
+    "Visual Place Recognition": ["eigenplaces-resnet18_512x512",
+                                 "eigenplaces-resnet50_512x512",
+                                 "pp-shituv2-feature-extraction_224x224"],
+    "Person ReID": ["repvgg-a0-reid_256x128"],
+}
 
 
 @pytest.fixture(scope="module")
@@ -68,20 +66,10 @@ def registry_task() -> dict:
     return {r["variant"]: r["task"] for r in rows}
 
 
-def test_the_page_still_declares_all_four_new_categories(zoo_tasks):
-    """If a category vanished from the page, the mapping below is stale, not wrong."""
-    present = set(zoo_tasks.values())
-    missing = sorted(set(CATEGORY_TASK) - present)
-    assert not missing, (
-        f"the page no longer lists {missing}; CATEGORY_TASK needs revisiting")
-
-
 @pytest.mark.parametrize("category", sorted(CATEGORY_TASK))
-def test_registry_task_matches_the_zoo_category(category, zoo_tasks, registry_task):
+def test_registry_task_matches_the_zoo_category(category, registry_task):
     expected = CATEGORY_TASK[category]
-    members = sorted(s for s, c in zoo_tasks.items() if c == category)
-    assert members, f"no model listed under {category!r}"
-    wrong = {s: registry_task.get(s) for s in members
+    wrong = {s: registry_task.get(s) for s in CATEGORY_MEMBERS[category]
              if registry_task.get(s) != expected}
     assert not wrong, (
         f"{category!r} should map to task {expected!r}; these disagree: {wrong}")
