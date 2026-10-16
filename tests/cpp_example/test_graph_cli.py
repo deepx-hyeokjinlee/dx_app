@@ -1909,6 +1909,44 @@ def test_people_count_counts_and_decides_per_stream(tmp_path):
 
 
 @pytest.mark.graph_e2e
+def test_hand_cascade_landmarks_sit_where_the_landmark_model_puts_them_on_the_whole_hand(tmp_path):
+    """sample_hand.jpg is one hand filling the frame, so the landmark model run on the whole frame (what the
+    single-model example does) is the reference. The cascade's crop must hold the whole hand: the palm detector's
+    box (2x the palm) cut off the thumb tip and put the thumb tip ~230 px and the wrist ~110 px off; the edge's pad
+    0.15 makes it MediaPipe's 2.6x."""
+    graph = "hand_cascade.json"
+    absent = missing_artifacts(graph)
+    if absent:
+        pytest.skip(absent)
+    spec = json.loads((GRAPH_DIR / graph).read_text(encoding="utf-8"))
+    whole = {"version": 1, "name": "hand_whole_frame",
+             "nodes": [n for n in spec["nodes"] if n["id"] != "palm"],
+             "edges": [{"from": "cam", "to": "landmark"}]}
+    whole_graph = tmp_path / "whole.json"
+    whole_graph.write_text(json.dumps(whole), encoding="utf-8")
+
+    def landmarks(graph_path, name):
+        report = tmp_path / (name + ".json")
+        result = run("multi_model_graph_sync", "--graph", str(graph_path), "--report", str(report))
+        assert result.returncode == 0, result.stdout + result.stderr
+        frame = json.loads(report.read_text(encoding="utf-8"))["frames"][0]
+        runs = frame.get("roi_nodes", {}).get("landmark") or [frame["nodes"]["landmark"]]
+        assert len(runs) == 1, "one hand on the sample"
+        a, b, tx, c, d, ty = runs[0]["origin"]["inv_align"]   # crop-local -> source pixels
+        items = runs[0]["payload"]["items"]
+        assert len(items) == 1 and len(items[0]["keypoints"]) == 21
+        return [(a * k["x"] + b * k["y"] + tx, c * k["x"] + d * k["y"] + ty) for k in items[0]["keypoints"]]
+
+    reference = landmarks(whole_graph, "whole")
+    cascade = landmarks(GRAPH_DIR / graph, "cascade")
+    # 2 % of the 3009 px frame; the hand spans about 2500 px.
+    names = {0: "wrist", 4: "thumb tip", 8: "index tip", 12: "middle tip", 16: "ring tip", 20: "pinky tip"}
+    for i, name in names.items():
+        dx, dy = cascade[i][0] - reference[i][0], cascade[i][1] - reference[i][1]
+        assert (dx * dx + dy * dy) ** 0.5 < 60, "{} is {:.0f} px off".format(name, (dx * dx + dy * dy) ** 0.5)
+
+
+@pytest.mark.graph_e2e
 def test_logistics_volume_measures_the_package_on_its_sample(tmp_path):
     """The segmenter's 500x333 masks and the depth model's 768x768 map both cover the frame: volume gives a median
     depth and a volume_proxy (it gave none before Phase 4)."""

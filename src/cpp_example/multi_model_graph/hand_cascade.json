@@ -8,6 +8,6 @@
   ],
   "edges": [
     { "from": "cam",  "to": "palm" },
-    { "from": "palm", "to": "landmark", "roi": { "pad": 0 } }
+    { "from": "palm", "to": "landmark", "roi": { "pad": 0.15 } }
   ]
 }

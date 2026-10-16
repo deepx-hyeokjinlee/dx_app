@@ -112,7 +112,17 @@ Shipped samples, next to the CLI sources in `src/cpp_example/multi_model_graph/`
 
 `hand_cascade.json`, `dms_headpose.json` and `logistics_volume.json` are
 shipped scenarios. The hand cascade is a crop chain. Head pose and volume
-are cpu nodes. CLIP prompt scores are not a graph node (see *Not in this
+are cpu nodes.
+
+The hand cascade's ROI edge has `"pad": 0.15`. The palm detector's box is
+the palm grown 2× toward the fingers, which can cut off the thumb tip;
+MediaPipe crops 2.6× the palm for its landmark model, and `pad` 0.15 per
+side makes the 2× box 2.6×. Without it, the thumb tip on `sample_hand.jpg`
+lands about 230 px from where the landmark model puts it on the whole
+frame; with it, every point is within 15 px. The crop is not rotated:
+MediaPipe also turns the crop so that the hand points up, and the graph has
+no ROI option for that, so a hand held far from upright gets less accurate
+landmarks. CLIP prompt scores are not a graph node (see *Not in this
 release*).
 
 The last nine are decision graphs (see *Logic nodes*). On their sample
