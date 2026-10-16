@@ -680,7 +680,7 @@ cd ~/my_graph && ./setup.sh && ./run.sh      # results/result.jpg, results/event
 | `--name <name>` | the project and program name (default: from the graph's `name`) |
 | `--no-models` | leave the `.dxnn` files out; `setup.sh` downloads them (`models/models.tsv`) or copies them (`--models-from <dir>`) |
 | `--model-dir <dir>` | where the `.dxnn` files are (default `assets/models`) |
-| `--dry-run` | write nothing; with `--json`, print what would be exported and its size |
+| `--dry-run` | write nothing; with `--json`, print what would be exported and its size. A model file that is not installed has `"bytes": null` (the Model Zoo manifest gives addresses, not sizes); `model_bytes_unknown` counts them |
 | `--json` | one JSON summary on stdout (`ok`, `models`, `user_logic`, `inputs`, `bytes`; on failure `error`, `error_key`) |
 
 The project holds `graph.json` (its inputs and galleries copied into
@@ -688,6 +688,12 @@ The project holds `graph.json` (its inputs and galleries copied into
 used factories under `src/` at their dx_app paths, `models/`, `setup.sh`,
 `run.sh` and a README. The program is this CLI: `./run.sh --help`,
 `./run.sh --check`, `./run.sh --sync`, `--input`, `--display`, `--loop`.
+
+A source's input is copied into the project unless it is live
+(`camera:<N>` or `rtsp://...`, run with `--display`) or a video at an
+`http://` or `https://` address, which the program opens as a video file
+(OpenCV), by its extension. An `rtsps://` source, and an http(s) address
+that is not a video file, cannot be opened by this CLI and are refused.
 
 **`user` nodes.** In a run of this CLI a `user` node passes its input
 through. In an export it becomes a class `user_logic/<name>.{hpp,cpp}` with

@@ -24,6 +24,8 @@ C++17 compiler and OpenCV 4, and nothing of this repository:
 Exit codes: 0 exported (or planned, --dry-run); 1 the graph cannot be exported: the reason on
 stderr as "ERROR [<key>] <text>", and with --json {"ok": false, "error", "error_key"} on stdout;
 2 a usage error.
+A dry run's model row has "bytes": null for a file that is not installed (the manifest has no sizes);
+"model_bytes" sums the known ones and "model_bytes_unknown" counts the others.
 Contract: tests/scripts/test_export_graph_project.py, tests/cpp_example/test_graph_export.py
 """
 from __future__ import annotations
@@ -57,7 +59,11 @@ POSTPROCESS_LIBS = ("sfa3d", "superpoint", "dope", "yolopv2", "vitpose")
 CLI_SOURCES = ("src/cpp_example/common/registry/static_model_registry.cpp",
                "src/cpp_example/multi_model_graph/graph_cli.cpp",
                "src/cpp_example/multi_model_graph/graph_consumer.cpp")
-LIVE_PREFIXES = ("camera:", "rtsp://", "rtsps://", "http://", "https://")
+# What dx_app's graph CLI opens as a live stream (graph_consumer.cpp's OpenInput): a camera and rtsp://. It opens
+# any other uri as a file, by its extension (InputFactory::createFromFile): an http(s) address ending in a video
+# extension plays as a video file, any other one does not open, and rtsps:// never does.
+LIVE_PREFIXES = ("camera:", "rtsp://")
+REMOTE_PREFIXES = ("http://", "https://")
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
 VIDEO_EXT = (".mp4", ".mov", ".avi", ".mkv", ".webm")
 # Files never searched for this repository's path: binary data, whatever it embeds.
@@ -238,14 +244,15 @@ def manifest_urls() -> dict:
 
 
 def model_files(used: list, model_dir: Path) -> list:
-    """[{"model", "file", "bytes", "present", "url"}]: one .dxnn per used model."""
+    """[{"model", "file", "bytes", "present", "url"}]: one .dxnn per used model. "bytes" is None for a file that is
+    not on disk: the manifest gives its address, not its size."""
     urls = manifest_urls()
     out = []
     for row in used:
         path = Path(model_dir) / row["dxnn_file"]
         size = path.stat().st_size if path.is_file() else 0
-        out.append({"model": row["variant"], "file": row["dxnn_file"], "bytes": size, "present": size > 0,
-                    "url": urls.get(row["dxnn_file"], "")})
+        out.append({"model": row["variant"], "file": row["dxnn_file"], "bytes": size if size > 0 else None,
+                    "present": size > 0, "url": urls.get(row["dxnn_file"], "")})
     return out
 
 
@@ -346,7 +353,16 @@ def localize_files(graph: dict, out, write: bool):
                 warnings.append("source {!r} has no input: run it with --input {}=<file>".format(
                     node.get("id"), node.get("id")))
                 inputs.append({"source": node.get("id"), "uri": "", "copied": False})
+            elif str(uri).lower().startswith("rtsps://"):
+                raise ExportError("input_unsupported", "node {!r}: rtsps:// is not supported: dx_app opens "
+                                  "rtsp:// streams".format(node.get("id")))
             elif str(uri).startswith(LIVE_PREFIXES):
+                inputs.append({"source": node.get("id"), "uri": uri, "copied": False})
+            elif str(uri).lower().startswith(REMOTE_PREFIXES):
+                if not str(uri).lower().endswith(VIDEO_EXT):
+                    raise ExportError("input_unsupported", "node {!r}: dx_app opens an http(s) address only as a "
+                                      "video file ({}); {} is not one".format(node.get("id"), ", ".join(VIDEO_EXT),
+                                                                             uri))
                 inputs.append({"source": node.get("id"), "uri": uri, "copied": False})
             else:
                 node["uri"] = place(local_file(uri, "input", node.get("id")), "inputs")
@@ -862,8 +878,9 @@ def export(graph_path, out=None, name=None, include_models=True, model_dir=None,
             inputs, copies, warnings = localize_files(graph, target, write=not dry_run)
             source_bytes = sum(p.stat().st_size for p in data_files) + \
                 sum(Path(g).stat().st_size for g in generated)
-            model_bytes = sum(m["bytes"] for m in models)
+            model_bytes = sum(m["bytes"] or 0 for m in models)
             summary.update(inputs=inputs, warnings=warnings, source_bytes=source_bytes, model_bytes=model_bytes,
+                           model_bytes_unknown=sum(1 for m in models if m["bytes"] is None),
                            input_bytes=sum(c["bytes"] for c in copies),
                            bytes=source_bytes + sum(c["bytes"] for c in copies) +
                            (model_bytes if include_models else 0))
@@ -950,9 +967,12 @@ def main(argv=None) -> int:
     if args.json:
         print(json.dumps(summary))
     elif args.dry_run:
-        print("plan: {} ({} bytes with the models, {} without)".format(
-            summary["name"], summary["source_bytes"] + summary["input_bytes"] + summary["model_bytes"],
-            summary["source_bytes"] + summary["input_bytes"]))
+        unknown = summary.get("model_bytes_unknown", 0)
+        print("plan: {} ({}{} bytes with the models{}, {} without)".format(
+            summary["name"], "at least " if unknown else "",
+            summary["source_bytes"] + summary["input_bytes"] + summary["model_bytes"],
+            " ({} model file{} of unknown size: not installed)".format(unknown, "" if unknown == 1 else "s")
+            if unknown else "", summary["source_bytes"] + summary["input_bytes"]))
     else:
         print("exported {} to {} ({} files, {} bytes)".format(summary["name"], summary["out"], summary["files"],
                                                              summary["bytes"]))

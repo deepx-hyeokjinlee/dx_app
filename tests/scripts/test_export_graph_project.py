@@ -195,6 +195,61 @@ def test_dry_run_writes_nothing_and_sizes_the_export(tmp_path):
     assert sorted(p.name for p in tmp_path.iterdir()) == ["models"]
 
 
+def test_dry_run_marks_a_model_file_that_is_not_installed_as_of_unknown_size(tmp_path):
+    """The model zoo manifest gives each file's address, not its size: a file not on disk is of unknown size
+    (null), never 0 bytes, and the plan counts such files apart from the bytes it knows."""
+    r = run("--graph", USER_ZONE, "--dry-run", "--model-dir", tmp_path / "none", "--json")
+    assert r.returncode == 0, r.stderr
+    plan = json.loads(r.stdout)
+    assert plan["models"][0]["present"] is False and plan["models"][0]["bytes"] is None
+    assert plan["models"][0]["url"].startswith("https://")
+    assert plan["model_bytes"] == 0 and plan["model_bytes_unknown"] == 1
+    assert plan["bytes"] == plan["source_bytes"] + plan["input_bytes"]
+    models = fake_models(tmp_path, "yolov8-n_640x640.dxnn")
+    known = json.loads(run("--graph", USER_ZONE, "--dry-run", "--model-dir", models, "--json").stdout)
+    assert known["model_bytes_unknown"] == 0 and known["models"][0]["bytes"] > 0
+
+
+@pytest.mark.parametrize("uri", ["rtsps://cam.example/live", "RTSPS://cam.example/live"])
+def test_an_rtsps_source_is_refused_as_studio_refuses_it(tmp_path, uri):
+    """dx_app opens rtsp:// streams only (graph_consumer.cpp's OpenInput); an rtsps:// address is not one."""
+    g = user_zone()
+    g["nodes"][0]["uri"] = uri
+    r = run("--graph", write_graph(tmp_path, g), "--out", tmp_path / "p", "--no-models", "--json")
+    assert r.returncode == 1
+    out = json.loads(r.stdout)
+    assert out["error_key"] == "input_unsupported" and "rtsp://" in out["error"]
+    assert not (tmp_path / "p").exists()
+
+
+def test_an_http_source_is_a_remote_video_file_not_a_live_stream(tmp_path):
+    """dx_app opens an http(s) address as a file, by its extension (InputFactory::createFromFile): a video
+    address plays as a video (run.sh writes result.mp4); any other address is refused, since it cannot open."""
+    g = user_zone()
+    g["nodes"][0]["uri"] = "https://example.com/clips/hall.mp4"
+    out = tmp_path / "p"
+    r = run("--graph", write_graph(tmp_path, g), "--out", out, "--no-models", "--json")
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout)["inputs"] == [{"source": g["nodes"][0]["id"],
+                                               "uri": "https://example.com/clips/hall.mp4", "copied": False}]
+    run_sh = (out / "run.sh").read_text()
+    assert "result.mp4" in run_sh and "--display" not in run_sh
+    for uri in ("https://example.com/stream", "http://example.com/a.jpg"):
+        g["nodes"][0]["uri"] = uri
+        r = run("--graph", write_graph(tmp_path, g), "--out", tmp_path / "q", "--no-models", "--json")
+        assert r.returncode == 1 and json.loads(r.stdout)["error_key"] == "input_unsupported", uri
+
+
+def test_a_camera_or_rtsp_source_is_live(tmp_path):
+    g = user_zone()
+    for uri in ("camera:0", "rtsp://cam.example/live"):
+        g["nodes"][0]["uri"] = uri
+        out = tmp_path / uri.split(":")[0]
+        r = run("--graph", write_graph(tmp_path, g), "--out", out, "--no-models", "--json")
+        assert r.returncode == 0, r.stderr
+        assert "--display" in (out / "run.sh").read_text(), uri
+
+
 def test_a_gallery_param_is_copied_into_data(tmp_path):
     out = tmp_path / "p"
     r = run("--graph", SAMPLES / "gallery_known_person.json", "--out", out, "--no-models", "--json")
