@@ -333,10 +333,12 @@ before. From `yolopv2_384x640` on a 768×576 image:
 **In the render**, each port is drawn in the pass of its shape, right after
 its result's primary payload, with the same `origin`. The `yolopv2_384x640` masks
 blend only their non-zero pixels at alpha 0.5, `drivable` in green and
-`lane` in red, the colours of the YOLOPv2 runner. A 3DDFA `pose` prints
-`vec[3]` at the face crop and `handedness` prints `Left: 97%` at the hand
-crop. SuperPoint's descriptors are not spatial and are never drawn, so its
-render is unchanged.
+`lane` in red, the colours of the YOLOPv2 runner. A `vector` port is not
+drawn: a 3DDFA `pose` rides on the face's 68 landmarks, and a `vec[3]` label
+would only cover the face box's own label (a node whose primary output is a
+vector, an embedding, still prints `vec[N]`). `handedness` prints `Left: 97%`
+at the hand crop. SuperPoint's descriptors are not spatial and are never
+drawn, so its render is unchanged.
 
 **Memory.** A port lives in its frame's report, so every frame in flight
 (up to `--max-inflight`, default 16) holds its ports until its report is

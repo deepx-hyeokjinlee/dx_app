@@ -14933,6 +14933,48 @@ GraphSpec KnownPersonSpec(const std::string& gallery_reads) {
 
 }  // namespace
 
+// scrfd -> 3ddfa-v2 wrote "vec[3]" over each face's "face: 87%": 3DDFA's "pose" port (yaw, pitch, roll) went
+// through pass 4 like an embedding. A port rides on a result that is drawn already (the 68 landmarks), and
+// "vec[N]" says only its length, so a vector port draws nothing and takes no label area. A node whose own
+// result is a vector (a ReID embedding) still says "vec[N]".
+void TestAVectorPortDrawsNoVecLabel() {
+    const cv::Mat black = cv::Mat::zeros(400, 400, CV_8UC3);
+    std::shared_ptr<KeypointsData> marks(new KeypointsData());
+    PoseResult face;
+    for (int i = 0; i < 68; ++i) {
+        face.keypoints.push_back(Keypoint(20.f + static_cast<float>(i % 10) * 8.f,
+                                          30.f + static_cast<float>(i / 10) * 12.f, 1.f));
+    }
+    marks->items.push_back(face);
+    StageResult lmk;
+    lmk.data = marks;
+    lmk.origin.from_roi = true;
+    lmk.origin.src_box = cv::Rect2f(100.f, 100.f, 120.f, 150.f);
+    lmk.origin.inv_align = cv::Matx23f(1.f, 0.f, 100.f, 0.f, 1.f, 100.f);
+    FrameReport plain;
+    plain.roi_results["lmk"].push_back(lmk);
+    FrameReport ported = plain;
+    std::shared_ptr<VectorData> pose(new VectorData());
+    pose->values.push_back(10.f);
+    pose->values.push_back(-5.f);
+    pose->values.push_back(2.f);
+    ported.roi_results["lmk"][0].ports["pose"] = pose;
+    std::vector<cv::Rect> plain_labels;
+    std::vector<cv::Rect> ported_labels;
+    const cv::Mat a = RenderReport(black, plain, RenderOptions(), &plain_labels);
+    const cv::Mat b = RenderReport(black, ported, RenderOptions(), &ported_labels);
+    cv::Mat diff;
+    cv::absdiff(a, b, diff);
+    GRAPH_CHECK(cv::countNonZero(diff.reshape(1)) == 0);
+    GRAPH_CHECK(plain_labels == ported_labels);
+
+    FrameReport reid;
+    reid.roi_results["reid"].push_back(ReidCrop(cv::Rect2f(40.f, 60.f, 120.f, 300.f)));
+    reid.roi_results["reid"][0].ports.clear();
+    const cv::Mat drawn = RenderReport(black, reid);
+    GRAPH_CHECK(cv::countNonZero(drawn(cv::Rect(40, 60, 80, 24)).reshape(1)) > 0);  // "vec[512]"
+}
+
 // gallery_known_person: the gallery node names each person under its box,
 // so the ReID node it reads draws no "vec[512]" and no top-5 list over the
 // person; a node no gallery reads keeps its text.
@@ -16175,6 +16217,7 @@ int main() {
     TestARestartedStreamStartsItsTracksAndLogicAgain();
     TestSecondsAreWrittenRoundedLikeTime();
     TestAGalleryNodeQuietsTheTextOfTheNodeItReads();
+    TestAVectorPortDrawsNoVecLabel();
     TestEventLogKeepsOffTheLabelsRenderReportDrew();
     TestDrawFilterDrawsOnlyTheNamedNodes();
     TestLayerFromBackdropsRecoversColourAndAlpha();

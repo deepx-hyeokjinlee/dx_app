@@ -833,6 +833,15 @@ void DrawLogicLabels(cv::Mat* canvas, const std::map<std::string, LogicOverlay>&
 
 typedef void (*DrawFn)(cv::Mat*, const StageResult&);
 
+/// Whether a port is drawn. A vector port is not: it rides on a primary
+/// result that is drawn already (3DDFA's yaw, pitch and roll on its 68
+/// landmarks), and DrawVector's "vec[N]" would say only its length, over
+/// the face's own label. A node whose own result is a vector (an embedding)
+/// still says "vec[N]".
+bool DrawsPort(const StageDataPtr& port) {
+    return port && port->shape() != Shape::kVector;
+}
+
 /// Draw `result`'s primary payload when it has `shape`, then each of its
 /// ports of that shape (in port-name order) as if it were a result of its
 /// own with the same `origin`: a port lands exactly where its primary does.
@@ -841,7 +850,7 @@ void DrawResultAndPorts(const StageResult& result, cv::Mat* canvas, Shape shape,
         fn(canvas, result);
     }
     for (StagePorts::const_iterator it = result.ports.begin(); it != result.ports.end(); ++it) {
-        if (it->second && it->second->shape() == shape) {
+        if (DrawsPort(it->second) && it->second->shape() == shape) {
             StageResult port;
             port.data = it->second;
             port.origin = result.origin;
@@ -854,7 +863,7 @@ void DrawResultAndPorts(const StageResult& result, cv::Mat* canvas, Shape shape,
 bool HasShape(const StageResult& result, Shape shape) {
     if (result.data && result.data->shape() == shape) return true;
     for (StagePorts::const_iterator it = result.ports.begin(); it != result.ports.end(); ++it) {
-        if (it->second && it->second->shape() == shape) return true;
+        if (DrawsPort(it->second) && it->second->shape() == shape) return true;
     }
     return false;
 }
@@ -922,8 +931,8 @@ bool StepKeeps(const Step& step, const Painting& painting, const std::string& no
            !(step.text && painting.options->quiet_text.count(node) != 0);
 }
 
-/// Every result ForEachDrawn visits, ports as results of their own, in its
-/// order, each with the id of the node that produced it.
+/// Every result ForEachDrawn visits, its drawn ports (DrawsPort) as results
+/// of their own, in its order, each with the id of the node that produced it.
 template <typename Visit>
 void VisitResults(const FrameReport& report, Visit visit) {
     std::vector<std::pair<const std::string*, const StageResult*> > results;
@@ -946,6 +955,7 @@ void VisitResults(const FrameReport& report, Visit visit) {
         visit(*results[i].first, result);
         for (StagePorts::const_iterator port = result.ports.begin(); port != result.ports.end();
              ++port) {
+            if (!DrawsPort(port->second)) continue;
             StageResult as_result;
             as_result.data = port->second;
             as_result.origin = result.origin;
