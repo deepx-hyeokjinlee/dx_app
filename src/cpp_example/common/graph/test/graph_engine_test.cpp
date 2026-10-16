@@ -383,6 +383,73 @@ void TestHandLandmarksAreDrawnWithTheHandSkeleton() {
     GRAPH_CHECK(PeakAround(canvas, cv::Point(94, 118)) == 0);
 }
 
+/// SuperPoint's keypoints come with descriptors: in a graph they are drawn
+/// as points only - all of them, however low their score - even when there
+/// happen to be 21 (the hand's count) or 17 (COCO's).
+void TestSuperPointKeypointsAreDrawnAsPointsOnly() {
+    const std::size_t counts[] = {17, 21};
+    for (std::size_t c = 0; c < 2; ++c) {
+        PoseResult pose;
+        pose.confidence = 1.f;
+        std::shared_ptr<std::vector<std::vector<float> > > descriptors(
+            new std::vector<std::vector<float> >());
+        for (std::size_t i = 0; i < counts[c]; ++i) {
+            // A 5 x 5 grid, 40 px apart: no two points touch.
+            pose.keypoints.push_back(Keypoint(20.f + 40.f * static_cast<float>(i % 5),
+                                              20.f + 40.f * static_cast<float>(i / 5), 0.05f));
+            descriptors->push_back(std::vector<float>(4, 0.5f));
+        }
+        pose.descriptors = descriptors;
+        StageDataPtr data = ToStageData(std::vector<PoseResult>(1, pose));
+        const KeypointsData* kps = dynamic_cast<const KeypointsData*>(data.get());
+        GRAPH_CHECK(kps != NULL && kps->unordered);
+
+        FrameReport report;
+        StageResult points;
+        points.data = data;
+        report.node_results["superpoint"] = points;
+        const cv::Mat canvas = RenderReport(cv::Mat::zeros(224, 224, CV_8UC3), report);
+        int drawn = 0;
+        for (std::size_t i = 0; i < pose.keypoints.size(); ++i) {
+            const cv::Point at(cvRound(pose.keypoints[i].x), cvRound(pose.keypoints[i].y));
+            if (PeakAround(canvas, at) > 100) ++drawn;
+        }
+        GRAPH_CHECK(drawn == static_cast<int>(counts[c]));
+        GRAPH_CHECK(PeakAround(canvas, cv::Point(40, 20)) == 0);  // 0 -> 1: COCO and hand bone
+        GRAPH_CHECK(PeakAround(canvas, cv::Point(20, 40)) == 0);  // 0 -> 5: hand bone
+    }
+    // A pose model's keypoints (no descriptors) stay ordered.
+    PoseResult body;
+    body.keypoints.push_back(Keypoint(1.f, 1.f, 0.9f));
+    StageDataPtr body_data = ToStageData(std::vector<PoseResult>(1, body));
+    const KeypointsData* body_kps = dynamic_cast<const KeypointsData*>(body_data.get());
+    GRAPH_CHECK(body_kps != NULL && !body_kps->unordered);
+}
+
+/// A face alignment node's 68 landmarks are drawn with the face's outline
+/// (jaw, brows, nose, eyes, lips), not with COCO body limbs.
+void TestFaceAlignmentLandmarksAreDrawnWithTheFaceOutline() {
+    std::vector<FaceAlignmentResult> results(1);
+    for (int i = 0; i < 68; ++i) {
+        // 68 points, 20 px apart on a circle of radius 220 around (240, 240).
+        const double angle = 2.0 * 3.14159265358979 * i / 68.0;
+        results[0].landmarks_2d.push_back(Keypoint(static_cast<float>(240.0 + 220.0 * std::cos(angle)),
+                                                   static_cast<float>(240.0 + 220.0 * std::sin(angle))));
+    }
+    const std::vector<Keypoint>& lm = results[0].landmarks_2d;
+    FrameReport report;
+    StageResult face;
+    face.data = ToStageData(results);
+    report.node_results["align"] = face;
+    const cv::Mat canvas = RenderReport(cv::Mat::zeros(480, 480, CV_8UC3), report);
+    const cv::Point lips((cvRound(lm[59].x) + cvRound(lm[48].x)) / 2,
+                         (cvRound(lm[59].y) + cvRound(lm[48].y)) / 2);
+    const cv::Point limb((cvRound(lm[5].x) + cvRound(lm[11].x)) / 2,
+                         (cvRound(lm[5].y) + cvRound(lm[11].y)) / 2);
+    GRAPH_CHECK(PeakAround(canvas, lips) > 100);  // outer lip closes 59 -> 48
+    GRAPH_CHECK(PeakAround(canvas, limb) == 0);   // COCO's 5 -> 11 is not drawn
+}
+
 void TestFaceAlignmentConversion() {
     std::vector<FaceAlignmentResult> results;
     FaceAlignmentResult align;
@@ -15549,6 +15616,8 @@ int main() {
     TestHandLandmarkConversion();
     TestPalmDetectorBoxesAreNamedHand();
     TestHandLandmarksAreDrawnWithTheHandSkeleton();
+    TestSuperPointKeypointsAreDrawnAsPointsOnly();
+    TestFaceAlignmentLandmarksAreDrawnWithTheFaceOutline();
     TestFaceAlignmentConversion();
     TestSegmentationConversionCatchesTransposition();
     TestSegmentationConversionDefensiveSizeCheck();

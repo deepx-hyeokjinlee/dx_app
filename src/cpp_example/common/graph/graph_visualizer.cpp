@@ -562,6 +562,7 @@ void DrawKeypoints(cv::Mat* canvas, const StageResult& result) {
     ctx.original_width = canvas->cols;
     ctx.original_height = canvas->rows;
     PoseVisualizer visualizer;
+    visualizer.setUnorderedKeypoints(kps->unordered);
     *canvas = visualizer.draw(*canvas, restored, ctx);
 }
 

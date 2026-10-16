@@ -127,8 +127,12 @@ inline StageDataPtr ToStageData(const std::vector<PoseResult>& results) {
     std::shared_ptr<KeypointsData> data(new KeypointsData());
     data->items = results;
     // SuperPoint's descriptors travel in the "descriptors" port; the
-    // keypoints payload does not hold on to them.
-    for (std::size_t i = 0; i < data->items.size(); ++i) data->items[i].descriptors.reset();
+    // keypoints payload does not hold on to them. Keypoints that come with
+    // descriptors are SuperPoint's: unordered, whatever their count.
+    for (std::size_t i = 0; i < data->items.size(); ++i) {
+        if (data->items[i].descriptors) data->unordered = true;
+        data->items[i].descriptors.reset();
+    }
     return data;
 }
 

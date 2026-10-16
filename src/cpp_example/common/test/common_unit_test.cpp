@@ -79,6 +79,7 @@
 #include "common/utility/run_dir.hpp"
 #include "common/utility/sr_tiling.hpp"
 #include "common/utility/verify_serialize.hpp"
+#include "common/visualizers/pose_visualizer.hpp"
 #include "common/visualizers/retrieval_visualizer.hpp"
 // header-only so this binary tests the CLI's own handler (see its file comment)
 #include "multi_model_graph/graph_cli_interrupt.hpp"
@@ -2527,6 +2528,116 @@ void TestHandLandmarkDumpDoesNotReportConfidenceAsDepth() {
     COMMON_CHECK(!point.contains("z"));
 }
 
+
+// =====================================================================
+// PoseVisualizer joins keypoints by what they are, read from their count:
+// COCO body (17), MediaPipe hand (21), 68-point face, CenterPose box (8).
+// Any other count, and unordered points (SuperPoint), is drawn as points
+// only - never with the COCO body limbs between unrelated indices.
+// =====================================================================
+
+/// `count` points evenly on a circle of radius 220 around (240, 240): 68 of
+/// them are 20 px apart, so a probe between two never touches either dot.
+dxapp::PoseResult PoseOnCircle(std::size_t count, float confidence) {
+    dxapp::PoseResult pose;
+    for (std::size_t i = 0; i < count; ++i) {
+        const double angle = 2.0 * 3.14159265358979 * static_cast<double>(i) / static_cast<double>(count);
+        pose.keypoints.push_back(dxapp::Keypoint(static_cast<float>(240.0 + 220.0 * std::cos(angle)),
+                                                 static_cast<float>(240.0 + 220.0 * std::sin(angle)),
+                                                 confidence));
+    }
+    return pose;
+}
+
+cv::Mat DrawPose(const dxapp::PoseResult& pose, bool unordered) {
+    dxapp::PoseVisualizer visualizer;
+    visualizer.setUnorderedKeypoints(unordered);
+    dxapp::PreprocessContext ctx;
+    ctx.original_width = 480;
+    ctx.original_height = 480;
+    return visualizer.draw(cv::Mat::zeros(480, 480, CV_8UC3),
+                           std::vector<dxapp::PoseResult>(1, pose), ctx);
+}
+
+/// Brightest channel in the 5x5 window around the midpoint of keypoints a
+/// and b: lines are anti-aliased, so one exact pixel is too strict a probe.
+int PeakBetween(const cv::Mat& canvas, const dxapp::PoseResult& pose, int a, int b) {
+    const cv::Point mid(cvRound((pose.keypoints[a].x + pose.keypoints[b].x) / 2.f),
+                        cvRound((pose.keypoints[a].y + pose.keypoints[b].y) / 2.f));
+    const cv::Rect window = cv::Rect(mid.x - 2, mid.y - 2, 5, 5) & cv::Rect(0, 0, canvas.cols, canvas.rows);
+    double peak = 0.0;
+    cv::minMaxLoc(canvas(window).reshape(1), NULL, &peak);
+    return static_cast<int>(peak);
+}
+
+int PointsDrawn(const cv::Mat& canvas, const dxapp::PoseResult& pose) {
+    int drawn = 0;
+    for (std::size_t i = 0; i < pose.keypoints.size(); ++i) {
+        const int k = static_cast<int>(i);
+        if (PeakBetween(canvas, pose, k, k) > 100) ++drawn;
+    }
+    return drawn;
+}
+
+void TestPoseVisualizerJoinsCocoBodyLimbs() {
+    const dxapp::PoseResult pose = PoseOnCircle(17, 0.9f);
+    const cv::Mat canvas = DrawPose(pose, false);
+    COMMON_CHECK(PeakBetween(canvas, pose, 5, 11) > 100);  // left shoulder -> left hip
+    COMMON_CHECK(PeakBetween(canvas, pose, 0, 1) > 100);   // nose -> left eye
+    COMMON_CHECK(PeakBetween(canvas, pose, 9, 10) == 0);   // wrists are not joined
+    COMMON_CHECK(PointsDrawn(canvas, pose) == 17);
+}
+
+void TestPoseVisualizerDrawsTheFaceOutlineFor68Points() {
+    const dxapp::PoseResult pose = PoseOnCircle(68, 1.f);
+    const cv::Mat canvas = DrawPose(pose, false);
+    COMMON_CHECK(PeakBetween(canvas, pose, 0, 1) > 100);    // jaw
+    COMMON_CHECK(PeakBetween(canvas, pose, 41, 36) > 100);  // left eye closes
+    COMMON_CHECK(PeakBetween(canvas, pose, 59, 48) > 100);  // outer lip closes
+    COMMON_CHECK(PeakBetween(canvas, pose, 67, 60) > 100);  // inner lip closes
+    COMMON_CHECK(PeakBetween(canvas, pose, 16, 17) == 0);   // jaw end -> brow: no line
+    COMMON_CHECK(PeakBetween(canvas, pose, 21, 22) == 0);   // brow -> brow: no line
+    COMMON_CHECK(PeakBetween(canvas, pose, 5, 11) == 0);    // no COCO limb
+    COMMON_CHECK(PeakBetween(canvas, pose, 6, 12) == 0);    // no COCO limb
+    COMMON_CHECK(PointsDrawn(canvas, pose) == 68);
+}
+
+void TestPoseVisualizerDrawsTheCenterPoseBox() {
+    const dxapp::PoseResult pose = PoseOnCircle(8, 0.9f);
+    const cv::Mat canvas = DrawPose(pose, false);
+    COMMON_CHECK(PeakBetween(canvas, pose, 3, 0) > 100);  // front face closes
+    COMMON_CHECK(PeakBetween(canvas, pose, 0, 4) > 100);  // front -> back
+}
+
+void TestPoseVisualizerDrawsOtherCountsAsPointsOnly() {
+    const std::size_t counts[] = {5, 30, 133};
+    for (std::size_t c = 0; c < sizeof(counts) / sizeof(counts[0]); ++c) {
+        const dxapp::PoseResult pose = PoseOnCircle(counts[c], 0.9f);
+        const cv::Mat canvas = DrawPose(pose, false);
+        int lines = 0;
+        for (std::size_t i = 0; i + 1 < pose.keypoints.size(); ++i) {
+            const int k = static_cast<int>(i);
+            if (PeakBetween(canvas, pose, k, k + 1) > 0) ++lines;
+        }
+        COMMON_CHECK(lines == 0 || counts[c] == 133);  // 133 points touch each other
+        COMMON_CHECK(PeakBetween(canvas, pose, 0, static_cast<int>(counts[c] / 2)) == 0);
+        COMMON_CHECK(PointsDrawn(canvas, pose) == static_cast<int>(counts[c]));
+    }
+}
+
+/// SuperPoint's points: never joined, even 17 or 21 of them, and each one is
+/// drawn - the model's own threshold already kept it.
+void TestPoseVisualizerDrawsUnorderedPointsOnly() {
+    const std::size_t counts[] = {17, 21, 68};
+    for (std::size_t c = 0; c < sizeof(counts) / sizeof(counts[0]); ++c) {
+        const dxapp::PoseResult pose = PoseOnCircle(counts[c], 0.05f);
+        const cv::Mat canvas = DrawPose(pose, true);
+        COMMON_CHECK(PeakBetween(canvas, pose, 0, 1) == 0);
+        COMMON_CHECK(PeakBetween(canvas, pose, 5, 11) == 0);
+        COMMON_CHECK(PeakBetween(canvas, pose, 0, 5) == 0);
+        COMMON_CHECK(PointsDrawn(canvas, pose) == static_cast<int>(counts[c]));
+    }
+}
 }  // namespace
 
 int main() {
@@ -2609,6 +2720,12 @@ int main() {
     TestHandLandmarkKeypointsCarryPresenceNotDepth();
     TestHandLandmarkKeypointsWithoutPresenceAreFullyConfident();
     TestHandLandmarkDumpDoesNotReportConfidenceAsDepth();
+
+    TestPoseVisualizerJoinsCocoBodyLimbs();
+    TestPoseVisualizerDrawsTheFaceOutlineFor68Points();
+    TestPoseVisualizerDrawsTheCenterPoseBox();
+    TestPoseVisualizerDrawsOtherCountsAsPointsOnly();
+    TestPoseVisualizerDrawsUnorderedPointsOnly();
 
     std::printf("%d checks, %d failures, %d skipped\n",
                 g_checks, g_failures, g_skipped);
