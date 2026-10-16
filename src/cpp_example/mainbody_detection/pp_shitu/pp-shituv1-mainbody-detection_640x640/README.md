@@ -2,15 +2,15 @@
 
 # PP-ShiTuV1_mainbody_detection
 
-Object Detection · `pp-shituv1-mainbody-detection_640x640` · DX-APP C++ example
+Main-body Detection · `pp-shituv1-mainbody-detection_640x640` · DX-APP C++ example
 
-Object Detection model, evaluated on COCO.
+Main-body Detection model, evaluated on COCO.
 
 **Input** 640 × 640 × 3 · **Dataset** COCO · **License** Apache-2.0 · **Quantization** Q-Lite
 
-![PP-ShiTuV1_mainbody_detection output](../../../../python_example/object_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/result.webp)
+![PP-ShiTuV1_mainbody_detection output](../../../../python_example/mainbody_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/result.webp)
 
-Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/object_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/model.html)
+Full card with copy buttons and dark/light theme (open it in a browser; GitHub shows its source): [model.html](../../../../python_example/mainbody_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/model.html)
 
 ## Quick start
 
@@ -33,7 +33,7 @@ Run from the dx_app root after `./install.sh` and `./build.sh`.
 **Python**
 
 ```bash
-python src/python_example/object_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/pp-shituv1-mainbody-detection_640x640_sync.py \
+python src/python_example/mainbody_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/pp-shituv1-mainbody-detection_640x640_sync.py \
   --model assets/models/pp-shituv1-mainbody-detection_640x640.dxnn \
   --image sample/img/sample_street.jpg
 ```
@@ -51,7 +51,7 @@ COCO · difference vs Raw in brackets.
 
 | | |
 |---|---|
-| Task | Object Detection |
+| Task | Main-body Detection |
 | Dataset | COCO |
 | Metric | Recall@1 |
 | Input | 640 × 640 × 3 |
@@ -75,7 +75,7 @@ COCO · difference vs Raw in brackets.
 | `config.json` | Thresholds, input size, default sample |
 | `factory/` | Pre-, post-processor and visualizer |
 
-[Python version of this example](../../../../python_example/object_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/)
+[Python version of this example](../../../../python_example/mainbody_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/)
 
 ## Source & License
 

@@ -8710,8 +8710,8 @@
       "nms_threshold": 0.5
     },
     "source_dir": "pp_shitu",
-    "source_task": "object_detection",
-    "task": "object_detection",
+    "source_task": "mainbody_detection",
+    "task": "mainbody_detection",
     "variant": "pp-shituv1-mainbody-detection_640x640",
     "visualizer": {
       "class": "DetectionVisualizer",
@@ -8845,8 +8845,8 @@
       "nms_threshold": 0.5
     },
     "source_dir": "pp_shitu",
-    "source_task": "object_detection",
-    "task": "object_detection",
+    "source_task": "mainbody_detection",
+    "task": "mainbody_detection",
     "variant": "pp-shituv2-mainbody-detection_640x640",
     "visualizer": {
       "class": "DetectionVisualizer",

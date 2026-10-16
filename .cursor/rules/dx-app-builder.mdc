@@ -563,7 +563,7 @@ After confirmation, hand off to the appropriate sub-agent with the gathered cont
    `export DXRT_DYNAMIC_CPU_THREAD=ON` to `run.sh`. See `memory/common_pitfalls.md`
    Pitfall #21 and `memory/performance_patterns.md` for diagnosis method.
 
-## 28 Supported AI Tasks
+## 29 Supported AI Tasks
 
 Each family directory holds one `<variant>/` directory per `.dxnn` stem.
 
@@ -585,7 +585,8 @@ Each family directory holds one `<variant>/` directory per `.dxnn` stem.
 | instance_segmentation | `src/python_example/instance_segmentation/` | mask_rtdetr, yolact, yolo11_seg, yolo26_seg, … |
 | keypoint_detection | `src/python_example/keypoint_detection/` | superpoint |
 | low_light_enhancement | `src/python_example/low_light_enhancement/` | zerodce |
-| object_detection | `src/python_example/object_detection/` | damoyolo, efficientdet, nanodet, pp_shitu, … |
+| mainbody_detection | `src/python_example/mainbody_detection/` | pp_shitu |
+| object_detection | `src/python_example/object_detection/` | damoyolo, efficientdet, nanodet, rtdetr, … |
 | object_pose_estimation | `src/python_example/object_pose_estimation/` | dope |
 | oriented_object_detection | `src/python_example/oriented_object_detection/` | yolo26_obb |
 | panoptic_driving_perception | `src/python_example/panoptic_driving_perception/` | yolopv2 |

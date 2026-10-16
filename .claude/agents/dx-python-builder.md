@@ -502,6 +502,7 @@ that match the model's AI task. Do NOT use generic `test.jpg` or `input.jpg`.
 | Task | Sample Images | Path |
 |---|---|---|
 | object_detection | `sample_dog.jpg`, `sample_horse.jpg`, `sample_street.jpg` | `sample/img/` |
+| mainbody_detection | `sample_street.jpg` (img) / `snowboard.mp4` (video) | `sample/img/`, `assets/videos/` |
 | face_detection | `sample_face.jpg`, `sample_crowd.jpg` | `sample/img/` |
 | pose_estimation | `sample_people.jpg`, `sample_crowd.jpg` | `sample/img/` |
 | hand_landmark | `sample_hand.jpg` | `sample/img/` |

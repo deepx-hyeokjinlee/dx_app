@@ -101,7 +101,7 @@ API accuracy. Please switch to a recommended model.
 
 ## 개요
 
-dx_app은 28개 AI 작업에 걸쳐 497개의 컴파일된 `.dxnn` 모델을 제공하며, Python (4개 변형) 및 C++ 예제를 포함합니다.
+dx_app은 29개 AI 작업에 걸쳐 497개의 컴파일된 `.dxnn` 모델을 제공하며, Python (4개 변형) 및 C++ 예제를 포함합니다.
 
 ## 컨텍스트 라우팅 테이블
 
@@ -527,11 +527,11 @@ Artifact Verification Gate는 각 artifact가 **어떻게** 검증되는지 정�
 또는 "delete branch" 같은 옵션을 제시하지 마세요 — 작업만 완료하세요.
 
 
-## 28개 지원 AI 작업
+## 29개 지원 AI 작업
 
 | AI task | 변형 수 | 예제 경로 |
 |---|--:|---|
-| `object_detection` | 169 | `src/{python,cpp}_example/object_detection/` |
+| `object_detection` | 167 | `src/{python,cpp}_example/object_detection/` |
 | `image_classification` | 137 | `src/{python,cpp}_example/image_classification/` |
 | `instance_segmentation` | 53 | `src/{python,cpp}_example/instance_segmentation/` |
 | `pose_estimation` | 37 | `src/{python,cpp}_example/pose_estimation/` |
@@ -549,6 +549,7 @@ Artifact Verification Gate는 각 artifact가 **어떻게** 검증되는지 정�
 | `image_matting` **(2_5_0 신규)** | 2 | `src/{python,cpp}_example/image_matting/` |
 | `image_retrieval` **(2_5_0 신규)** | 2 | `src/{python,cpp}_example/image_retrieval/` |
 | `low_light_enhancement` | 2 | `src/{python,cpp}_example/low_light_enhancement/` |
+| `mainbody_detection` | 2 | `src/{python,cpp}_example/mainbody_detection/` |
 | `person_attribute` | 2 | `src/{python,cpp}_example/person_attribute/` |
 | `3d_object_detection` | 1 | `src/{python,cpp}_example/3d_object_detection/` |
 | `face_attribute` | 1 | `src/{python,cpp}_example/face_attribute/` |

@@ -1407,7 +1407,7 @@
   },
   "provisional": {
     "note": "Unpublished in dx-modelzoo as of assigned_at. The (task, family) values here are OUR assignments, following dx-modelzoo's postprocessing-chain rule, because the authoritative upstream table does not exist for these stems yet. When upstream publishes one it must move into 'variants'; test_provisional_never_overlaps_the_harvested_table fails until it does, and harvest_modelzoo_tree.py reports any stem upstream assigns differently.",
-    "assigned_at": "2026-09-30",
+    "assigned_at": "2026-10-16",
     "variant_count": 147,
     "variants": {
       "beit-l-p16_384x384": {
@@ -1483,7 +1483,7 @@
         "family": "pp_liteseg"
       },
       "pp-shituv1-mainbody-detection_640x640": {
-        "task": "object_detection",
+        "task": "mainbody_detection",
         "family": "pp_shitu"
       },
       "pp-shituv2-feature-extraction_224x224": {
@@ -1491,7 +1491,7 @@
         "family": "pp_shitu_rec"
       },
       "pp-shituv2-mainbody-detection_640x640": {
-        "task": "object_detection",
+        "task": "mainbody_detection",
         "family": "pp_shitu"
       },
       "pphgnet-base_224x224": {

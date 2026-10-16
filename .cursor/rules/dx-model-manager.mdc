@@ -162,6 +162,7 @@ for i, o in enumerate(out_info):
 | instance_segmentation | ISEG, SEG | Per-instance masks |
 | keypoint_detection | KD | Generic keypoint detection |
 | obb_detection | OBB | Oriented bounding-box detection |
+| mainbody_detection | OD | Main-body (salient object) detection, one class; PP-ShiTu's first stage |
 | object_detection | OD | Bounding-box object detection |
 | object_pose_estimation | OD | 6-DoF object pose estimation |
 | panoptic_driving_perception | OD | Panoptic driving perception |
@@ -184,7 +185,7 @@ for i, o in enumerate(out_info):
 
 | Task | Variants | Example families |
 |---|--:|---|
-| object_detection | 169 | damoyolo, efficientdet, nanodet, pp_shitu, rtdetr, ... |
+| object_detection | 167 | damoyolo, efficientdet, nanodet, rtdetr, ssd, ... |
 | image_classification | 137 | alexnet, beit, casvit, deit, densenet, ... |
 | instance_segmentation | 53 | mask_rtdetr, yolact, yolo11_seg, yolo26_seg, yolov12_seg, ... |
 | pose_estimation | 37 | centerpose, dark_hrnet, vitpose, yolo11_pose, yolo26_pose, ... |
@@ -202,6 +203,7 @@ for i, o in enumerate(out_info):
 | image_matting **(2_5_0 new)** | 2 | ppmatting |
 | image_retrieval **(2_5_0 new)** | 2 | clip_rn50 |
 | low_light_enhancement | 2 | zerodce |
+| mainbody_detection | 2 | pp_shitu |
 | person_attribute | 2 | deepmar |
 | 3d_object_detection | 1 | sfa3d |
 | face_attribute | 1 | faceattr |
@@ -212,4 +214,4 @@ for i, o in enumerate(out_info):
 | panoptic_driving_perception | 1 | yolopv2 |
 | person_reid **(2_5_0 new)** | 1 | repvgg_reid |
 | zero_shot_instance_segmentation | 1 | fastsam |
-| **Total** | **497** | across 28 tasks |
+| **Total** | **497** | across 29 tasks |

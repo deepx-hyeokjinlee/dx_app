@@ -291,7 +291,7 @@ Use this when you need to convert an external model package into the repository 
 
 The extracted package carries only the `common/` files the model actually depends on.
 For `object_detection/yolov7` that is 29 of 121 files (C++) and 54 of 103 (Python), instead of
-every postprocessor, runner, and visualizer for all 28 tasks.
+every postprocessor, runner, and visualizer for all 29 tasks.
 
 To get the complete shared framework instead, answer `n` at the `Prune unused common/ files?
 [Y/n]` prompt, or pass `--no-prune`:

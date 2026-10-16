@@ -334,6 +334,13 @@
 |---|---|---:|---|---|
 | SuperPoint (`superpoint_480x640`) | 480 × 640 × 3 | 73.45 HEA | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/superpoint_480x640.dxnn) | [Python](src/python_example/keypoint_detection/superpoint/superpoint_480x640/README.md) · [C++](src/cpp_example/keypoint_detection/superpoint/superpoint_480x640/README.md) |
 
+## Main-body Detection
+
+| Model | Input | Accuracy (Q-Lite) | Download | Examples |
+|---|---|---:|---|---|
+| PP-ShiTuV1_mainbody_detection (`pp-shituv1-mainbody-detection_640x640`) | 640 × 640 × 3 | 31.60 Recall@1 | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/pp-shituv1-mainbody-detection_640x640.dxnn) | [Python](src/python_example/mainbody_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/README.md) · [C++](src/cpp_example/mainbody_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/README.md) |
+| PP-ShiTuV2_mainbody_detection (`pp-shituv2-mainbody-detection_640x640`) | 640 × 640 × 3 | 31.88 Recall@1 | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/pp-shituv2-mainbody-detection_640x640.dxnn) | [Python](src/python_example/mainbody_detection/pp_shitu/pp-shituv2-mainbody-detection_640x640/README.md) · [C++](src/cpp_example/mainbody_detection/pp_shitu/pp-shituv2-mainbody-detection_640x640/README.md) |
+
 ## OBB Detection
 
 | Model | Input | Accuracy (Q-Lite) | Download | Examples |
@@ -363,8 +370,6 @@
 | NanoDet-Plus-1.5x (`nanodet-plus-1.5x_224x224`) | 416 × 416 × 3 | 26.52 mAP | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/nanodet-plus-1.5x_224x224.dxnn) | [Python](src/python_example/object_detection/nanodet/nanodet-plus-1.5x_224x224/README.md) · [C++](src/cpp_example/object_detection/nanodet/nanodet-plus-1.5x_224x224/README.md) |
 | NanoDet-RepVGG-A (`nanodet-repvgg-a_224x224`) | 640 × 640 × 3 | 28.93 mAP | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/nanodet-repvgg-a_224x224.dxnn) | [Python](src/python_example/object_detection/nanodet/nanodet-repvgg-a_224x224/README.md) · [C++](src/cpp_example/object_detection/nanodet/nanodet-repvgg-a_224x224/README.md) |
 | NanoDet-RepVGG-A12 (`nanodet-repvgg-a12_224x224`) | 640 × 640 × 3 | 29.17 mAP | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/nanodet-repvgg-a12_224x224.dxnn) | [Python](src/python_example/object_detection/nanodet/nanodet-repvgg-a12_224x224/README.md) · [C++](src/cpp_example/object_detection/nanodet/nanodet-repvgg-a12_224x224/README.md) |
-| PP-ShiTuV1_mainbody_detection (`pp-shituv1-mainbody-detection_640x640`) | 640 × 640 × 3 | 31.60 Recall@1 | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/pp-shituv1-mainbody-detection_640x640.dxnn) | [Python](src/python_example/object_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/README.md) · [C++](src/cpp_example/object_detection/pp_shitu/pp-shituv1-mainbody-detection_640x640/README.md) |
-| PP-ShiTuV2_mainbody_detection (`pp-shituv2-mainbody-detection_640x640`) | 640 × 640 × 3 | 31.88 Recall@1 | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/pp-shituv2-mainbody-detection_640x640.dxnn) | [Python](src/python_example/object_detection/pp_shitu/pp-shituv2-mainbody-detection_640x640/README.md) · [C++](src/cpp_example/object_detection/pp_shitu/pp-shituv2-mainbody-detection_640x640/README.md) |
 | rtdetr_hgnetv2_h_6x_coco (`rtdetr-hgnetv2-h-6x_640x640`) | 640 × 640 × 3 | 56.18 mAP | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/rtdetr-hgnetv2-h-6x_640x640.dxnn) | [Python](src/python_example/object_detection/rtdetr/rtdetr-hgnetv2-h-6x_640x640/README.md) · [C++](src/cpp_example/object_detection/rtdetr/rtdetr-hgnetv2-h-6x_640x640/README.md) |
 | rtdetr_hgnetv2_l_6x_coco (`rtdetr-hgnetv2-l-6x_640x640`) | 640 × 640 × 3 | 52.65 mAP | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/rtdetr-hgnetv2-l-6x_640x640.dxnn) | [Python](src/python_example/object_detection/rtdetr/rtdetr-hgnetv2-l-6x_640x640/README.md) · [C++](src/cpp_example/object_detection/rtdetr/rtdetr-hgnetv2-l-6x_640x640/README.md) |
 | rtdetr_hgnetv2_x_6x_coco (`rtdetr-hgnetv2-x-6x_640x640`) | 640 × 640 × 3 | 54.69 mAP | [Q-Lite DXNN](https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/rtdetr-hgnetv2-x-6x_640x640.dxnn) | [Python](src/python_example/object_detection/rtdetr/rtdetr-hgnetv2-x-6x_640x640/README.md) · [C++](src/cpp_example/object_detection/rtdetr/rtdetr-hgnetv2-x-6x_640x640/README.md) |

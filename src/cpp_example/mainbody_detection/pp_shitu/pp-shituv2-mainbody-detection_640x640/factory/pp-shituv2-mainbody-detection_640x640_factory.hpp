@@ -68,7 +68,7 @@ public:
     std::string getModelName() const override {
         return "pp-shituv2-mainbody-detection_640x640";
     }
-    std::string getTaskType() const override { return "object_detection"; }
+    std::string getTaskType() const override { return "mainbody_detection"; }
 
 private:
     float obj_threshold_;  // from a sibling variant in this family

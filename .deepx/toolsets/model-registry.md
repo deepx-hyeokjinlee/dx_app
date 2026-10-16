@@ -218,6 +218,7 @@ Known `add_model_task` values (query `config/model_registry.json` for the curren
 | `add_model_task` | `csv_task` | Description |
 |---|---|---|
 | `object_detection` | `OD` | Bounding-box object detection |
+| `mainbody_detection` | `OD` | Main-body (salient object) detection, one class |
 | `classification` | `IC` | Image classification |
 | `face_detection` | `FD` | Face detection |
 | `instance_segmentation` | `ISEG, SEG` | Per-instance masks |

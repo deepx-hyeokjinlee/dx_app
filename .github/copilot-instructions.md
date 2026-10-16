@@ -103,7 +103,7 @@ Read `.deepx/README.md` for the complete index.
 
 ## Overview
 
-dx_app provides 497 compiled `.dxnn` models across 28 AI tasks with Python (4 variants) and C++ examples.
+dx_app provides 497 compiled `.dxnn` models across 29 AI tasks with Python (4 variants) and C++ examples.
 
 ## Context Routing Table
 
@@ -545,11 +545,11 @@ work. The user will handle all git operations themselves. Never present options
 like "merge to main", "create PR", or "delete branch" — just finish the task.
 
 
-## 28 Supported AI Tasks
+## 29 Supported AI Tasks
 
 | AI task | Variants | Example tree |
 |---|--:|---|
-| `object_detection` | 169 | `src/{python,cpp}_example/object_detection/` |
+| `object_detection` | 167 | `src/{python,cpp}_example/object_detection/` |
 | `image_classification` | 137 | `src/{python,cpp}_example/image_classification/` |
 | `instance_segmentation` | 53 | `src/{python,cpp}_example/instance_segmentation/` |
 | `pose_estimation` | 37 | `src/{python,cpp}_example/pose_estimation/` |
@@ -567,6 +567,7 @@ like "merge to main", "create PR", or "delete branch" — just finish the task.
 | `image_matting` **(2_5_0 new)** | 2 | `src/{python,cpp}_example/image_matting/` |
 | `image_retrieval` **(2_5_0 new)** | 2 | `src/{python,cpp}_example/image_retrieval/` |
 | `low_light_enhancement` | 2 | `src/{python,cpp}_example/low_light_enhancement/` |
+| `mainbody_detection` | 2 | `src/{python,cpp}_example/mainbody_detection/` |
 | `person_attribute` | 2 | `src/{python,cpp}_example/person_attribute/` |
 | `3d_object_detection` | 1 | `src/{python,cpp}_example/3d_object_detection/` |
 | `face_attribute` | 1 | `src/{python,cpp}_example/face_attribute/` |

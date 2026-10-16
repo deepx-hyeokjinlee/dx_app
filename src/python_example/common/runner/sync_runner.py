@@ -248,6 +248,7 @@ _IMAGE_ONLY_TASKS = {
 
 _DEFAULT_SAMPLE_IMAGE = {
     "object_detection":       _IMG_STREET,
+    "mainbody_detection":     _IMG_STREET,
     "face_detection":         "sample/img/sample_face.jpg",
     "obb_detection":          "sample/img/sample_airport_satellite_view.png",
     "pose_estimation":        "sample/img/sample_people.jpg",
@@ -303,6 +304,7 @@ _MODEL_SAMPLE_IMAGE_OVERRIDE = {
 
 _DEFAULT_SAMPLE_VIDEO = {
     "object_detection":       _VID_SNOWBOARD,
+    "mainbody_detection":     _VID_SNOWBOARD,
     "face_detection":         _VID_DANCE_GROUP,
     "obb_detection":          "assets/videos/obb.mp4",
     "pose_estimation":        "assets/videos/dance-solo.mov",

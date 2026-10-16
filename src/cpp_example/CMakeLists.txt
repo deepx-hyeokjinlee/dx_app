@@ -480,6 +480,7 @@ set(CATEGORIES
     instance_segmentation
     keypoint_detection
     low_light_enhancement
+    mainbody_detection
     object_detection
     object_pose_estimation
     oriented_object_detection

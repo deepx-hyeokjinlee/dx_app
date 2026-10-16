@@ -606,6 +606,7 @@ inline std::string getDefaultSampleImage(const std::string& taskType,
         return "sample/img/sample_lowres275x150.png";
     }
     if (taskType == "object_detection")       return "sample/img/sample_street.jpg";
+    if (taskType == "mainbody_detection")     return "sample/img/sample_street.jpg";
     if (taskType == "face_detection")         return "sample/img/sample_face.jpg";
     if (taskType == "obb_detection")          return "sample/img/sample_airport_satellite_view.png";
     if (taskType == "pose_estimation")        return "sample/img/sample_people.jpg";
@@ -668,6 +669,7 @@ inline std::string getDefaultSampleVideo(const std::string& taskType) {
     if (isComparisonOnlyTask(taskType))       return "";
     if (taskType == "image_matting")          return "assets/videos/person-pair-hallway.mp4";
     if (taskType == "object_detection")       return "assets/videos/snowboard.mp4";
+    if (taskType == "mainbody_detection")     return "assets/videos/snowboard.mp4";
     if (taskType == "face_detection")         return "assets/videos/dance-group.mov";
     if (taskType == "obb_detection")          return "assets/videos/obb.mp4";
     if (taskType == "pose_estimation")        return "assets/videos/dance-solo.mov";

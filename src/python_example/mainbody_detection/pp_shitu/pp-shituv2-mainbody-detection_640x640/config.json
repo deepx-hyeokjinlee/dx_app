@@ -1,7 +1,7 @@
 {
-  "variant": "pp-shituv1-mainbody-detection_640x640",
-  "dxnn_file": "pp-shituv1-mainbody-detection_640x640.dxnn",
-  "task": "object_detection",
+  "variant": "pp-shituv2-mainbody-detection_640x640",
+  "dxnn_file": "pp-shituv2-mainbody-detection_640x640.dxnn",
+  "task": "mainbody_detection",
   "family": "pp_shitu",
   "input_width": 640,
   "input_height": 640,

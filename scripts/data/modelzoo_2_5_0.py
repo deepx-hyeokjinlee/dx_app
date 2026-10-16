@@ -687,7 +687,7 @@ GROUPS: list[dict] = [
         # EIGHT tensors, a score and a box tensor per pyramid level
         # ((1,6400,1)...(1,100,32), strides 8/16/32/64, reg_max 7), where NanoDet emits
         # one concatenated (1, N, nc + 4*(reg_max+1)).
-        task="object_detection", task_legacy="object_detection", family="pp_shitu",
+        task="mainbody_detection", task_legacy="object_detection", family="pp_shitu",
         cpp_donor="object_detection/nanodet",
         variants=["pp-shituv1-mainbody-detection_640x640",
                   "pp-shituv2-mainbody-detection_640x640"],

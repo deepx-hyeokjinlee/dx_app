@@ -8,7 +8,7 @@ alwaysApply: true
 # dx_app — Cursor Rules
 
 ## Overview
-dx_app provides 497 model variants across 28 AI tasks with Python (4 variants) and C++ examples. All 497 have a downloadable `.dxnn`.
+dx_app provides 497 model variants across 29 AI tasks with Python (4 variants) and C++ examples. All 497 have a downloadable `.dxnn`.
 
 ## Context Routing
 | Task | Read |

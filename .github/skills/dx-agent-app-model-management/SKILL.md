@@ -253,6 +253,7 @@ application code.
 | add_model_task | csv_task |
 |---|---|
 | object_detection | OD |
+| mainbody_detection | OD |
 | classification | IC |
 | instance_segmentation | ISEG, SEG |
 | pose_estimation | POSE |

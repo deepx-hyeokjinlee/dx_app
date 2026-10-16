@@ -232,7 +232,7 @@ fragment 라이브러리를 기준으로 해석됩니다.
 
 ## 핵심 정보
 
-- **dx_app v3.3.0**: 28개 AI task, 497개 variant (전부 공개; registry 498행, alias 1개), 4개 Python variant, C++ 예제
+- **dx_app v3.3.0**: 29개 AI task, 497개 variant (전부 공개; registry 498행, alias 1개), 4개 Python variant, C++ 예제
 - **프레임워크**: SyncRunner (1104 라인), AsyncRunner, 11개 IFactory 인터페이스
 - **Postprocess**: 37개 pybind11 C++ 바인딩
 - **CLI**: 11개 플래그를 갖는 parse_common_args()
