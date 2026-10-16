@@ -61,10 +61,12 @@
 
 namespace dxapp {
 
-/** Serialises writes of pipeline-parsed stdout lines across threads. */
+/** Serialises writes of pipeline-parsed stdout lines across threads.
+ *  Never destroyed: progress()'s Progress prints its last line from its destructor at exit, and it is built before
+ *  this mutex is first used, so a static mutex would be destroyed first and then locked. */
 inline std::mutex& stdoutMutex() {
-    static std::mutex m;
-    return m;
+    static std::mutex* m = new std::mutex;
+    return *m;
 }
 
 /** Running stage-time sums in milliseconds, as the runners' metric structs keep them. */
