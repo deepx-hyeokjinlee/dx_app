@@ -141,6 +141,7 @@ bool SameScoresData(const ScoresData& a, const ScoresData& b) {
 }
 
 bool SameKeypointsData(const KeypointsData& a, const KeypointsData& b) {
+    if (a.unordered != b.unordered) return false;
     if (a.items.size() != b.items.size()) return false;
     for (std::size_t i = 0; i < a.items.size(); ++i) {
         const PoseResult& x = a.items[i];

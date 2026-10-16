@@ -95,6 +95,10 @@ struct BoxesData : StageData {
 
 struct KeypointsData : StageData {
     std::vector<PoseResult> items;
+    /// The points have no order or connectivity (SuperPoint's): drawn as
+    /// points only, never joined by a skeleton chosen from their count.
+    bool unordered;
+    KeypointsData() : unordered(false) {}
     Shape shape() const { return Shape::kKeypoints; }
 };
 
