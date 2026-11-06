@@ -2980,5 +2980,209 @@
     "category": "Object Detection",
     "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/yolov9-t_640x640_pre-optimized.dxnn",
     "json_url": null
+  },
+  {
+    "name": "beit-b-p16_384x384",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/beit-b-p16_384x384.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/beit-b-p16_384x384.json"
+  },
+  {
+    "name": "ConvNeXtTiny224_1k",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ConvNeXtTiny224_1k.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ConvNeXtTiny224_1k.json"
+  },
+  {
+    "name": "DenseNet-1",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/DenseNet-1.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/DenseNet-1.json"
+  },
+  {
+    "name": "efficientformer-l1_224x224",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/efficientformer-l1_224x224.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/efficientformer-l1_224x224.json"
+  },
+  {
+    "name": "efficientformerv2-s1_224x224",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/efficientformerv2-s1_224x224.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/efficientformerv2-s1_224x224.json"
+  },
+  {
+    "name": "efficientformerv2-s2_224x224",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/efficientformerv2-s2_224x224.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/efficientformerv2-s2_224x224.json"
+  },
+  {
+    "name": "EfficientNetB0-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/EfficientNetB0-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/EfficientNetB0-2.json"
+  },
+  {
+    "name": "EfficientNetB1-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/EfficientNetB1-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/EfficientNetB1-2.json"
+  },
+  {
+    "name": "EfficientNetB3-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/EfficientNetB3-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/EfficientNetB3-2.json"
+  },
+  {
+    "name": "MobileNetV1-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/MobileNetV1-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/MobileNetV1-2.json"
+  },
+  {
+    "name": "mobilenetv3-small_224x224",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/mobilenetv3-small_224x224.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/mobilenetv3-small_224x224.json"
+  },
+  {
+    "name": "OSNet0_25-1",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/OSNet0_25-1.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/OSNet0_25-1.json"
+  },
+  {
+    "name": "OSNet0_5-1",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/OSNet0_5-1.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/OSNet0_5-1.json"
+  },
+  {
+    "name": "resmlp12_224x224",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/resmlp12_224x224.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/resmlp12_224x224.json"
+  },
+  {
+    "name": "resmlp36_224x224",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/resmlp36_224x224.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/resmlp36_224x224.json"
+  },
+  {
+    "name": "ResNeSt50-1",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNeSt50-1.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNeSt50-1.json"
+  },
+  {
+    "name": "ResNet101-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet101-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet101-2.json"
+  },
+  {
+    "name": "ResNet101-3",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet101-3.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet101-3.json"
+  },
+  {
+    "name": "ResNet101-4",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet101-4.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet101-4.json"
+  },
+  {
+    "name": "ResNet101V1-1",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet101V1-1.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet101V1-1.json"
+  },
+  {
+    "name": "ResNet152-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet152-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet152-2.json"
+  },
+  {
+    "name": "ResNet18-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet18-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet18-2.json"
+  },
+  {
+    "name": "ResNet34-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet34-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet34-2.json"
+  },
+  {
+    "name": "ResNet50-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet50-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet50-2.json"
+  },
+  {
+    "name": "ResNet50-8",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet50-8.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet50-8.json"
+  },
+  {
+    "name": "ResNet50-9",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/ResNet50-9.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/ResNet50-9.json"
+  },
+  {
+    "name": "VGG11BN-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/VGG11BN-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/VGG11BN-2.json"
+  },
+  {
+    "name": "VGG13BN-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/VGG13BN-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/VGG13BN-2.json"
+  },
+  {
+    "name": "VGG16BN-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/VGG16BN-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/VGG16BN-2.json"
+  },
+  {
+    "name": "VGG19BN-2",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/VGG19BN-2.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/VGG19BN-2.json"
+  },
+  {
+    "name": "WideResNet101-1",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/WideResNet101-1.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/WideResNet101-1.json"
+  },
+  {
+    "name": "WideResNet50-3",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/WideResNet50-3.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/WideResNet50-3.json"
+  },
+  {
+    "name": "fastvit-sa12_256x256",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-lite-dxnn/2_5_0/fastvit-sa12_256x256.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-lite-json/2_5_0/fastvit-sa12_256x256.json"
+  },
+  {
+    "name": "yolox-n_416x416",
+    "category": "Classification",
+    "dxnn_url": "https://sdk.deepx.ai/modelzoo/q-master-dxnn/2_5_0/yolox-n_416x416.dxnn",
+    "json_url": "https://sdk.deepx.ai/modelzoo/q-master-json/2_5_0/yolox-n_416x416.json"
   }
 ]

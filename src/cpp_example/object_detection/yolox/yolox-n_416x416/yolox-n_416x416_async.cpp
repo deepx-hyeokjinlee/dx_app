@@ -1,0 +1,16 @@
+/**
+ * @file yolox-n_416x416
+ * @brief yolox async inference -- one entry point for the whole family.
+ *
+ * The variant is the .dxnn stem, so the model path alone identifies it and no
+ * --variant flag or runner change is needed.
+ */
+
+#include "factory/yolox-n_416x416_factory.hpp"
+#include "common/runner/async_detection_runner.hpp"
+
+int main(int argc, char* argv[]) {
+    auto factory = std::make_unique<dxapp::v_yolox_n_416x416::YoloxFactory>();
+    dxapp::AsyncDetectionRunner<dxapp::v_yolox_n_416x416::YoloxFactory> runner(std::move(factory));
+    return runner.run(argc, argv);
+}
