@@ -2724,7 +2724,7 @@
     "original_name": "YOLOV10N_PPU",
     "csv_task": "OD",
     "add_model_task": "ppu",
-    "postprocessor": "yolov8_ppu",
+    "postprocessor": "yolov10_ppu",
     "input_width": 640,
     "input_height": 640,
     "config": {
@@ -5408,7 +5408,7 @@
     "original_name": "YOLOV3Tiny_1_PPU",
     "csv_task": "PPU",
     "add_model_task": "ppu",
-    "postprocessor": "yolov5_ppu",
+    "postprocessor": "yolov3tiny_ppu",
     "input_width": 416,
     "input_height": 416,
     "config": {
@@ -6080,7 +6080,7 @@
     "original_name": "YOLOX-S_2_PPU",
     "csv_task": "PPU",
     "add_model_task": "ppu",
-    "postprocessor": "yolov5_ppu",
+    "postprocessor": "yolox_ppu",
     "input_width": 640,
     "input_height": 640,
     "config": {
