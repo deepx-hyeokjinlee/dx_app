@@ -13,7 +13,8 @@
   "published": true,
   "config": {
     "score_threshold": 0.4,
-    "nms_threshold": 0.5
+    "nms_threshold": 0.5,
+    "obj_threshold": 0.25
   },
   "registry_config": {
     "score_threshold": 0.4,
@@ -38,7 +39,7 @@
     "config_overrides": {}
   },
   "postprocessor": {
-    "class": "YOLOv8Postprocessor",
+    "class": "YOLOv5Postprocessor",
     "args": [
       {
         "token": "input_width"

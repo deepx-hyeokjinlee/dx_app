@@ -10966,7 +10966,7 @@
     "original_name": "yolov6-m6_1280x1280",
     "csv_task": "OD",
     "add_model_task": "object_detection",
-    "postprocessor": "YOLOv8Postprocessor",
+    "postprocessor": "yolov5",
     "input_width": 1280,
     "input_height": 1280,
     "config": {
