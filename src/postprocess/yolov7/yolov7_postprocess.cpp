@@ -71,8 +71,16 @@ std::vector<YOLOv7Result> YOLOv7PostProcess::postprocess(const dxrt::TensorPtrs&
     // First align the tensors based on model configuration
     auto aligned_outputs = align_tensors(outputs);
 
+    // Select the decode path by tensor rank rather than the global ORT flag,
+    // as YOLOv5PostProcess does: a single fused 3D [1, N, 5+C] tensor is the
+    // CPU/ORT decode; multi-scale feature maps (4D [1, (5+C)*A, gh, gw] or 5D
+    // [1, A, gh, gw, 5+C]) are the anchor-grid decode. A *_nodecode export run
+    // with the ORT tail on emits only 5D maps, and selecting by the flag found
+    // no 3D tensor and returned nothing.
     std::vector<YOLOv7Result> detections;
-    if (is_ort_configured_) {
+    const bool fused_layout =
+        !aligned_outputs.empty() && aligned_outputs.front()->shape().size() == 3;
+    if (fused_layout) {
         detections = decoding_cpu_outputs(aligned_outputs);
     } else {
         detections = decoding_npu_outputs(aligned_outputs);
@@ -88,22 +96,31 @@ std::vector<YOLOv7Result> YOLOv7PostProcess::postprocess(const dxrt::TensorPtrs&
 dxrt::TensorPtrs YOLOv7PostProcess::align_tensors(const dxrt::TensorPtrs& outputs) const {
     dxrt::TensorPtrs aligned;
 
-    if (is_ort_configured_) {
-        for (const auto& output : outputs) {
-            if (output->shape().size() == 3) {
-                aligned.push_back(output);
-                break;
-            }
+    // Prefer a fused 3D [1, N, 5+C] tensor if present (ORT/CPU-decoded output);
+    // selection follows the tensors, not the ORT flag (see postprocess()).
+    for (const auto& output : outputs) {
+        if (output->shape().size() == 3) {
+            aligned.push_back(output);
+            return aligned;  // fused output does not require reordering
         }
-        return aligned;  // ORT inference does not require reordering
-    } else {
-        // Align outputs based on anchors_by_strides
+    }
+    {
+        // Align raw multi-scale NPU feature maps by stride. Accept both 4D NCHW
+        // [1, (5+C)*A, gh, gw] and 5D [1, A, gh, gw, 5+C] layouts (mirrors
+        // YOLOv5PostProcess::align_tensors's match_5d branch -- some YOLOv7
+        // exports emit the anchor axis un-collapsed as a 5D row-major tensor
+        // instead of the NCHW-folded 4D layout).
         for (const auto& as : anchors_by_strides_) {
+            const int64_t anchors = static_cast<int64_t>(as.second.size());
+            const int64_t gw = input_width_ / as.first;
+            const int64_t gh = input_height_ / as.first;
             for (const auto& output : outputs) {
-                if (output->shape().size() == 4 && output->shape()[2] == input_width_ / as.first &&
-                    output->shape()[3] == input_height_ / as.first &&
-                    output->shape()[1] ==
-                        static_cast<int64_t>((num_classes_ + 5) * as.second.size())) {
+                const auto& s = output->shape();
+                const bool match_4d = (s.size() == 4 && s[2] == gw && s[3] == gh &&
+                                       s[1] == (num_classes_ + 5) * anchors);
+                const bool match_5d = (s.size() == 5 && s[1] == anchors && s[2] == gh &&
+                                       s[3] == gw && s[4] == (num_classes_ + 5));
+                if (match_4d || match_5d) {
                     aligned.push_back(output);
                     break;
                 }
@@ -137,14 +154,25 @@ std::vector<YOLOv7Result> YOLOv7PostProcess::decoding_npu_outputs(
         int grid_y_size = input_height_ / stride;
         // Process each grid cell
         const auto& anchors = anchors_by_strides_.at(stride);
+        const bool is_5d = (outputs[output_idx]->shape().size() == 5);
+        const int num_fields = num_classes_ + 5;
+        // Layout-aware flat index for (anchor, field, grid_y, grid_x), mirrors
+        // YOLOv5PostProcess::decoding_npu_outputs's is_5d flat_index:
+        //  - 4D NCHW [1, A*F, gh, gw] : ((anchor*F + field)*gh + gy)*gw + gx
+        //  - 5D      [1, A, gh, gw, F]: ((anchor*gh + gy)*gw + gx)*F + field
+        auto flat_index = [&](int anchor_i, int field, int gy, int gx) -> int {
+            if (is_5d) {
+                return ((anchor_i * grid_y_size + gy) * grid_x_size + gx) * num_fields + field;
+            }
+            return ((anchor_i * num_fields) + field) * grid_x_size * grid_y_size +
+                   gy * grid_x_size + gx;
+        };
         for (int anchor = 0; anchor < static_cast<int>(anchors.size()); ++anchor) {
             int anchor_width = anchors[anchor].first;
             int anchor_height = anchors[anchor].second;
             for (int grid_y = 0; grid_y < grid_y_size; ++grid_y) {
                 for (int grid_x = 0; grid_x < grid_x_size; ++grid_x) {
-                    int objectness_idx =
-                        ((anchor * (num_classes_ + 5)) + 4) * grid_x_size * grid_y_size +
-                        grid_y * grid_x_size + grid_x;
+                    int objectness_idx = flat_index(anchor, 4, grid_y, grid_x);
                     auto objectness_score = sigmoid(output[objectness_idx]);
                     if (objectness_score < object_threshold_) {
                         continue;
@@ -152,9 +180,7 @@ std::vector<YOLOv7Result> YOLOv7PostProcess::decoding_npu_outputs(
                     int max_cls = -1;
                     float max_cls_conf = score_threshold_;
                     for (int cls = 0; cls < num_classes_; ++cls) {
-                        auto cls_conf_idx =
-                            ((anchor * (num_classes_ + 5)) + 5 + cls) * grid_x_size * grid_y_size +
-                            grid_y * grid_x_size + grid_x;
+                        auto cls_conf_idx = flat_index(anchor, 5 + cls, grid_y, grid_x);
                         auto cls_conf = objectness_score * sigmoid(output[cls_conf_idx]);
                         if (cls_conf > max_cls_conf) {
                             max_cls_conf = cls_conf;
@@ -170,9 +196,7 @@ std::vector<YOLOv7Result> YOLOv7PostProcess::decoding_npu_outputs(
                     result.class_id = max_cls;
                     result.class_name = dxapp::common::get_coco_class_name(max_cls);
                     for (int i = 0; i < 4; i++) {
-                        int box_idx =
-                            ((anchor * (num_classes_ + 5)) + i) * grid_x_size * grid_y_size +
-                            grid_y * grid_x_size + grid_x;
+                        int box_idx = flat_index(anchor, i, grid_y, grid_x);
                         box_temp[i] = output[box_idx];
                     }
                     box_temp[0] = (sigmoid(box_temp[0]) * 2.0f - 0.5 + grid_x) * stride;
