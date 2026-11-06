@@ -53,6 +53,16 @@ static std::vector<int> nms(const std::vector<EfficientDetResult>& dets, float t
     return kept;
 }
 
+namespace {
+// Product of every dimension: the element count of a tensor shape.
+template <typename Shape>
+int64_t element_count(const Shape& shape) {
+    int64_t n = 1;
+    for (auto d : shape) n *= static_cast<int64_t>(d);
+    return n;
+}
+}  // namespace
+
 std::vector<EfficientDetResult> EfficientDetPostProcess::postprocess(
     const dxrt::TensorPtrs& outputs) {
     // Multi-output (BiFPN features + anchor regressions + class scores):
@@ -230,7 +240,9 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::processTFFormat(
 
     const float* boxes = static_cast<const float*>((*boxes_t)->data());
     auto boxes_shape = (*boxes_t)->shape();
-    int N = static_cast<int>(boxes_shape.size() >= 2 ? boxes_shape[boxes_shape.size() - 2] : boxes_shape[0]);
+    // Box count = elements / 4: a [1,N,1,4] head (yolov4 exports) puts a 1
+    // at shape[size-2], which read as N gave one box.
+    int N = static_cast<int>(element_count(boxes_shape) / 4);
 
     int num_det = N;
     if (num_det_t) {
@@ -246,7 +258,7 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::processTFFormat(
     for (auto* ptr : others) {
         const float* data = static_cast<const float*>((*ptr)->data());
         auto shape = (*ptr)->shape();
-        int len = static_cast<int>(shape.size() >= 2 ? shape[shape.size() - 2] : shape[0]);
+        int len = static_cast<int>(element_count(shape));
         // Check if values exceed 1.0 (class IDs) or stay in [0,1] (scores)
         float max_val = 0.0f;
         for (int i = 0; i < std::min(len, num_det); ++i) {
@@ -312,7 +324,8 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::process2Tensor(
     auto boxes_shape = (*boxes_t)->shape();
     auto scores_shape = (*scores_t)->shape();
 
-    int N = static_cast<int>(boxes_shape.size() >= 2 ? boxes_shape[boxes_shape.size() - 2] : boxes_shape[0]);
+    // Box count = elements / 4, as above: yolov4tiny boxes=[1,2535,1,4].
+    int N = static_cast<int>(element_count(boxes_shape) / 4);
     const float* boxes = static_cast<const float*>((*boxes_t)->data());
     const float* scores_data = static_cast<const float*>((*scores_t)->data());
 
