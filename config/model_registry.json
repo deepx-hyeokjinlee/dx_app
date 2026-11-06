@@ -731,8 +731,8 @@
     "csv_task": "OD",
     "add_model_task": "object_detection",
     "postprocessor": "nanodet",
-    "input_width": 224,
-    "input_height": 224,
+    "input_width": 416,
+    "input_height": 416,
     "config": {
       "score_threshold": 0.3,
       "nms_threshold": 0.45
@@ -755,8 +755,8 @@
     "csv_task": "OD",
     "add_model_task": "object_detection",
     "postprocessor": "nanodet",
-    "input_width": 224,
-    "input_height": 224,
+    "input_width": 640,
+    "input_height": 640,
     "config": {
       "score_threshold": 0.3,
       "nms_threshold": 0.45
@@ -4051,8 +4051,8 @@
     "csv_task": "OD",
     "add_model_task": "object_detection",
     "postprocessor": "nanodet",
-    "input_width": 224,
-    "input_height": 224,
+    "input_width": 640,
+    "input_height": 640,
     "config": {
       "score_threshold": 0.4,
       "nms_threshold": 0.45
