@@ -1408,7 +1408,7 @@
   "provisional": {
     "note": "Unpublished in dx-modelzoo as of assigned_at. The (task, family) values here are OUR assignments, following dx-modelzoo's postprocessing-chain rule, because the authoritative upstream table does not exist for these stems yet. When upstream publishes one it must move into 'variants'; test_provisional_never_overlaps_the_harvested_table fails until it does, and harvest_modelzoo_tree.py reports any stem upstream assigns differently.",
     "assigned_at": "2026-10-16",
-    "variant_count": 147,
+    "variant_count": 181,
     "variants": {
       "beit-l-p16_384x384": {
         "task": "image_classification",
@@ -1997,6 +1997,142 @@
       "yolov9-t_640x640_pre-optimized": {
         "task": "object_detection",
         "family": "yolov9"
+      },
+      "ConvNeXtTiny224_1k": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "DenseNet-1": {
+        "task": "image_classification",
+        "family": "densenet"
+      },
+      "EfficientNetB0-2": {
+        "task": "image_classification",
+        "family": "efficientnet"
+      },
+      "EfficientNetB1-2": {
+        "task": "image_classification",
+        "family": "efficientnet"
+      },
+      "EfficientNetB3-2": {
+        "task": "image_classification",
+        "family": "efficientnet"
+      },
+      "MobileNetV1-2": {
+        "task": "image_classification",
+        "family": "mobilenet"
+      },
+      "OSNet0_25-1": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "OSNet0_5-1": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNeSt50-1": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet101-2": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet101-3": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet101-4": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet101V1-1": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet152-2": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet18-2": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet34-2": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet50-2": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet50-8": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "ResNet50-9": {
+        "task": "image_classification",
+        "family": "resnet"
+      },
+      "VGG11BN-2": {
+        "task": "image_classification",
+        "family": "vgg"
+      },
+      "VGG13BN-2": {
+        "task": "image_classification",
+        "family": "vgg"
+      },
+      "VGG16BN-2": {
+        "task": "image_classification",
+        "family": "vgg"
+      },
+      "VGG19BN-2": {
+        "task": "image_classification",
+        "family": "vgg"
+      },
+      "WideResNet101-1": {
+        "task": "image_classification",
+        "family": "wide_resnet"
+      },
+      "WideResNet50-3": {
+        "task": "image_classification",
+        "family": "wide_resnet"
+      },
+      "beit-b-p16_384x384": {
+        "task": "image_classification",
+        "family": "beit"
+      },
+      "efficientformer-l1_224x224": {
+        "task": "image_classification",
+        "family": "efficientformer"
+      },
+      "efficientformerv2-s1_224x224": {
+        "task": "image_classification",
+        "family": "efficientformer"
+      },
+      "efficientformerv2-s2_224x224": {
+        "task": "image_classification",
+        "family": "efficientformer"
+      },
+      "fastvit-sa12_256x256": {
+        "task": "image_classification",
+        "family": "fastvit"
+      },
+      "mobilenetv3-small_224x224": {
+        "task": "image_classification",
+        "family": "mobilenet"
+      },
+      "resmlp12_224x224": {
+        "task": "image_classification",
+        "family": "resmlp"
+      },
+      "resmlp36_224x224": {
+        "task": "image_classification",
+        "family": "resmlp"
+      },
+      "yolox-n_416x416": {
+        "task": "object_detection",
+        "family": "yolox"
       }
     }
   }
