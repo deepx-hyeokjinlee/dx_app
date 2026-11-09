@@ -7,6 +7,7 @@
 #define HARDNET39DS_224X224_FACTORY_HPP
 
 #include "common/base/i_factory.hpp"
+#include "common/processors/simple_resize_preprocessor.hpp"
 #include "common/processors/letterbox_preprocessor.hpp"
 #include "common/processors/classification_postprocessor.hpp"
 #include "common/visualizers/classification_visualizer.hpp"
@@ -25,7 +26,8 @@ public:
         : num_classes_(num_classes), top_k_(top_k) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        return std::make_unique<DetectionPreprocessor>(input_width, input_height);
+        // Stretch, as the Python config says (it used a letterbox here).
+        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
     }
 
     PostprocessorPtr<ClassificationResult> createPostprocessor(

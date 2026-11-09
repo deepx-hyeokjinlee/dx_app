@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <vector>
 
 #include "common/base/i_processor.hpp"
@@ -57,10 +58,14 @@ public:
             converted = input;
         }
 
-        // Direct resize (no letterbox)
+        // Direct resize (no letterbox), or the model's resize + centre crop
         cv::Mat resized;
-        cv::resize(converted, resized, cv::Size(input_width_, input_height_),
-                   0, 0, cv::INTER_LINEAR);
+        if (crop_short_ > 0 || (crop_resize_w_ > 0 && crop_resize_h_ > 0)) {
+            resized = resizeCenterCrop(converted);
+        } else {
+            cv::resize(converted, resized, cv::Size(input_width_, input_height_),
+                       0, 0, cv::INTER_LINEAR);
+        }
 
         // Optional illumination gain, mirroring the Python preprocessor's
         // `mean_target` / `mean_target_above`. A per-channel gain that moves the
@@ -112,11 +117,50 @@ public:
         }
     }
 
+    /// The model's evaluation resize then a centre crop to the input size -- what
+    /// the ModelZoo compile JSON calibrated with (default_loader.preprocessings).
+    /// short_side > 0: shorter side to short_side keeping the aspect
+    /// (torchvision Resize(int)); else resize_w x resize_h. interpolation:
+    /// cv::INTER_LINEAR or cv::INTER_CUBIC. Not called: the plain stretch.
+    void setCenterCrop(int short_side, int resize_w, int resize_h, int interpolation) {
+        crop_short_ = short_side;
+        crop_resize_w_ = resize_w;
+        crop_resize_h_ = resize_h;
+        crop_interp_ = interpolation;
+    }
+
     int getInputWidth() const override { return input_width_; }
     int getInputHeight() const override { return input_height_; }
     int getColorConversion() const override { return color_conversion_; }
 
 private:
+    cv::Mat resizeCenterCrop(const cv::Mat& img) const {
+        int nw = crop_resize_w_, nh = crop_resize_h_;
+        if (crop_short_ > 0) {
+            if (img.cols <= img.rows) {
+                nw = crop_short_;
+                nh = static_cast<int>(static_cast<double>(crop_short_) * img.rows / img.cols);
+            } else {
+                nh = crop_short_;
+                nw = static_cast<int>(static_cast<double>(crop_short_) * img.cols / img.rows);
+            }
+        }
+        cv::Mat resized;
+        cv::resize(img, resized, cv::Size(nw, nh), 0, 0, crop_interp_);
+        if (nw < input_width_ || nh < input_height_) {
+            cv::Mat out;
+            cv::resize(resized, out, cv::Size(input_width_, input_height_), 0, 0, crop_interp_);
+            return out;
+        }
+        const int top = static_cast<int>(std::lround((nh - input_height_) / 2.0));
+        const int left = static_cast<int>(std::lround((nw - input_width_) / 2.0));
+        return resized(cv::Rect(left, top, input_width_, input_height_)).clone();
+    }
+
+    int crop_short_{0};
+    int crop_resize_w_{0};
+    int crop_resize_h_{0};
+    int crop_interp_{cv::INTER_LINEAR};
     int input_width_;
     int input_height_;
     int color_conversion_;

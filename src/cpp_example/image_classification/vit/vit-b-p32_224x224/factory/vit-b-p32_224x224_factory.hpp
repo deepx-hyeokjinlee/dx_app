@@ -28,7 +28,8 @@ public:
         : num_classes_(num_classes), top_k_(top_k) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        return std::make_unique<DetectionPreprocessor>(input_width, input_height);
+        // Stretch, as the Python config says (it used a letterbox here).
+        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
     }
 
     PostprocessorPtr<ClassificationResult> createPostprocessor(

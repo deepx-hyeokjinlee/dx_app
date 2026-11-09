@@ -86,7 +86,8 @@ class SimpleResizePreprocessor(IPreprocessor):
                  store_original: bool = False,
                  store_normalized: bool = False,
                  mean_target: Optional[float] = None,
-                 mean_target_above: Optional[float] = None):
+                 mean_target_above: Optional[float] = None,
+                 crop_resize: Optional[dict] = None):
         self._input_width = input_width
         self._input_height = input_height
         self._normalize_float = normalize_float
@@ -99,6 +100,39 @@ class SimpleResizePreprocessor(IPreprocessor):
         self._mean_target = float(mean_target) if mean_target is not None else None
         self._mean_target_above = (float(mean_target_above)
                                    if mean_target_above is not None else None)
+        # crop_resize: the model's own evaluation resize, then a centre crop to
+        # the input size -- what the ModelZoo compile JSON calibrated with
+        # (default_loader.preprocessings). {"short": S} resizes the shorter side
+        # to S keeping the aspect (torchvision Resize(int)); {"width": W,
+        # "height": H} resizes to W x H. "interpolation": "bilinear" (default)
+        # or "bicubic". None: the plain stretch to the input size, as before.
+        self._crop_resize = crop_resize
+        if crop_resize is not None:
+            if not (("short" in crop_resize) or ("width" in crop_resize and "height" in crop_resize)):
+                raise ValueError(f"crop_resize needs 'short' or 'width'+'height': {crop_resize!r}")
+            interp = crop_resize.get("interpolation", "bilinear")
+            if interp not in ("bilinear", "bicubic"):
+                raise ValueError(f"crop_resize interpolation must be bilinear or bicubic: {interp!r}")
+            self._crop_interp = cv2.INTER_CUBIC if interp == "bicubic" else cv2.INTER_LINEAR
+
+    def _resize_center_crop(self, img: np.ndarray) -> np.ndarray:
+        """Resize as crop_resize says, then crop the centre to the input size."""
+        h, w = img.shape[:2]
+        if "short" in self._crop_resize:
+            short = int(self._crop_resize["short"])
+            if w <= h:
+                nw, nh = short, int(short * h / w)
+            else:
+                nw, nh = int(short * w / h), short
+        else:
+            nw, nh = int(self._crop_resize["width"]), int(self._crop_resize["height"])
+        resized = cv2.resize(img, (nw, nh), interpolation=self._crop_interp)
+        iw, ih = self._input_width, self._input_height
+        if nw < iw or nh < ih:
+            return cv2.resize(resized, (iw, ih), interpolation=self._crop_interp)
+        top = int(round((nh - ih) / 2.0))
+        left = int(round((nw - iw) / 2.0))
+        return np.ascontiguousarray(resized[top:top + ih, left:left + iw])
     
     def process(self, input_image: np.ndarray) -> Tuple[np.ndarray, PreprocessContext]:
         """
@@ -133,9 +167,12 @@ class SimpleResizePreprocessor(IPreprocessor):
         else:
             img = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
         
-        # Direct resize
-        resized = cv2.resize(img, (self._input_width, self._input_height), 
-                            interpolation=cv2.INTER_LINEAR)
+        # Direct resize, or the model's resize + centre crop (crop_resize)
+        if self._crop_resize is not None:
+            resized = self._resize_center_crop(img)
+        else:
+            resized = cv2.resize(img, (self._input_width, self._input_height),
+                                 interpolation=cv2.INTER_LINEAR)
 
         # Optional illumination gain (see `mean_target` above). Computed on the RESIZED
         # image, which is what the model actually sees, and applied per channel so a
