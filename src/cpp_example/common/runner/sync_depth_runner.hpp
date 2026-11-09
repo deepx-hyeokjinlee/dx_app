@@ -143,7 +143,7 @@ public:
             }
             std::cout << std::endl;
 
-            if (args.saveMode) {
+            if (args.saveMode || args.dumpTensors) {  // --dump-tensors needs the run directory too
                 std::string run_name;
                 if (args.cameraIndex >= 0) run_name = "camera" + std::to_string(args.cameraIndex);
                 else if (!args.rtspUrl.empty()) run_name = "rtsp";
@@ -155,11 +155,11 @@ public:
                 fs::create_directories(run_dir);
                 writeRunInfo(run_dir, argv[0], args.modelPath, input_src);
 
-                writer = initVideoWriter(
+                if (args.saveMode) writer = initVideoWriter(
                     run_dir, fps > 0 ? fps : 30.0,
                     cv::Size(SHOW_WINDOW_SIZE_W, SHOW_WINDOW_SIZE_H),
                     video_save_path);
-                if (!writer.isOpened()) {
+                if (args.saveMode && !writer.isOpened()) {
                     std::cerr << "[DXAPP] [ERROR] Failed to open video writer." << std::endl;
                     return -1;
                 }
@@ -174,7 +174,7 @@ public:
         cv::Mat display_image;
 
         // Image mode: create run_dir when saving
-        if (is_image && args.saveMode) {
+        if (is_image && (args.saveMode || args.dumpTensors)) {
             std::string run_kind = fs::is_directory(args.imageFilePath) ? "image-dir" : "image";
             std::string run_name = fs::path(args.imageFilePath).filename().string();
             std::string input_src = buildInputSourceString(
@@ -492,7 +492,7 @@ private:
         for (int i = 0; i < loopTest; ++i) {
             std::string currentImagePath = imageFiles[i % imageFiles.size()];
             std::string saveImagePath;
-            if (!runDir.empty() && (saveMode || dumpEnabled)) {
+            if (!runDir.empty() && saveMode) {
                 saveImagePath = dxapp::buildPerImageSavePath(runDir, factory_->getModelName() + "_sync", currentImagePath, i);
             }
             auto tr0 = std::chrono::high_resolution_clock::now();

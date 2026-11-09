@@ -71,6 +71,13 @@ public:
         int processCount = 0;
 
         CommandLineArgs args = parseCommandLine(argc, argv);
+        // The async pipelines have no tensor-dump path: refusing the flag beats
+        // accepting it and writing nothing (the sync examples dump).
+        if (args.dumpTensors) {
+            dxapp::fatal_error("[DXAPP] [ERROR] --dump-tensors is not supported by the async "
+                               "example (it would write no tensors); run the _sync example "
+                               "to dump them.");
+        }
 
         dxapp::configureDisplayPump(display_pump_, args.drop_frames);
         verbose_ = args.verbose;
@@ -555,7 +562,7 @@ private:
             ("r, rtsp_url", "RTSP stream URL", cxxopts::value<std::string>(args.rtspUrl))
             ("s, save", "Save rendered output to disk", cxxopts::value<bool>(args.saveMode)->default_value("false"))
             ("save-dir", "Base directory for run outputs when using --save/--dump-tensors.", cxxopts::value<std::string>(args.saveDir)->default_value("artifacts/cpp_example"))
-            ("dump-tensors", "(Debug) Always dump input/output tensors as .bin files.", cxxopts::value<bool>(args.dumpTensors)->default_value("false"))
+            ("dump-tensors", "(Debug) Not supported here: the _sync example dumps tensors.", cxxopts::value<bool>(args.dumpTensors)->default_value("false"))
             ("l, loop", "Number of inference iterations", cxxopts::value<int>(args.loopTest)->default_value("-1"))
             ("no-display", "will not visualize, only show fps", cxxopts::value<bool>(args.no_display)->default_value("false"))
             ("drop-frames", "display: drop stale frames instead of pacing the pipeline (default: off, every frame is shown)",
