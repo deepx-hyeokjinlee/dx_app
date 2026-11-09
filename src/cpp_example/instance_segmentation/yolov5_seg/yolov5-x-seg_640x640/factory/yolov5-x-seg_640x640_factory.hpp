@@ -36,10 +36,15 @@ public:
 
     PostprocessorPtr<InstanceSegmentationResult> createPostprocessor(
         int input_width, int input_height, bool is_ort_configured = false) override {
-        return std::make_unique<YOLOv8SegPostprocessor>(
+        // The yolov5-seg decoder, as for yolov5-n/s/m/l-seg and as the Python
+        // config (YOLOv5InstanceSegPostprocessor) says. YOLOv8SegPostprocessor
+        // read this export's [1,25200,117] rows (box, objectness, 80 classes,
+        // 32 mask coefficients) without the objectness column and emitted
+        // dozens of misplaced "person" instances; obj_threshold_ was dropped.
+        return std::make_unique<YOLOv5SegPostprocessor>(
             input_width, input_height,
-            score_threshold_, nms_threshold_,
-            is_ort_configured);
+            obj_threshold_, score_threshold_, nms_threshold_,
+            80, 32, is_ort_configured, class_names_);
     }
 
     VisualizerPtr<InstanceSegmentationResult> createVisualizer() override {

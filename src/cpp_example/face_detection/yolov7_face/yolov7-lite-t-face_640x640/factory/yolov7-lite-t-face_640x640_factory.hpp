@@ -33,9 +33,14 @@ public:
     }
 
     PostprocessorPtr<FaceDetectionResult> createPostprocessor(
-        int input_width, int input_height, bool /*is_ort_configured*/ = false) override {
+        int input_width, int input_height, bool is_ort_configured = false) override {
+        // YOLOv5FacePostprocessor(w, h, obj, score, nms, ort): passing
+        // (w, h, score, nms) put score in the objectness slot and nms in the
+        // score slot, and dropped obj_threshold_ and the ORT flag.
         return std::make_unique<YOLOv5FacePostprocessor>(
-            input_width, input_height, score_threshold_, nms_threshold_);
+            input_width, input_height,
+            obj_threshold_, score_threshold_, nms_threshold_,
+            is_ort_configured);
     }
 
     VisualizerPtr<FaceDetectionResult> createVisualizer() override {
