@@ -95,6 +95,11 @@ public:
 
     Preset getPreset() const { return preset_; }
 
+    /// Replace the preset's anchors (see AnchorYOLOPostProcess::set_anchors).
+    void setAnchors(const std::map<int, std::vector<std::pair<int,int>>>& anchors) {
+        impl_.set_anchors(anchors);
+    }
+
 private:
     AnchorYOLOPostProcess impl_;
     Preset preset_;

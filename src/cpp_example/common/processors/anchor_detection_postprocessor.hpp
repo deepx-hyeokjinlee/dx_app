@@ -186,6 +186,12 @@ public:
     bool get_is_ort_configured() const { return is_ort_configured_; }
     int get_num_classes() const { return num_classes_; }
     const std::map<int, std::vector<std::pair<int,int>>>& get_anchors_by_strides() const { return anchors_by_strides_; }
+
+    /// Replace the preset's anchors, e.g. the four P6 levels (strides 8/16/32/64)
+    /// of a YOLOv7-W6 export without the in-graph decoder. Empty keeps the preset's.
+    void set_anchors(const std::map<int, std::vector<std::pair<int,int>>>& anchors) {
+        if (!anchors.empty()) anchors_by_strides_ = anchors;
+    }
     const std::vector<std::string>& get_cpu_output_names() const { return cpu_output_names_; }
     const std::vector<std::string>& get_npu_output_names() const { return npu_output_names_; }
 

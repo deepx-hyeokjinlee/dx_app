@@ -22,7 +22,7 @@ class Yolov7Factory : public IDetectionFactory {
 public:
 
     Yolov7Factory(float obj_threshold = 0.25f,
-                  float score_threshold = 0.25f,
+                  float score_threshold = 0.4f,
                   float nms_threshold = 0.45f)
         : obj_threshold_(obj_threshold),
           score_threshold_(score_threshold),
@@ -34,14 +34,23 @@ public:
 
     PostprocessorPtr<DetectionResult> createPostprocessor(
         int input_width, int input_height, bool is_ort_configured = false) override {
-        // default: yolov7-d6_1280x1280
-        return std::make_unique<YOLOv7Postprocessor>(
+        // Four detection heads (P3-P6, strides 8/16/32/64) and no in-graph decoder:
+        // the anchor maps need the W6 anchors, as the Python example's
+        // YOLOV7_W6_ANCHORS. The YOLOv7 preset carries only the three P5 levels.
+        auto post = std::make_unique<YOLOv7Postprocessor>(
             input_width, input_height,
             obj_threshold_, score_threshold_, nms_threshold_,
             is_ort_configured,
             num_classes_,
             class_names_
         );
+        post->setAnchors({
+            {8,  {{19, 27}, {44, 40}, {38, 94}}},
+            {16, {{96, 68}, {86, 152}, {180, 137}}},
+            {32, {{140, 301}, {303, 264}, {238, 542}}},
+            {64, {{436, 615}, {739, 380}, {925, 792}}},
+        });
+        return PostprocessorPtr<DetectionResult>(std::move(post));
     }
 
     VisualizerPtr<DetectionResult> createVisualizer() override {
