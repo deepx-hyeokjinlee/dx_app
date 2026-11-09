@@ -283,10 +283,10 @@ class YOLOv5Postprocessor(IPostprocessor):
         for idx in indices:
             box = boxes[idx].copy()
             # Restore to original coordinates
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
@@ -382,10 +382,10 @@ class YOLOv5Postprocessor(IPostprocessor):
         results = []
         for idx in indices:
             box = boxes[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / scale_x, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / scale_y, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / scale_x, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / scale_y, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / scale_x, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / scale_y, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / scale_x, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / scale_y, 0, ctx.original_height)
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(filtered_scores[idx]),
@@ -534,10 +534,10 @@ class YOLOv8Postprocessor(IPostprocessor):
         
         for idx in indices:
             box = boxes[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
@@ -581,10 +581,10 @@ class YOLOv8Postprocessor(IPostprocessor):
         
         for idx in indices:
             box = boxes[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
@@ -721,10 +721,10 @@ class YOLOXPostprocessor(IPostprocessor):
 
         for idx in indices:
             box = boxes[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
@@ -797,10 +797,10 @@ class YOLOXPostprocessor(IPostprocessor):
         pad_x, pad_y = ctx.pad_x, ctx.pad_y
         for idx in indices:
             box = boxes[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(confidences[idx]),

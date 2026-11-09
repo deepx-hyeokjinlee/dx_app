@@ -183,8 +183,8 @@ inline std::vector<Query> mergeDuplicates(std::vector<Query> queries,
 }
 
 inline void clampToFrame(Query& q, const PreprocessContext& ctx) {
-    const float w = static_cast<float>(std::max(ctx.original_width - 1, 0));
-    const float h = static_cast<float>(std::max(ctx.original_height - 1, 0));
+    const float w = static_cast<float>(std::max(ctx.original_width, 0));
+    const float h = static_cast<float>(std::max(ctx.original_height, 0));
     q.x1 = std::max(0.0f, std::min(q.x1, w));
     q.x2 = std::max(0.0f, std::min(q.x2, w));
     q.y1 = std::max(0.0f, std::min(q.y1, h));

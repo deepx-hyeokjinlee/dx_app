@@ -135,9 +135,9 @@ class PicoDetPostprocessor(IPostprocessor):
         # Undo the letterbox, clipping as every other postprocessor here does.
         gain = max(ctx.scale, 1e-6)
         boxes_all[:, 0::2] = np.clip((boxes_all[:, 0::2] - ctx.pad_x) / gain,
-                                     0, ctx.original_width - 1)
+                                     0, ctx.original_width)
         boxes_all[:, 1::2] = np.clip((boxes_all[:, 1::2] - ctx.pad_y) / gain,
-                                     0, ctx.original_height - 1)
+                                     0, ctx.original_height)
 
         order = np.argsort(-conf_all, kind="stable")
         areas = (np.clip(boxes_all[:, 2] - boxes_all[:, 0], 0, None)

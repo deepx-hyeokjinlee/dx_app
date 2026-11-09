@@ -169,10 +169,10 @@ class PPUPostprocessor(IPostprocessor):
 
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
@@ -302,10 +302,10 @@ class YOLOv8PPUPostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
@@ -414,15 +414,15 @@ class SCRFDPPUPostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             keypoints = []
             for k in range(5):
-                kp_x = np.clip((lx[idx, k] - pad_x) / gain, 0, ctx.original_width - 1)
-                kp_y = np.clip((ly[idx, k] - pad_y) / gain, 0, ctx.original_height - 1)
+                kp_x = np.clip((lx[idx, k] - pad_x) / gain, 0, ctx.original_width)
+                kp_y = np.clip((ly[idx, k] - pad_y) / gain, 0, ctx.original_height)
                 keypoints.append(Keypoint(x=float(kp_x), y=float(kp_y), confidence=1.0))
 
             results.append(FaceResult(
@@ -569,15 +569,15 @@ class YOLOv5PosePPUPostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             keypoints = []
             for k in range(17):
-                kp_x = np.clip((lx[idx, k] - pad_x) / gain, 0, ctx.original_width - 1)
-                kp_y = np.clip((ly[idx, k] - pad_y) / gain, 0, ctx.original_height - 1)
+                kp_x = np.clip((lx[idx, k] - pad_x) / gain, 0, ctx.original_width)
+                kp_y = np.clip((ly[idx, k] - pad_y) / gain, 0, ctx.original_height)
                 keypoints.append(Keypoint(
                     x=float(kp_x), y=float(kp_y), confidence=float(ls[idx, k])
                 ))
@@ -673,10 +673,10 @@ class YOLOv10PPUPostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
@@ -798,10 +798,10 @@ class YOLOXPPUPostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],

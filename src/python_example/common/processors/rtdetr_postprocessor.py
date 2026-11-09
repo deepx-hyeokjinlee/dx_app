@@ -206,8 +206,8 @@ class _RTDETRBase(IPostprocessor):
 
     @staticmethod
     def _clip(xyxy: np.ndarray, ctx: PreprocessContext) -> np.ndarray:
-        xyxy[:, 0::2] = np.clip(xyxy[:, 0::2], 0.0, max(ctx.original_width - 1, 0))
-        xyxy[:, 1::2] = np.clip(xyxy[:, 1::2], 0.0, max(ctx.original_height - 1, 0))
+        xyxy[:, 0::2] = np.clip(xyxy[:, 0::2], 0.0, max(ctx.original_width, 0))
+        xyxy[:, 1::2] = np.clip(xyxy[:, 1::2], 0.0, max(ctx.original_height, 0))
         return xyxy
 
     def _merge_duplicates(self, boxes: np.ndarray) -> np.ndarray:

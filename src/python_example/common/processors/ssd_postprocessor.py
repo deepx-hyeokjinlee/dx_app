@@ -68,16 +68,16 @@ class SSDPostprocessor(IPostprocessor):
         if hasattr(ctx, 'pad_x') and ctx.pad_x == 0 and ctx.pad_y == 0:
             sx = ctx.original_width / self.input_width
             sy = ctx.original_height / self.input_height
-            box[0] = np.clip(box[0] * sx, 0, ctx.original_width - 1)
-            box[1] = np.clip(box[1] * sy, 0, ctx.original_height - 1)
-            box[2] = np.clip(box[2] * sx, 0, ctx.original_width - 1)
-            box[3] = np.clip(box[3] * sy, 0, ctx.original_height - 1)
+            box[0] = np.clip(box[0] * sx, 0, ctx.original_width)
+            box[1] = np.clip(box[1] * sy, 0, ctx.original_height)
+            box[2] = np.clip(box[2] * sx, 0, ctx.original_width)
+            box[3] = np.clip(box[3] * sy, 0, ctx.original_height)
         else:
             gain = max(ctx.scale, 1e-6)
-            box[0] = np.clip((box[0] - ctx.pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - ctx.pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - ctx.pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - ctx.pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - ctx.pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - ctx.pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - ctx.pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - ctx.pad_y) / gain, 0, ctx.original_height)
         return box
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[DetectionResult]:

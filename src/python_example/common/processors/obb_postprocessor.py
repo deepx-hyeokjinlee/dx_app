@@ -81,8 +81,8 @@ class OBBPostprocessor(IPostprocessor):
         
         # Clip coordinates
         if ctx.original_width > 0 and ctx.original_height > 0:
-            rboxes[:, 0] = np.clip(rboxes[:, 0], 0, ctx.original_width - 1)
-            rboxes[:, 1] = np.clip(rboxes[:, 1], 0, ctx.original_height - 1)
+            rboxes[:, 0] = np.clip(rboxes[:, 0], 0, ctx.original_width)
+            rboxes[:, 1] = np.clip(rboxes[:, 1], 0, ctx.original_height)
         
         # Create result objects
         results = []

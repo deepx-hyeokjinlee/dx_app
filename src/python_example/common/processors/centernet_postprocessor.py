@@ -141,10 +141,10 @@ class CenterNetPostprocessor(IPostprocessor):
 
         results = []
         for idx in keep:
-            bx1 = np.clip((x1[idx] - pad_x) / gain, 0, ctx.original_width - 1)
-            by1 = np.clip((y1[idx] - pad_y) / gain, 0, ctx.original_height - 1)
-            bx2 = np.clip((x2[idx] - pad_x) / gain, 0, ctx.original_width - 1)
-            by2 = np.clip((y2[idx] - pad_y) / gain, 0, ctx.original_height - 1)
+            bx1 = np.clip((x1[idx] - pad_x) / gain, 0, ctx.original_width)
+            by1 = np.clip((y1[idx] - pad_y) / gain, 0, ctx.original_height)
+            bx2 = np.clip((x2[idx] - pad_x) / gain, 0, ctx.original_width)
+            by2 = np.clip((y2[idx] - pad_y) / gain, 0, ctx.original_height)
 
             results.append(DetectionResult(
                 box=[float(bx1), float(by1), float(bx2), float(by2)],

@@ -327,8 +327,8 @@ private:
                       std::vector<Keypoint>& kps,
                       const PreprocessContext& ctx) const {
         float gain  = std::max(ctx.scale, 1e-6f);
-        float max_x = static_cast<float>(ctx.original_width - 1);
-        float max_y = static_cast<float>(ctx.original_height - 1);
+        float max_x = static_cast<float>(ctx.original_width);
+        float max_y = static_cast<float>(ctx.original_height);
         auto to_x = [&](float v) { return std::min(std::max((v - ctx.pad_x) / gain, 0.0f), max_x); };
         auto to_y = [&](float v) { return std::min(std::max((v - ctx.pad_y) / gain, 0.0f), max_y); };
         x1 = to_x(x1); y1 = to_y(y1); x2 = to_x(x2); y2 = to_y(y2);

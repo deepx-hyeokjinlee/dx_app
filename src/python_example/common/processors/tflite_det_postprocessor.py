@@ -82,10 +82,10 @@ class TFLiteDetectionPostprocessor(IPostprocessor):
                 x2 = (x2_inp - ctx.pad_x) / gain
                 y2 = (y2_inp - ctx.pad_y) / gain
 
-            x1 = np.clip(x1, 0, ctx.original_width - 1)
-            y1 = np.clip(y1, 0, ctx.original_height - 1)
-            x2 = np.clip(x2, 0, ctx.original_width - 1)
-            y2 = np.clip(y2, 0, ctx.original_height - 1)
+            x1 = np.clip(x1, 0, ctx.original_width)
+            y1 = np.clip(y1, 0, ctx.original_height)
+            x2 = np.clip(x2, 0, ctx.original_width)
+            y2 = np.clip(y2, 0, ctx.original_height)
 
             results.append(DetectionResult(
                 box=[float(x1), float(y1), float(x2), float(y2)],

@@ -124,8 +124,8 @@ def scale_to_original(x: float, y: float, ctx: PreprocessContext) -> Tuple[float
         y = y / ctx.scale
     
     # Clamp to original bounds
-    x = max(0.0, min(x, ctx.original_width - 1))
-    y = max(0.0, min(y, ctx.original_height - 1))
+    x = max(0.0, min(x, ctx.original_width))
+    y = max(0.0, min(y, ctx.original_height))
     
     return x, y
 

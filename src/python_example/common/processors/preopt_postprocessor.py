@@ -128,10 +128,10 @@ def _scale_box(row: np.ndarray, ctx: PreprocessContext) -> List[float]:
     """Undo the letterbox, clipping to the original image as every runner expects."""
     gain = max(ctx.scale, 1e-6)
     return [
-        float(np.clip((row[X1] - ctx.pad_x) / gain, 0, ctx.original_width - 1)),
-        float(np.clip((row[Y1] - ctx.pad_y) / gain, 0, ctx.original_height - 1)),
-        float(np.clip((row[X2] - ctx.pad_x) / gain, 0, ctx.original_width - 1)),
-        float(np.clip((row[Y2] - ctx.pad_y) / gain, 0, ctx.original_height - 1)),
+        float(np.clip((row[X1] - ctx.pad_x) / gain, 0, ctx.original_width)),
+        float(np.clip((row[Y1] - ctx.pad_y) / gain, 0, ctx.original_height)),
+        float(np.clip((row[X2] - ctx.pad_x) / gain, 0, ctx.original_width)),
+        float(np.clip((row[Y2] - ctx.pad_y) / gain, 0, ctx.original_height)),
     ]
 
 
@@ -197,9 +197,9 @@ class PreoptPosePostprocessor(_PreoptBase):
             keypoints = [
                 Keypoint(
                     x=float(np.clip((kp[0] - ctx.pad_x) / gain,
-                                    0, ctx.original_width - 1)),
+                                    0, ctx.original_width)),
                     y=float(np.clip((kp[1] - ctx.pad_y) / gain,
-                                    0, ctx.original_height - 1)),
+                                    0, ctx.original_height)),
                     confidence=float(kp[2]),
                 )
                 for kp in triplets

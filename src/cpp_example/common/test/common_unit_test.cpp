@@ -68,6 +68,7 @@
 #include "common/processors/anchor_face_postprocessor.hpp"
 #include "common/processors/classification_postprocessor.hpp"
 #include "common/processors/letterbox_preprocessor.hpp"
+#include "common/processors/result_converters.hpp"
 #include "common/processors/clip_text_postprocessor.hpp"
 #include "common/processors/hand_landmark_postprocessor.hpp"
 #include "common/processors/picodet_postprocessor.hpp"
@@ -757,6 +758,28 @@ void TestLetterboxRoundsLikePython() {
         }
         COMMON_CHECK(first == c.top && last - first + 1 == c.rows);
     }
+}
+
+/// Boxes AND keypoints clip to [0, w] x [0, h] (Ultralytics' clip_coords, the
+/// Python tree since its fix): boxes were clipped to w here but to w - 1 in
+/// Python, and keypoints were not clipped at all.
+void TestBoxesAndKeypointsClipToTheImage() {
+    dxapp::PreprocessContext ctx;
+    ctx.original_width = 100;
+    ctx.original_height = 50;
+    ctx.scale = 1.0f;
+    ctx.pad_x = 0;
+    ctx.pad_y = 0;
+    std::vector<float> box = {-5.0f, -5.0f, 150.0f, 70.0f};
+    dxapp::detail::scaleBox(box, ctx);
+    COMMON_CHECK(box[0] == 0.0f && box[1] == 0.0f && box[2] == 100.0f && box[3] == 50.0f);
+    dxapp::Keypoint kp;
+    kp.x = 150.0f;
+    kp.y = -3.0f;
+    dxapp::detail::scaleKeypoint(kp, ctx);
+    COMMON_CHECK(kp.x == 100.0f && kp.y == 0.0f);
+    auto pt = dxapp::scaleToOriginal(150.0f, 70.0f, ctx);
+    COMMON_CHECK(pt.first == 100.0f && pt.second == 50.0f);
 }
 
 void TestClassificationNonImageNetClassCountLeavesNameEmpty() {
@@ -3205,7 +3228,7 @@ void TestPicoDetDecodesPerLevelTensors() {
     COMMON_CHECK(found[0].class_id == 0 && found[0].class_name == "mainbody");
     COMMON_CHECK(std::fabs(found[0].box[0] - 8.f) < 0.05f);
     COMMON_CHECK(found[0].box[1] == 0.f);                 // -8 clipped to the frame
-    COMMON_CHECK(std::fabs(found[0].box[2] - 63.f) < 1e-4f);  // 72 clipped to width - 1
+    COMMON_CHECK(std::fabs(found[0].box[2] - 64.f) < 1e-4f);  // 72 clipped to the width
     COMMON_CHECK(std::fabs(found[0].box[3] - 56.f) < 0.05f);
 }
 
@@ -3245,6 +3268,7 @@ int main() {
     TestClassificationDistributionGuardToleratesQuantizedSums();
     TestClassificationTiesGoToTheLowerClassId();
     TestLetterboxRoundsLikePython();
+    TestBoxesAndKeypointsClipToTheImage();
     TestClipTextTokenizerMergesAndPads();
     TestClipTextProjectsTheEotRowThroughLnFinal();
     TestClipTextMissingAssetsNameTheExportCommand();

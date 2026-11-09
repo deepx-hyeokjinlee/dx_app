@@ -138,17 +138,17 @@ class ULFGPostprocessor(IPostprocessor):
                 sx = ctx.original_width / self.input_width
                 sy = ctx.original_height / self.input_height
             return (
-                np.clip(x1 * sx, 0, ctx.original_width - 1),
-                np.clip(y1 * sy, 0, ctx.original_height - 1),
-                np.clip(x2 * sx, 0, ctx.original_width - 1),
-                np.clip(y2 * sy, 0, ctx.original_height - 1),
+                np.clip(x1 * sx, 0, ctx.original_width),
+                np.clip(y1 * sy, 0, ctx.original_height),
+                np.clip(x2 * sx, 0, ctx.original_width),
+                np.clip(y2 * sy, 0, ctx.original_height),
             )
         gain = max(ctx.scale, 1e-6)
         return (
-            np.clip((x1 - ctx.pad_x) / gain, 0, ctx.original_width - 1),
-            np.clip((y1 - ctx.pad_y) / gain, 0, ctx.original_height - 1),
-            np.clip((x2 - ctx.pad_x) / gain, 0, ctx.original_width - 1),
-            np.clip((y2 - ctx.pad_y) / gain, 0, ctx.original_height - 1),
+            np.clip((x1 - ctx.pad_x) / gain, 0, ctx.original_width),
+            np.clip((y1 - ctx.pad_y) / gain, 0, ctx.original_height),
+            np.clip((x2 - ctx.pad_x) / gain, 0, ctx.original_width),
+            np.clip((y2 - ctx.pad_y) / gain, 0, ctx.original_height),
         )
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[FaceResult]:

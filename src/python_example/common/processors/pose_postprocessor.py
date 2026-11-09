@@ -99,17 +99,17 @@ class YOLOv5PosePostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             
             # Parse keypoints (x, y, conf) triplets
             kps_raw = keypoints_raw[idx].reshape(-1, 3)
             keypoints = []
             for kp in kps_raw:
-                kp_x = np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width - 1)
-                kp_y = np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height - 1)
+                kp_x = np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width)
+                kp_y = np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height)
                 keypoints.append(Keypoint(x=float(kp_x), y=float(kp_y), confidence=float(kp[2])))
             
             results.append(PoseResult(
@@ -232,17 +232,17 @@ class YOLOv8PosePostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             
             # Parse keypoints
             kps_raw = keypoints_raw[idx].reshape(-1, 3)
             keypoints = []
             for kp in kps_raw:
-                kp_x = np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width - 1)
-                kp_y = np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height - 1)
+                kp_x = np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width)
+                kp_y = np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height)
                 keypoints.append(Keypoint(x=float(kp_x), y=float(kp_y), confidence=float(kp[2])))
             
             results.append(PoseResult(

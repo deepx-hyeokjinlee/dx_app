@@ -195,7 +195,7 @@ class RetinaFacePostprocessor(IPostprocessor):
 
     def _build_results(self, keep, x1, y1, x2, y2, face_scores, lmk_decoded, ctx):
         pad_x, pad_y = ctx.pad_x, ctx.pad_y
-        ow, oh = ctx.original_width - 1, ctx.original_height - 1
+        ow, oh = ctx.original_width, ctx.original_height
         # Use independent scale_x/scale_y for stretch-resize; fall back to uniform scale
         if ctx.scale_x > 0 and ctx.scale_y > 0:
             gain_x, gain_y = ctx.scale_x, ctx.scale_y

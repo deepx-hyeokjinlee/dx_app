@@ -80,6 +80,12 @@ inline void scaleKeypoint(Keypoint& kp, const PreprocessContext& ctx) {
         kp.x = (kp.x - ctx.pad_x) / ctx.scale;
         kp.y = (kp.y - ctx.pad_y) / ctx.scale;
     }
+    // Keypoints are clipped to the image like boxes, [0, w] x [0, h], as the
+    // Python tree and Ultralytics' clip_coords do (C++ left them unclipped).
+    if (ctx.original_width > 0 && ctx.original_height > 0) {
+        kp.x = std::max(0.0f, std::min(kp.x, static_cast<float>(ctx.original_width)));
+        kp.y = std::max(0.0f, std::min(kp.y, static_cast<float>(ctx.original_height)));
+    }
 }
 
 }  // namespace detail

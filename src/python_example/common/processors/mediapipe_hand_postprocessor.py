@@ -206,10 +206,10 @@ class MediaPipeHandPostprocessor(IPostprocessor):
 
         results = []
         for i in keep:
-            bx1 = float(np.clip(ox1[i], 0, ow - 1))
-            by1 = float(np.clip(oy1[i], 0, oh - 1))
-            bx2 = float(np.clip(ox2[i], 0, ow - 1))
-            by2 = float(np.clip(oy2[i], 0, oh - 1))
+            bx1 = float(np.clip(ox1[i], 0, ow))
+            by1 = float(np.clip(oy1[i], 0, oh))
+            bx2 = float(np.clip(ox2[i], 0, ow))
+            by2 = float(np.clip(oy2[i], 0, oh))
             results.append(FaceResult(
                 box=[bx1, by1, bx2, by2],
                 confidence=float(scores_f[i]),

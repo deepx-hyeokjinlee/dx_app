@@ -195,15 +195,15 @@ class YOLACTPostprocessor(IPostprocessor):
 
         if pad_x == 0 and pad_y == 0:
             sx, sy = ow / self.input_width, oh / self.input_height
-            box[0] = np.clip(box[0] * sx, 0, ow - 1)
-            box[1] = np.clip(box[1] * sy, 0, oh - 1)
-            box[2] = np.clip(box[2] * sx, 0, ow - 1)
-            box[3] = np.clip(box[3] * sy, 0, oh - 1)
+            box[0] = np.clip(box[0] * sx, 0, ow)
+            box[1] = np.clip(box[1] * sy, 0, oh)
+            box[2] = np.clip(box[2] * sx, 0, ow)
+            box[3] = np.clip(box[3] * sy, 0, oh)
         else:
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ow - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, oh - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ow - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, oh - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ow)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, oh)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ow)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, oh)
         return box
 
     def _to_original_coords(self, box, scaled_mask_i, ctx):

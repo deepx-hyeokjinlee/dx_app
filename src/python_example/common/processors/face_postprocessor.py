@@ -133,15 +133,15 @@ class SCRFDPostprocessor(IPostprocessor):
             y1 = boxes_x1y1wh[idx, 1]
             x2 = x1 + boxes_x1y1wh[idx, 2]
             y2 = y1 + boxes_x1y1wh[idx, 3]
-            x1 = np.clip((x1 - pad_x) / gain, 0, ctx.original_width - 1)
-            y1 = np.clip((y1 - pad_y) / gain, 0, ctx.original_height - 1)
-            x2 = np.clip((x2 - pad_x) / gain, 0, ctx.original_width - 1)
-            y2 = np.clip((y2 - pad_y) / gain, 0, ctx.original_height - 1)
+            x1 = np.clip((x1 - pad_x) / gain, 0, ctx.original_width)
+            y1 = np.clip((y1 - pad_y) / gain, 0, ctx.original_height)
+            x2 = np.clip((x2 - pad_x) / gain, 0, ctx.original_width)
+            y2 = np.clip((y2 - pad_y) / gain, 0, ctx.original_height)
             kps_raw = keypoints_array[idx].reshape(-1, 2)
             keypoints = [
                 Keypoint(
-                    x=float(np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width - 1)),
-                    y=float(np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height - 1)),
+                    x=float(np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width)),
+                    y=float(np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height)),
                     confidence=1.0,
                 )
                 for kp in kps_raw
@@ -248,15 +248,15 @@ class YOLOv5FacePostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             kps_raw = keypoints_raw[idx].reshape(-1, 2)
             keypoints = [
                 Keypoint(
-                    x=float(np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width - 1)),
-                    y=float(np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height - 1)),
+                    x=float(np.clip((kp[0] - pad_x) / gain, 0, ctx.original_width)),
+                    y=float(np.clip((kp[1] - pad_y) / gain, 0, ctx.original_height)),
                     confidence=1.0,
                 )
                 for kp in kps_raw
@@ -320,15 +320,15 @@ class YOLOv5FacePostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             keypoints = []
             for k in range(5):
-                kx = float(np.clip((kp_xs[idx, k] - pad_x) / gain, 0, ctx.original_width - 1))
-                ky = float(np.clip((kp_ys[idx, k] - pad_y) / gain, 0, ctx.original_height - 1))
+                kx = float(np.clip((kp_xs[idx, k] - pad_x) / gain, 0, ctx.original_width))
+                ky = float(np.clip((kp_ys[idx, k] - pad_y) / gain, 0, ctx.original_height))
                 keypoints.append(Keypoint(x=kx, y=ky, confidence=float(kp_confs[idx, k])))
 
             results.append(FaceResult(
@@ -435,15 +435,15 @@ class YOLOv7FacePostprocessor(IPostprocessor):
         results = []
         for idx in keep:
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             keypoints = []
             for k in range(5):
-                kx = float(np.clip((kp_xs[idx, k] - pad_x) / gain, 0, ctx.original_width - 1))
-                ky = float(np.clip((kp_ys[idx, k] - pad_y) / gain, 0, ctx.original_height - 1))
+                kx = float(np.clip((kp_xs[idx, k] - pad_x) / gain, 0, ctx.original_width))
+                ky = float(np.clip((kp_ys[idx, k] - pad_y) / gain, 0, ctx.original_height))
                 keypoints.append(Keypoint(x=kx, y=ky, confidence=float(kp_confs[idx, k])))
 
             results.append(FaceResult(

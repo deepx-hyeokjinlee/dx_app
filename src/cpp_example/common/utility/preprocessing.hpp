@@ -141,8 +141,9 @@ inline std::pair<float, float> scaleToOriginal(float x, float y,
         orig_y = orig_y / ctx.scale;
     }
     
-    orig_x = std::max(0.0f, std::min(orig_x, static_cast<float>(ctx.original_width - 1)));
-    orig_y = std::max(0.0f, std::min(orig_y, static_cast<float>(ctx.original_height - 1)));
+    // [0, w] x [0, h], as scaleBox and the Python tree clip (the Ultralytics rule).
+    orig_x = std::max(0.0f, std::min(orig_x, static_cast<float>(ctx.original_width)));
+    orig_y = std::max(0.0f, std::min(orig_y, static_cast<float>(ctx.original_height)));
     
     return {orig_x, orig_y};
 }

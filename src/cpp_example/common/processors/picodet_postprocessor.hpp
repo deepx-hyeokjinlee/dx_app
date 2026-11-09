@@ -86,8 +86,8 @@ public:
 
         // Undo the letterbox, clipping as the other detection postprocessors do.
         const float gain = std::max(ctx.scale, 1e-6f);
-        const float max_x = static_cast<float>(ctx.original_width - 1);
-        const float max_y = static_cast<float>(ctx.original_height - 1);
+        const float max_x = static_cast<float>(ctx.original_width);
+        const float max_y = static_cast<float>(ctx.original_height);
         for (std::size_t k = 0; k < keep.size(); ++k) {
             const int idx = keep[k];
             const cv::Rect2d& b = boxes[idx];

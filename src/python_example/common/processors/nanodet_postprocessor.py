@@ -226,10 +226,10 @@ class NanoDetPostprocessor(IPostprocessor):
         results = []
         for idx in indices:
             box = boxes[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
 
             # Skip degenerate boxes (zero width or height after clip)
             if box[2] <= box[0] or box[3] <= box[1]:

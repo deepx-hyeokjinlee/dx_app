@@ -170,10 +170,10 @@ class InstanceSegPostprocessor(IPostprocessor):
         results = []
         for i, idx in enumerate(keep):
             box = boxes_x1y1x2y2[idx].copy()
-            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height - 1)
-            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width - 1)
-            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height - 1)
+            box[0] = np.clip((box[0] - pad_x) / gain, 0, ctx.original_width)
+            box[1] = np.clip((box[1] - pad_y) / gain, 0, ctx.original_height)
+            box[2] = np.clip((box[2] - pad_x) / gain, 0, ctx.original_width)
+            box[3] = np.clip((box[3] - pad_y) / gain, 0, ctx.original_height)
             orig_mask = self._crop_mask_to_original(scaled_masks[i], ctx, box)
             results.append(InstanceSegResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
