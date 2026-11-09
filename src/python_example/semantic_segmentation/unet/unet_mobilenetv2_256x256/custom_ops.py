@@ -42,8 +42,9 @@ class Unet_mobilenet_v2Factory(ISegmentationFactory):
     
     def create_postprocessor(self, input_width: int, input_height: int):
         config = {**self.config, 'num_classes': 3}
-        return SemanticSegmentationPostprocessor(input_width, input_height, config,
-                                                 resize_to_original=False)
+        # The class map comes back in image coordinates, as every segmentation
+        # result does (it was left at 256x256 here).
+        return SemanticSegmentationPostprocessor(input_width, input_height, config)
     
     def create_visualizer(self):
         return SemanticSegmentationVisualizer(custom_palette=_UNET_3CLASS_PALETTE,

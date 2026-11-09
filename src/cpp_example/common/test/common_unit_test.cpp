@@ -69,6 +69,7 @@
 #include "common/processors/classification_postprocessor.hpp"
 #include "common/processors/letterbox_preprocessor.hpp"
 #include "common/processors/result_converters.hpp"
+#include "common/processors/segmentation_postprocessor.hpp"
 #include "common/processors/clip_text_postprocessor.hpp"
 #include "common/processors/hand_landmark_postprocessor.hpp"
 #include "common/processors/picodet_postprocessor.hpp"
@@ -780,6 +781,25 @@ void TestBoxesAndKeypointsClipToTheImage() {
     COMMON_CHECK(kp.x == 100.0f && kp.y == 0.0f);
     auto pt = dxapp::scaleToOriginal(150.0f, 70.0f, ctx);
     COMMON_CHECK(pt.first == 100.0f && pt.second == 50.0f);
+}
+
+/// A class map comes back in image coordinates, letterbox padding cut (scaled for
+/// a head smaller than the input), as the Python tree's class_map_to_original.
+void TestClassMapGoesBackToTheImage() {
+    dxapp::PreprocessContext ctx;
+    ctx.pad_x = 0; ctx.pad_y = 16; ctx.scale = 0.32f;
+    ctx.original_width = 200; ctx.original_height = 100;
+    ctx.input_width = 64; ctx.input_height = 64;
+    cv::Mat full(64, 64, CV_32S, cv::Scalar(0));
+    full(cv::Rect(0, 16, 64, 32)).setTo(cv::Scalar(3));
+    cv::Mat out = dxapp::detail::classMapToOriginal(full, ctx, 64, 64);
+    COMMON_CHECK(out.cols == 200 && out.rows == 100);
+    COMMON_CHECK(cv::countNonZero(out != 3) == 0);
+    cv::Mat small(16, 16, CV_32S, cv::Scalar(0));
+    small(cv::Rect(0, 4, 16, 8)).setTo(cv::Scalar(5));
+    out = dxapp::detail::classMapToOriginal(small, ctx, 64, 64);
+    COMMON_CHECK(out.cols == 200 && out.rows == 100);
+    COMMON_CHECK(cv::countNonZero(out != 5) == 0);
 }
 
 void TestClassificationNonImageNetClassCountLeavesNameEmpty() {
@@ -3269,6 +3289,7 @@ int main() {
     TestClassificationTiesGoToTheLowerClassId();
     TestLetterboxRoundsLikePython();
     TestBoxesAndKeypointsClipToTheImage();
+    TestClassMapGoesBackToTheImage();
     TestClipTextTokenizerMergesAndPads();
     TestClipTextProjectsTheEotRowThroughLnFinal();
     TestClipTextMissingAssetsNameTheExportCommand();

@@ -47,9 +47,7 @@
     "config_overrides": {
       "num_classes": 3
     },
-    "kwargs": {
-      "resize_to_original": false
-    }
+    "kwargs": {}
   },
   "visualizer": {
     "args": [],

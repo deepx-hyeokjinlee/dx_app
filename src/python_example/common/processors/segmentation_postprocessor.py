@@ -56,7 +56,7 @@ class SemanticSegmentationPostprocessor(IPostprocessor):
         config: dict = None,
         *,
         upsample_to_input: bool = False,
-        resize_to_original: bool = False,
+        resize_to_original: bool = True,
     ):
         """
         Args:
@@ -155,39 +155,12 @@ class SemanticSegmentationPostprocessor(IPostprocessor):
             )
         return upsampled
 
-    @staticmethod
     def _maybe_resize_to_original(
+        self,
         class_map: np.ndarray,
         ctx: PreprocessContext,
     ) -> np.ndarray:
-        """Resize class map to original image size if available in *ctx*."""
-        if ctx.original_width <= 0 or ctx.original_height <= 0:
-            return class_map
-
-        if ctx.pad_x == 0 and ctx.pad_y == 0:
-            # SimpleResize — no padding
-            if (class_map.shape[1] != ctx.original_width
-                    or class_map.shape[0] != ctx.original_height):
-                class_map = cv2.resize(
-                    class_map.astype(np.float32),
-                    (ctx.original_width, ctx.original_height),
-                    interpolation=cv2.INTER_NEAREST,
-                ).astype(np.int32)
-        else:
-            # Letterbox — crop padding then resize
-            gain = max(ctx.scale, 1e-6)
-            unpad_h = int(round(ctx.original_height * gain))
-            unpad_w = int(round(ctx.original_width * gain))
-            top, left = int(ctx.pad_y), int(ctx.pad_x)
-            cropped = class_map[top:top + unpad_h, left:left + unpad_w]
-            if cropped.size > 0:
-                class_map = cv2.resize(
-                    cropped.astype(np.float32),
-                    (ctx.original_width, ctx.original_height),
-                    interpolation=cv2.INTER_NEAREST,
-                ).astype(np.int32)
-
-        return class_map
+        return class_map_to_original(class_map, ctx, self.input_width, self.input_height)
 
     @staticmethod
     def _make_result(class_map: np.ndarray) -> SegmentationResult:
@@ -203,3 +176,37 @@ class SemanticSegmentationPostprocessor(IPostprocessor):
 
     def get_model_name(self) -> str:
         return "semantic_segmentation"
+
+
+def class_map_to_original(class_map: np.ndarray, ctx: PreprocessContext,
+                          input_width: int, input_height: int) -> np.ndarray:
+    """A class map back to the original image: the letterbox padding cut away and
+    the rest resized NEAREST to the image size, as a box is mapped back.
+
+    The padding is in network-input pixels; a map smaller than the input
+    (a stride-4 head) scales it by map/input first. The C++ tree does the same
+    (detail::classMapToOriginal), so both return image-sized masks."""
+    if ctx is None or ctx.original_width <= 0 or ctx.original_height <= 0:
+        return class_map
+    ow, oh = int(ctx.original_width), int(ctx.original_height)
+    if ctx.pad_x == 0 and ctx.pad_y == 0:
+        if class_map.shape[1] == ow and class_map.shape[0] == oh:
+            return class_map
+        return cv2.resize(class_map.astype(np.float32), (ow, oh),
+                          interpolation=cv2.INTER_NEAREST).astype(np.int32)
+    gain = max(float(ctx.scale), 1e-6)
+    unpad_h = int(round(oh * gain))
+    unpad_w = int(round(ow * gain))
+    in_h = int(getattr(ctx, "input_height", 0) or input_height or class_map.shape[0])
+    in_w = int(getattr(ctx, "input_width", 0) or input_width or class_map.shape[1])
+    ratio_h = class_map.shape[0] / float(max(in_h, 1))
+    ratio_w = class_map.shape[1] / float(max(in_w, 1))
+    top = int(round(int(ctx.pad_y) * ratio_h))
+    left = int(round(int(ctx.pad_x) * ratio_w))
+    bottom = min(top + int(round(unpad_h * ratio_h)), class_map.shape[0])
+    right = min(left + int(round(unpad_w * ratio_w)), class_map.shape[1])
+    cropped = class_map[max(top, 0):bottom, max(left, 0):right]
+    if cropped.size == 0:
+        return class_map
+    return cv2.resize(cropped.astype(np.float32), (ow, oh),
+                      interpolation=cv2.INTER_NEAREST).astype(np.int32)

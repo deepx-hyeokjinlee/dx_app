@@ -59,7 +59,10 @@ public:
         
         // Remove letterbox padding before resize (matching original)
         cv::Mat unpadded_mask;
-        if (ctx.pad_x > 0 || ctx.pad_y > 0) {
+        // A mask already in image coordinates (every semantic postprocessor
+        // returns one now) has no padding left to cut.
+        const bool image_sized = seg.width == ctx.original_width && seg.height == ctx.original_height;
+        if (!image_sized && (ctx.pad_x > 0 || ctx.pad_y > 0)) {
             int unpad_w = seg.width - 2 * ctx.pad_x;
             int unpad_h = seg.height - 2 * ctx.pad_y;
             // Safety check to prevent ROI assertion errors

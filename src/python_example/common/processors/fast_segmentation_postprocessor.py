@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 
 from ..base import IPostprocessor, PreprocessContext, SegmentationResult
+from .segmentation_postprocessor import class_map_to_original
 
 
 class FastSegmentationPostprocessor(IPostprocessor):
@@ -67,40 +68,7 @@ class FastSegmentationPostprocessor(IPostprocessor):
 
     def _resize_to_original(self, class_map: np.ndarray, ctx: PreprocessContext) -> np.ndarray:
         """Resize the single-channel class map to original image size."""
-        if ctx is None or ctx.original_width <= 0 or ctx.original_height <= 0:
-            return class_map
-
-        if ctx.pad_x == 0 and ctx.pad_y == 0:
-            if (class_map.shape[1] == ctx.original_width
-                    and class_map.shape[0] == ctx.original_height):
-                return class_map
-            return cv2.resize(
-                class_map.astype(np.float32),
-                (ctx.original_width, ctx.original_height),
-                interpolation=cv2.INTER_NEAREST,
-            ).astype(np.int32)
-
-        gain = max(ctx.scale, 1e-6)
-        unpad_h = int(round(ctx.original_height * gain))
-        unpad_w = int(round(ctx.original_width * gain))
-        ratio_h = class_map.shape[0] / float(max(ctx.input_height or self.input_height, 1))
-        ratio_w = class_map.shape[1] / float(max(ctx.input_width or self.input_width, 1))
-        top = int(round(int(ctx.pad_y) * ratio_h))
-        left = int(round(int(ctx.pad_x) * ratio_w))
-        crop_h = int(round(unpad_h * ratio_h))
-        crop_w = int(round(unpad_w * ratio_w))
-        bottom = min(top + crop_h, class_map.shape[0])
-        right = min(left + crop_w, class_map.shape[1])
-        cropped = class_map[max(top, 0):bottom, max(left, 0):right]
-        if cropped.size == 0:
-            return class_map
-        return cv2.resize(
-            cropped.astype(np.float32),
-            (ctx.original_width, ctx.original_height),
-            interpolation=cv2.INTER_NEAREST,
-        ).astype(np.int32)
-
-    @staticmethod
+        return class_map_to_original(class_map, ctx, self.input_width, self.input_height)
     def _make_result(class_map: np.ndarray) -> SegmentationResult:
         height, width = class_map.shape
         unique_classes = np.unique(class_map).tolist()

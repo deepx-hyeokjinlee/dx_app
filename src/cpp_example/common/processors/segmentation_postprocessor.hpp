@@ -26,6 +26,42 @@ namespace dxapp {
 // ============================================================================
 // DeepLabv3 Semantic Segmentation Postprocessor
 // ============================================================================
+namespace detail {
+
+/// A class map (CV_32S) back to the original image: the letterbox padding cut
+/// away and the rest resized NEAREST to the image size, as a box is mapped back.
+/// The padding is in network-input pixels; a map smaller than the input (a
+/// stride-4 head) scales it by map/input. The Python tree does the same
+/// (class_map_to_original), so both return image-sized masks.
+inline cv::Mat classMapToOriginal(const cv::Mat& class_map, const PreprocessContext& ctx,
+                                  int input_width, int input_height) {
+    if (ctx.original_width <= 0 || ctx.original_height <= 0 || class_map.empty()) return class_map;
+    const cv::Size orig(ctx.original_width, ctx.original_height);
+    cv::Mat resized;
+    if (ctx.pad_x == 0 && ctx.pad_y == 0) {
+        if (class_map.cols == orig.width && class_map.rows == orig.height) return class_map;
+        cv::resize(class_map, resized, orig, 0, 0, cv::INTER_NEAREST);
+        return resized;
+    }
+    const double gain = std::max(static_cast<double>(ctx.scale), 1e-6);
+    const int unpad_w = static_cast<int>(std::round(ctx.original_width * gain));
+    const int unpad_h = static_cast<int>(std::round(ctx.original_height * gain));
+    const int in_w = ctx.input_width > 0 ? ctx.input_width : (input_width > 0 ? input_width : class_map.cols);
+    const int in_h = ctx.input_height > 0 ? ctx.input_height : (input_height > 0 ? input_height : class_map.rows);
+    const double rw = static_cast<double>(class_map.cols) / std::max(in_w, 1);
+    const double rh = static_cast<double>(class_map.rows) / std::max(in_h, 1);
+    const int left = std::max(0, static_cast<int>(std::round(ctx.pad_x * rw)));
+    const int top = std::max(0, static_cast<int>(std::round(ctx.pad_y * rh)));
+    const int right = std::min(class_map.cols, left + static_cast<int>(std::round(unpad_w * rw)));
+    const int bottom = std::min(class_map.rows, top + static_cast<int>(std::round(unpad_h * rh)));
+    if (right <= left || bottom <= top) return class_map;
+    cv::resize(class_map(cv::Rect(left, top, right - left, bottom - top)), resized, orig, 0, 0,
+               cv::INTER_NEAREST);
+    return resized;
+}
+
+}  // namespace detail
+
 class DeepLabv3Postprocessor : public IPostprocessor<SegmentationResult> {
 public:
     DeepLabv3Postprocessor(int input_width = 513, int input_height = 513,
@@ -34,7 +70,7 @@ public:
           upsample_to_input_(upsample_to_input) {}
 
     std::vector<SegmentationResult> process(const dxrt::TensorPtrs& outputs,
-                                            const PreprocessContext& /*ctx*/) override {
+                                            const PreprocessContext& ctx) override {
         std::vector<SegmentationResult> results;
         if (outputs.empty()) return results;
 
@@ -104,6 +140,17 @@ public:
                           C, H, W, is_nhwc, seg.mask, unique_classes);
         }
 
+        // In image coordinates, as the Python tree returns it (and as boxes are).
+        cv::Mat map(seg.height, seg.width, CV_32S, seg.mask.data());
+        cv::Mat orig = detail::classMapToOriginal(map, ctx, input_width_, input_height_);
+        if (orig.data != map.data) {
+            seg.width = orig.cols;
+            seg.height = orig.rows;
+            std::vector<int> mask(orig.begin<int>(), orig.end<int>());
+            seg.mask.swap(mask);
+            unique_classes.clear();
+            unique_classes.insert(seg.mask.begin(), seg.mask.end());
+        }
         seg.class_ids.assign(unique_classes.begin(), unique_classes.end());
         results.push_back(std::move(seg));
         return results;
@@ -235,7 +282,7 @@ public:
         cv::Mat class_map = toClassMap_(tensor->data(), tensor->shape(), tensor->elem_size());
         if (class_map.empty()) return results;
 
-        class_map = resizeToOriginal_(class_map, ctx);
+        class_map = detail::classMapToOriginal(class_map, ctx, input_width_, input_height_);
 
         SegmentationResult seg;
         seg.width = class_map.cols;
@@ -345,31 +392,6 @@ private:
             }
         }
         return class_map;
-    }
-
-    static cv::Mat resizeToOriginal_(const cv::Mat& class_map, const PreprocessContext& ctx) {
-        if (ctx.original_width <= 0 || ctx.original_height <= 0) return class_map;
-        if (ctx.pad_x == 0 && ctx.pad_y == 0) {
-            if (class_map.cols == ctx.original_width && class_map.rows == ctx.original_height) {
-                return class_map;
-            }
-            cv::Mat resized;
-            cv::resize(class_map, resized, cv::Size(ctx.original_width, ctx.original_height),
-                       0, 0, cv::INTER_NEAREST);
-            return resized;
-        }
-
-        float gain = std::max(ctx.scale, 1e-6f);
-        int unpad_w = static_cast<int>(std::round(ctx.original_width * gain));
-        int unpad_h = static_cast<int>(std::round(ctx.original_height * gain));
-        cv::Rect crop(ctx.pad_x, ctx.pad_y,
-                      std::min(unpad_w, class_map.cols - ctx.pad_x),
-                      std::min(unpad_h, class_map.rows - ctx.pad_y));
-        if (crop.width <= 0 || crop.height <= 0) return class_map;
-        cv::Mat resized;
-        cv::resize(class_map(crop), resized, cv::Size(ctx.original_width, ctx.original_height),
-                   0, 0, cv::INTER_NEAREST);
-        return resized;
     }
 
     int input_width_;

@@ -861,8 +861,8 @@ def convert_cpp_semantic_seg(class_map: np.ndarray, ctx=None,
         ctx: Optional PreprocessContext with original image dimensions.
         resize_to_original: When True, resize the class map to the original
             image size (matches the pre-argmaxed path of the Python golden,
-            and SegFormer's resize_to_original=True). When False, the class
-            map is returned at model resolution (e.g. U-Net).
+            and every semantic-segmentation postprocessor). When False, the
+            class map is returned at model resolution.
 
     Returns:
         List containing a single SegmentationResult.
@@ -877,24 +877,9 @@ def convert_cpp_semantic_seg(class_map: np.ndarray, ctx=None,
         cm = cm.squeeze()
 
     if resize_to_original and ctx is not None:
-        ow = getattr(ctx, 'original_width', 0)
-        oh = getattr(ctx, 'original_height', 0)
-        if ow > 0 and oh > 0:
-            pad_x = getattr(ctx, 'pad_x', 0)
-            pad_y = getattr(ctx, 'pad_y', 0)
-            if pad_x == 0 and pad_y == 0:
-                if cm.shape[1] != ow or cm.shape[0] != oh:
-                    cm = cv2.resize(cm.astype(np.float32), (ow, oh),
-                                    interpolation=cv2.INTER_NEAREST).astype(np.int32)
-            else:
-                gain = max(getattr(ctx, 'scale', 1.0), 1e-6)
-                unpad_h = int(round(oh * gain))
-                unpad_w = int(round(ow * gain))
-                top, left = int(pad_y), int(pad_x)
-                cropped = cm[top:top + unpad_h, left:left + unpad_w]
-                if cropped.size > 0:
-                    cm = cv2.resize(cropped.astype(np.float32), (ow, oh),
-                                    interpolation=cv2.INTER_NEAREST).astype(np.int32)
+        from ..processors.segmentation_postprocessor import class_map_to_original
+        cm = class_map_to_original(cm, ctx, int(getattr(ctx, 'input_width', 0) or cm.shape[1]),
+                                   int(getattr(ctx, 'input_height', 0) or cm.shape[0]))
 
     h, w = cm.shape
     return [SegmentationResult(

@@ -27,7 +27,6 @@ from common.runner.entry import install_import_paths, run_entry
 install_import_paths(_script)
 
 from common.utility import convert_cpp_semantic_seg
-from functools import partial
 from factory import UnetFactory
 from common.runner import SyncRunner
 
@@ -44,7 +43,7 @@ def on_engine_init(runner):
     from dx_postprocess import SemanticSegPostProcess
 
     runner._cpp_postprocessor = SemanticSegPostProcess(runner.input_width, runner.input_height)
-    runner._cpp_convert_fn = partial(convert_cpp_semantic_seg, resize_to_original=False)
+    runner._cpp_convert_fn = convert_cpp_semantic_seg
 
 
 def main():
