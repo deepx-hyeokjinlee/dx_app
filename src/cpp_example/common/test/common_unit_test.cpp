@@ -67,6 +67,7 @@
 #include "common/config/model_config.hpp"
 #include "common/processors/anchor_face_postprocessor.hpp"
 #include "common/processors/classification_postprocessor.hpp"
+#include "common/processors/letterbox_preprocessor.hpp"
 #include "common/processors/hand_landmark_postprocessor.hpp"
 #include "common/processors/picodet_postprocessor.hpp"
 #include "common/processors/pose_postprocessor.hpp"
@@ -593,6 +594,29 @@ void TestClassificationTiesGoToTheLowerClassId() {
         COMMON_CHECK(results[1].class_id == 260);
         COMMON_CHECK(results[2].class_id == 267);
         COMMON_CHECK(results[3].class_id == 999);
+    }
+}
+
+/// Letterbox as the Python LetterboxPreprocessor (Ultralytics): the scaled size
+/// is rounded and the odd padding row goes to the bottom. 1536x1024 -> 640x640:
+/// 640x427 at top 106 (C++ truncated to 426 rows at top 107, and every box moved).
+void TestLetterboxRoundsLikePython() {
+    struct Case { int w, h, rows, top; };
+    const Case cases[] = {{1536, 1024, 427, 106}, {768, 576, 480, 80}, {1200, 900, 480, 80},
+                          {773, 512, 424, 108}};
+    for (const auto& c : cases) {
+        cv::Mat img(c.h, c.w, CV_8UC3, cv::Scalar(10, 20, 30));
+        cv::Mat out;
+        dxapp::PreprocessContext ctx;
+        dxapp::DetectionPreprocessor pre(640, 640);
+        pre.process(img, out, ctx);
+        COMMON_CHECK(out.rows == 640 && out.cols == 640);
+        COMMON_CHECK(ctx.pad_y == c.top);
+        int first = -1, last = -1;
+        for (int y = 0; y < out.rows; ++y) {
+            if (out.at<cv::Vec3b>(y, 320)[0] != 114) { if (first < 0) first = y; last = y; }
+        }
+        COMMON_CHECK(first == c.top && last - first + 1 == c.rows);
     }
 }
 
@@ -3081,6 +3105,7 @@ int main() {
     TestClassificationDistributionGuardAvoidsDoubleSoftmax();
     TestClassificationDistributionGuardToleratesQuantizedSums();
     TestClassificationTiesGoToTheLowerClassId();
+    TestLetterboxRoundsLikePython();
     TestClassificationNonImageNetClassCountLeavesNameEmpty();
     TestClassificationTopKFieldFilled();
     TestClassificationShortTensorNeverReadPast();

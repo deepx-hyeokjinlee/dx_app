@@ -7,11 +7,17 @@
 #define DXAPP_PREPROCESSING_HPP
 
 #include <opencv2/opencv.hpp>
+#include <cmath>
 #include <vector>
 
 #include "../base/i_processor.hpp"
 
 namespace dxapp {
+
+/// round(size * gain), half to even like Python's round(), at least 1.
+inline int letterboxScaledSize(int size, double gain) {
+    return std::max(1, static_cast<int>(std::nearbyint(size * gain)));
+}
 
 /**
  * @brief Calculate letterbox padding for maintaining aspect ratio
@@ -29,18 +35,19 @@ inline void calculateLetterboxParams(int img_width, int img_height,
     ctx.input_width = target_width;
     ctx.input_height = target_height;
 
-    // Calculate scale to maintain aspect ratio
-    ctx.scale = std::min(
-        static_cast<float>(target_width) / img_width,
-        static_cast<float>(target_height) / img_height
-    );
-
-    // Calculate padding
-    int new_width = static_cast<int>(img_width * ctx.scale);
-    int new_height = static_cast<int>(img_height * ctx.scale);
-    
-    ctx.pad_x = (target_width - new_width) / 2;
-    ctx.pad_y = (target_height - new_height) / 2;
+    // The Ultralytics letterbox, as the Python LetterboxPreprocessor: the scaled
+    // size is ROUNDED (half to even, Python's round()) and the odd padding pixel
+    // goes to the bottom/right via round(d - 0.1). Truncating instead shifted
+    // the image a row and resized it a row short whenever the scale is not
+    // exact (1536x1024 -> 640: 426 rows at top 107 instead of 427 at 106), and
+    // every box moved -- yolov5-s up to 7.7 px against the Python example.
+    const double gain = std::min(static_cast<double>(target_width) / img_width,
+                                 static_cast<double>(target_height) / img_height);
+    ctx.scale = static_cast<float>(gain);
+    const int new_width = letterboxScaledSize(img_width, gain);
+    const int new_height = letterboxScaledSize(img_height, gain);
+    ctx.pad_x = static_cast<int>(std::nearbyint((target_width - new_width) / 2.0 - 0.1));
+    ctx.pad_y = static_cast<int>(std::nearbyint((target_height - new_height) / 2.0 - 0.1));
 }
 
 /**
@@ -60,9 +67,11 @@ inline void makeLetterboxImage(const cv::Mat& image, cv::Mat& output,
                                int pad_value = 114) {
     calculateLetterboxParams(image.cols, image.rows, target_width, target_height, ctx);
 
-    // Calculate new dimensions after scaling (must match calculateLetterboxParams)
-    int new_width = static_cast<int>(image.cols * ctx.scale);
-    int new_height = static_cast<int>(image.rows * ctx.scale);
+    // New dimensions after scaling (the same rule as calculateLetterboxParams)
+    const double gain = std::min(static_cast<double>(target_width) / image.cols,
+                                 static_cast<double>(target_height) / image.rows);
+    const int new_width = letterboxScaledSize(image.cols, gain);
+    const int new_height = letterboxScaledSize(image.rows, gain);
 
     // Resize to new dimensions
     cv::Mat resized;
