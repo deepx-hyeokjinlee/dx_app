@@ -9,6 +9,8 @@
 #ifndef POSE_POSTPROCESSOR_HPP
 #define POSE_POSTPROCESSOR_HPP
 
+#include <iostream>
+
 #include "common/base/i_processor.hpp"
 #include "common/processors/result_converters.hpp"
 
@@ -99,6 +101,19 @@ public:
                 channels = static_cast<int>(shape[2]);
                 needs_transpose = false;
             }
+        } else if (shape.size() != 2) {
+            // Per-level 4D heads (the CPU/ORT tail off) are not the fused
+            // table this decoder reads; reading shape[0]/[1] of one as
+            // channels/N published poses made of feature-map values. Say so
+            // once and publish nothing.
+            if (!warned_unfused_) {
+                warned_unfused_ = true;
+                std::cerr << "[DXAPP] [ERROR] YOLOv8PosePostprocessor: expected one fused "
+                             "[1,C,N]/[1,N,C] tensor, got a " << shape.size()
+                          << "D tensor (per-level heads: run the model with the CPU/ORT "
+                             "tail on); no poses decoded." << std::endl;
+            }
+            return results;
         } else {
             if (shape[0] <= shape[1]) {
                 channels = static_cast<int>(shape[0]);
@@ -217,6 +232,7 @@ private:
     int input_height_;
     float score_threshold_;
     float nms_threshold_;
+    bool warned_unfused_{false};
     int num_keypoints_;
 };
 

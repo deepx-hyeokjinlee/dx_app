@@ -2921,6 +2921,32 @@ void TestYolov5AlignsNonSquareNCHWMaps() { COMMON_CHECK(YoloAnchorMapsAlignFailu
 void TestYolov7AlignsNonSquareNCHWMaps() { COMMON_CHECK(YoloAnchorMapsAlignFailures("yolov7") == 0); }
 
 // ---------------------------------------------------------------------------
+// YOLOv8PosePostprocessor: only a fused [1,C,N]/[1,N,C] (or 2D) tensor.
+// ---------------------------------------------------------------------------
+
+/// With the CPU/ORT tail off a YOLOv8-pose export emits per-level 4D heads
+/// ([1,64,80,80], [1,1,80,80], [1,51,80,80], ...). The decoder read a 4D
+/// shape's [0] and [1] as channels/N -- 1 and 64 -- and walked the head as if
+/// it were the fused table, publishing poses from feature-map values (survey
+/// item F14). A head with every value 0.9 makes that visible: read as rows,
+/// each "score" column clears the threshold. It must publish nothing.
+void TestYolov8PoseRefusesUnfusedHeads() {
+    std::vector<float> storage(static_cast<std::size_t>(64) * 80 * 80, 0.9f);
+    std::vector<int64_t> shape;
+    shape.push_back(1);
+    shape.push_back(64);
+    shape.push_back(80);
+    shape.push_back(80);
+    dxrt::TensorPtrs outputs;
+    outputs.push_back(std::make_shared<dxrt::Tensor>("head", shape, dxrt::DataType::FLOAT, storage.data()));
+    dxapp::PreprocessContext ctx;
+    ctx.original_width = 640;
+    ctx.original_height = 640;
+    dxapp::YOLOv8PosePostprocessor post(640, 640, 0.3f, 0.45f, 17, false);
+    COMMON_CHECK(post.process(outputs, ctx).empty());
+}
+
+// ---------------------------------------------------------------------------
 // PicoDetPostprocessor: PP-PicoDet's per-level score and box tensors.
 // ---------------------------------------------------------------------------
 
@@ -2992,6 +3018,7 @@ int main() {
     // Must stay first of the postprocess tests: see the ORDER NOTE on this test.
     TestAnchorFaceDebugHeaderOncePerInstance();
     TestPicoDetDecodesPerLevelTensors();
+    TestYolov8PoseRefusesUnfusedHeads();
     TestYolov5AlignsNonSquareNCHWMaps();
     TestYolov7AlignsNonSquareNCHWMaps();
     TestPicoDetIgnoresASingleConcatenatedTensor();
