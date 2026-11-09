@@ -105,6 +105,12 @@ public:
     float get_score_threshold() const { return score_threshold_; }
     float get_nms_threshold() const { return nms_threshold_; }
     int get_num_classes() const { return num_classes_; }
+    /// Override the anchor sizes (stride -> (w, h) list); the PPU output carries only
+    /// the anchor INDEX. Same contract as the library's YOLOv5PPUPostProcess::set_anchors;
+    /// an empty map is ignored.
+    void set_anchors(const std::map<int, std::vector<std::pair<int,int>>>& anchors_by_strides) {
+        if (!anchors_by_strides.empty()) anchors_by_strides_ = anchors_by_strides;
+    }
     const std::map<int, std::vector<std::pair<int,int>>>& get_anchors_by_strides() const { return anchors_by_strides_; }
     const std::vector<std::string>& get_ppu_output_names() const { return ppu_output_names_; }
 

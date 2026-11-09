@@ -131,6 +131,16 @@ class YOLOv5PPUPostProcess {
     // Static configuration getters
     static int get_num_classes() { return num_classes_; }
 
+    /**
+     * @brief Override the anchors (stride -> (w, h) list). The PPU export carries
+     * only the anchor INDEX; the sizes are the host's. yolov4_512x512_ppu was
+     * trained with YOLOv4's anchors, not YOLOv5's defaults set by the constructor.
+     * Same contract as YOLOv5PostProcess::set_anchors; an empty map is ignored.
+     */
+    void set_anchors(const std::map<int, std::vector<std::pair<int, int>>>& anchors_by_strides) {
+        if (!anchors_by_strides.empty()) anchors_by_strides_ = anchors_by_strides;
+    }
+
     const std::map<int, std::vector<std::pair<int, int>>>& get_anchors_by_strides() const {
         return anchors_by_strides_;
     }

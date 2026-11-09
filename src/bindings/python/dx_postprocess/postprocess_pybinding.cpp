@@ -1520,6 +1520,8 @@ PYBIND11_MODULE(dx_postprocess, m)
             }
             return yolov5_ppu_results_to_numpy(results);
         }, py::arg("ie_output"))
+        .def("set_anchors", &YOLOv5PPUPostProcess::set_anchors, py::arg("anchors_by_strides"))
+        .def("get_anchors_by_strides", &YOLOv5PPUPostProcess::get_anchors_by_strides)
         .def("get_input_width", &YOLOv5PPUPostProcess::get_input_width)
         .def("get_input_height", &YOLOv5PPUPostProcess::get_input_height);
 

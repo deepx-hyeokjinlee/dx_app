@@ -80,8 +80,11 @@ class PPUPostprocessor(IPostprocessor):
         # Allow caller to override per-model anchors and strides via config
         custom_anchors = self.config.get('anchors', None)
         if custom_anchors is not None:
+            # int(): a config.json can only give the strides as STRING keys, and a
+            # string never equals the float stride array below -- every box got a
+            # zero-size anchor, silently.
             self.ANCHORS = {
-                k: np.array(v, dtype=np.float32)
+                int(k): np.array(v, dtype=np.float32)
                 for k, v in custom_anchors.items()
             }
         custom_strides = self.config.get('strides', None)

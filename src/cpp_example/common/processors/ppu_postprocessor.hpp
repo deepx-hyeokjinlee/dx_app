@@ -78,6 +78,11 @@ public:
 
     std::string getModelName() const override { return "YOLOv5-PPU"; }
 
+    /// Anchor sizes for exports not trained with YOLOv5's (yolov4_512x512_ppu).
+    void setAnchors(const std::map<int, std::vector<std::pair<int, int>>>& anchors_by_strides) {
+        impl_.set_anchors(anchors_by_strides);
+    }
+
 private:
     YOLOv5PPUPostProcess impl_;
 };

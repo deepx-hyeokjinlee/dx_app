@@ -49,6 +49,10 @@ def on_engine_init(runner):
     score_thr = config.get("score_threshold", 0.3)
     nms_thr = config.get("nms_threshold", 0.45)
     runner._cpp_postprocessor = YOLOv5PPUPostProcess(input_w, input_h, obj_thr, score_thr, nms_thr)
+    # YOLOv4's anchors, from the Python postprocessor the config built.
+    runner._cpp_postprocessor.set_anchors({
+        int(s): [(int(w), int(h)) for w, h in a]
+        for s, a in runner.postprocessor.ANCHORS.items()})
     runner._cpp_convert_fn = convert_cpp_detections
 
 
