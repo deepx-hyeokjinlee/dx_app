@@ -319,6 +319,13 @@ void YOLOv7PostProcess::set_thresholds(float obj_threshold, float score_threshol
     }
 }
 
+void YOLOv7PostProcess::set_anchors(
+    const std::map<int, std::vector<std::pair<int, int>>>& anchors_by_strides) {
+    if (!anchors_by_strides.empty()) {
+        anchors_by_strides_ = anchors_by_strides;
+    }
+}
+
 // Get configuration information
 std::string YOLOv7PostProcess::get_config_info() const {
     std::ostringstream oss;

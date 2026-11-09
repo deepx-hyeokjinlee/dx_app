@@ -129,6 +129,19 @@ class YOLOv7PostProcess {
                         const float nms_threshold);
 
     /**
+     * @brief Override the anchor box configuration (anchors grouped by stride).
+     *
+     * Same contract as YOLOv5PostProcess::set_anchors: models with a 4th
+     * detection head (YOLOv7-W6/E6/D6/E6E without the in-graph decoder,
+     * strides 8/16/32/64) need the P6 anchors; align_tensors and
+     * decoding_npu_outputs already iterate over whatever strides are set.
+     *
+     * @param anchors_by_strides Map of stride -> list of (width, height) anchors
+     */
+    void set_anchors(
+        const std::map<int, std::vector<std::pair<int, int>>>& anchors_by_strides);
+
+    /**
      * @brief Get current configuration
      * @return String representation of current configuration
      */
