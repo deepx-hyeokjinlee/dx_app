@@ -27,7 +27,7 @@ so the default path is never altered.
 
 import numpy as np
 
-from .efficientdet_postprocessor import EfficientDetPostprocessor
+from .efficientdet_postprocessor import EfficientDetPostprocessor, _COCO90_TO_80
 
 
 class FastEfficientDetPostprocessor(EfficientDetPostprocessor):
@@ -60,7 +60,8 @@ class FastEfficientDetPostprocessor(EfficientDetPostprocessor):
         ``(None, None)`` when no usable score tensor is present.
         """
         if scores_1d is None and scores_2d is not None:
-            if self.has_background and scores_2d.shape[-1] > 1:
+            coco90 = scores_2d.shape[-1] == 90  # see efficientdet_postprocessor._COCO90_TO_80
+            if not coco90 and self.has_background and scores_2d.shape[-1] > 1:
                 fg = scores_2d[:, 1:]
             else:
                 fg = scores_2d
@@ -69,6 +70,10 @@ class FastEfficientDetPostprocessor(EfficientDetPostprocessor):
             keep = np.nonzero(scores_cand >= self.score_threshold)[0]
             if keep.size:
                 class_ids[keep] = np.argmax(fg[keep], axis=1)
+                if coco90:
+                    mapped = _COCO90_TO_80[class_ids[keep]]
+                    scores_cand[keep[mapped < 0]] = -1.0  # an id with no COCO-80 class
+                    class_ids[keep] = np.maximum(mapped, 0)
             return scores_cand, class_ids
         if scores_1d is not None:
             return scores_1d, np.zeros(len(scores_1d), dtype=int)
