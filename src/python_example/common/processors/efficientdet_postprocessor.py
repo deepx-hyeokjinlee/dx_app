@@ -37,6 +37,14 @@ class EfficientDetPostprocessor(IPostprocessor):
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
         self.num_classes = self.config.get('num_classes', 90)
         self.has_background = self.config.get('has_background', True)
+        # Column order of a NORMALIZED box: 'yxyx' is TF EfficientDet's
+        # [ymin, xmin, ymax, xmax]; 'xyxy' is [x1, y1, x2, y2], which the
+        # yolov4 exports emit ([1,N,1,4] boxes + [1,N,80] scores, no
+        # background column). Read as yxyx, every yolov4 box came out
+        # transposed (2026-11-09).
+        self.box_order = self.config.get('box_order', 'yxyx')
+        if self.box_order not in ('yxyx', 'xyxy'):
+            raise ValueError(f"box_order must be 'yxyx' or 'xyxy', got {self.box_order!r}")
         self.max_nms_candidates = int(self.config.get('max_nms_candidates', 1000))
         self._anchors = None
 
@@ -306,7 +314,8 @@ class EfficientDetPostprocessor(IPostprocessor):
         """
         Convert boxes/scores/classes to DetectionResult list.
 
-        boxes: [N, 4] in [ymin, xmin, ymax, xmax] normalized or pixel format
+        boxes: [N, 4]: normalized [ymin, xmin, ymax, xmax] (box_order 'yxyx') or
+               [x1, y1, x2, y2] ('xyxy'), or pixel [x1, y1, x2, y2]
         scores: [N] confidence scores
         class_ids: [N] or None
         """
@@ -326,7 +335,13 @@ class EfficientDetPostprocessor(IPostprocessor):
         # Determine if normalized (values mostly in [0, 2])
         is_normalized = np.percentile(np.abs(boxes), 95) < 2.0
 
-        if is_normalized:
+        if is_normalized and self.box_order == 'xyxy':
+            # [x1, y1, x2, y2] normalized → pixel
+            x1 = boxes[:, 0] * self.input_width
+            y1 = boxes[:, 1] * self.input_height
+            x2 = boxes[:, 2] * self.input_width
+            y2 = boxes[:, 3] * self.input_height
+        elif is_normalized:
             # [ymin, xmin, ymax, xmax] normalized → [x1, y1, x2, y2] pixel
             x1 = boxes[:, 1] * self.input_width
             y1 = boxes[:, 0] * self.input_height

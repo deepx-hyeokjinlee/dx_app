@@ -2917,6 +2917,8 @@ void TestPoseVisualizerDrawsUnorderedPointsOnly() {
 // ---------------------------------------------------------------------------
 int YoloAnchorMapsAlignFailures(const char* which);  // 0 = aligned correctly
 
+int EfficientDetYolov4LayoutFailures();  // efficientdet_lib_test.cpp; 0 = correct
+void TestEfficientDetLibReadsYolov4BoxesAsXyxy() { COMMON_CHECK(EfficientDetYolov4LayoutFailures() == 0); }
 void TestYolov5AlignsNonSquareNCHWMaps() { COMMON_CHECK(YoloAnchorMapsAlignFailures("yolov5") == 0); }
 void TestYolov7AlignsNonSquareNCHWMaps() { COMMON_CHECK(YoloAnchorMapsAlignFailures("yolov7") == 0); }
 
@@ -3020,6 +3022,7 @@ int main() {
     TestPicoDetDecodesPerLevelTensors();
     TestYolov8PoseRefusesUnfusedHeads();
     TestYolov5AlignsNonSquareNCHWMaps();
+    TestEfficientDetLibReadsYolov4BoxesAsXyxy();
     TestYolov7AlignsNonSquareNCHWMaps();
     TestPicoDetIgnoresASingleConcatenatedTensor();
 

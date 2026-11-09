@@ -2056,13 +2056,14 @@ PYBIND11_MODULE(dx_postprocess, m)
 
     // --- EfficientDet ---
     py::class_<EfficientDetPostProcess>(m, "EfficientDetPostProcess")
-        .def(py::init<int, int, float, float, int, bool>(),
+        .def(py::init<int, int, float, float, int, bool, bool>(),
             py::arg("input_w"),
             py::arg("input_h"),
             py::arg("score_threshold") = 0.3f,
             py::arg("nms_threshold")   = 0.45f,
             py::arg("num_classes")     = 90,
-            py::arg("has_background")  = true)
+            py::arg("has_background")  = true,
+            py::arg("boxes_xyxy")      = false)
         .def("postprocess", [](EfficientDetPostProcess& self, py::list ie_output) {
             auto tensors = numpy_to_dxrt_tensors(ie_output);
             std::vector<EfficientDetResult> results;

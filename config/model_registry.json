@@ -5456,7 +5456,7 @@
     "original_name": "yolov4_leaky_512_512",
     "csv_task": "OD",
     "add_model_task": "object_detection",
-    "postprocessor": "yolov5",
+    "postprocessor": "efficientdet",
     "input_width": 512,
     "input_height": 512,
     "config": {
@@ -5480,7 +5480,7 @@
     "original_name": "YOLOV4Tiny_1",
     "csv_task": "OD",
     "add_model_task": "object_detection",
-    "postprocessor": "yolov5",
+    "postprocessor": "efficientdet",
     "input_width": 416,
     "input_height": 416,
     "config": {

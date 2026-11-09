@@ -8,10 +8,11 @@ EfficientDetPostProcess::EfficientDetPostProcess(int input_w, int input_h,
                                                    float score_threshold,
                                                    float nms_threshold,
                                                    int num_classes,
-                                                   bool has_background)
+                                                   bool has_background,
+                                                   bool boxes_xyxy)
     : input_width_(input_w), input_height_(input_h),
       score_threshold_(score_threshold), nms_threshold_(nms_threshold),
-      num_classes_(num_classes), has_background_(has_background) {}
+      num_classes_(num_classes), has_background_(has_background), boxes_xyxy_(boxes_xyxy) {}
 
 EfficientDetPostProcess::EfficientDetPostProcess()
     : input_width_(512), input_height_(512),
@@ -276,11 +277,11 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::processTFFormat(
         float score = scores[i];
         if (score < score_threshold_) continue;
 
-        // TF format: [ymin, xmin, ymax, xmax] normalized
-        float ymin = boxes[i * 4 + 0];
-        float xmin = boxes[i * 4 + 1];
-        float ymax = boxes[i * 4 + 2];
-        float xmax = boxes[i * 4 + 3];
+        // TF format: [ymin, xmin, ymax, xmax] normalized (boxes_xyxy_: [x1,y1,x2,y2])
+        float ymin = boxes[i * 4 + (boxes_xyxy_ ? 1 : 0)];
+        float xmin = boxes[i * 4 + (boxes_xyxy_ ? 0 : 1)];
+        float ymax = boxes[i * 4 + (boxes_xyxy_ ? 3 : 2)];
+        float xmax = boxes[i * 4 + (boxes_xyxy_ ? 2 : 3)];
 
         float x1 = xmin * input_width_;
         float y1 = ymin * input_height_;
@@ -360,9 +361,16 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::process2Tensor(
         float b3 = boxes[i * 4 + 3];
 
         float x1, y1, x2, y2;
-        // If all values are in [0,1], assume normalized [ymin,xmin,ymax,xmax]
-        if (b0 <= 1.0f && b1 <= 1.0f && b2 <= 1.0f && b3 <= 1.0f &&
-            b0 >= 0.0f && b1 >= 0.0f) {
+        // If all values are in [0,1], the box is normalized: [ymin,xmin,ymax,xmax]
+        // (TF EfficientDet) or, with boxes_xyxy_, [x1,y1,x2,y2] (yolov4 exports).
+        const bool normalized = b0 <= 1.0f && b1 <= 1.0f && b2 <= 1.0f && b3 <= 1.0f &&
+                                b0 >= 0.0f && b1 >= 0.0f;
+        if (normalized && boxes_xyxy_) {
+            x1 = b0 * input_width_;
+            y1 = b1 * input_height_;
+            x2 = b2 * input_width_;
+            y2 = b3 * input_height_;
+        } else if (normalized) {
             x1 = b1 * input_width_;
             y1 = b0 * input_height_;
             x2 = b3 * input_width_;

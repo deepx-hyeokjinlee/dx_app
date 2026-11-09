@@ -13,7 +13,10 @@
   "published": true,
   "config": {
     "nms_threshold": 0.45,
-    "score_threshold": 0.4
+    "score_threshold": 0.4,
+    "has_background": false,
+    "num_classes": 80,
+    "box_order": "xyxy"
   },
   "registry_config": {
     "score_threshold": 0.4,
@@ -33,7 +36,7 @@
         "token": "input_height"
       }
     ],
-    "class": "LetterboxPreprocessor",
+    "class": "SimpleResizePreprocessor",
     "config_overrides": {},
     "kwargs": {}
   },
@@ -49,7 +52,7 @@
         "token": "config"
       }
     ],
-    "class": "YOLOv5Postprocessor",
+    "class": "EfficientDetPostprocessor",
     "config_overrides": {},
     "kwargs": {}
   },

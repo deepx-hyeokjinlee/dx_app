@@ -35,6 +35,9 @@ class EfficientDetPostProcess {
     float nms_threshold_{0.45f};
     int num_classes_{90};
     bool has_background_{true};
+    // Column order of a NORMALIZED box. false: TF EfficientDet [ymin,xmin,ymax,xmax].
+    // true: [x1,y1,x2,y2], as the yolov4 exports emit ([1,N,1,4] boxes).
+    bool boxes_xyxy_{false};
     int max_nms_candidates_{1000};
 
     // Cached EfficientDet anchors (P3-P7): each entry is [cx, cy, w, h] in
@@ -54,7 +57,8 @@ class EfficientDetPostProcess {
                             float score_threshold = 0.3f,
                             float nms_threshold = 0.45f,
                             int num_classes = 90,
-                            bool has_background = true);
+                            bool has_background = true,
+                            bool boxes_xyxy = false);
     EfficientDetPostProcess();
     ~EfficientDetPostProcess() = default;
 
