@@ -3,8 +3,11 @@
  * @brief PP-Matting postprocessor: a continuous alpha matte, not a class map
  *
  * PaddleSeg's matting models emit ONE channel -- the foreground opacity of every
- * pixel. Neither ppmatting .dxnn is published (both URLs 403), so this is written to
- * that output shape and refuses anything else.
+ * pixel -- and this refuses anything else. Both ppmatting .dxnn are published
+ * (q-lite-dxnn/2_5_0/ppmatting-hrnet-w48-{composition,distinctions}_512x512, HTTP 200
+ * on 2026-11-09) and run on DX-RT 3.5.0 to a 512x512 float32 alpha that this class
+ * reads. (An earlier note here said both URLs answered 403 and the code had never
+ * met a real model.)
  *
  * The result carries both forms on purpose. `mask` is the alpha thresholded into a
  * 0/1 class map, because SemanticSegmentationVisualizer reads `mask` as class IDs and
