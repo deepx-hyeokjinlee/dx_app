@@ -19,6 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "src" / "python_example"))
 
 from common.base import PreprocessContext  # noqa: E402
+from common.utility.labels import name_for, resolve_class_name  # noqa: E402
 from common.utility.preprocessing import scale_to_original  # noqa: E402
 
 PROCESSORS = PROJECT_ROOT / "src" / "python_example" / "common" / "processors"
@@ -38,3 +39,29 @@ def test_no_python_processor_clips_coordinates_to_w_minus_1():
 def test_a_point_clips_to_the_image_size_not_one_less():
     ctx = PreprocessContext(original_width=100, original_height=50, scale=1.0)
     assert scale_to_original(150.0, 70.0, ctx) == (100.0, 50.0)
+
+
+def test_class_names_follow_the_cpp_rule():
+    assert resolve_class_name(16) == "dog"
+    assert resolve_class_name(99) == "class_99"
+    assert resolve_class_name(1, ["a", "b"]) == "b"
+    assert resolve_class_name(5, ["a", "b"]) == "class_5"
+
+    class P:
+        config = {"class_names": ["cat", "dog"]}
+    assert name_for(P(), 1) == "dog"
+    P.config = {}
+    assert name_for(P(), 0) == "person"
+
+
+def test_the_detection_processors_set_class_name():
+    names = ["yolo_postprocessor.py", "ppu_postprocessor.py", "rtdetr_postprocessor.py",
+             "preopt_postprocessor.py", "efficientdet_postprocessor.py",
+             "instance_seg_postprocessor.py", "yolact_postprocessor.py",
+             "tflite_det_postprocessor.py", "ssd_postprocessor.py", "picodet_postprocessor.py",
+             "nanodet_postprocessor.py", "damoyolo_postprocessor.py", "centernet_postprocessor.py"]
+    for n in names:
+        text = (PROCESSORS / n).read_text(encoding="utf-8")
+        built = len(re.findall(r"\b(DetectionResult|InstanceSegResult)\(", text))
+        named = text.count("class_name=name_for(self, ")
+        assert built and named == built, (n, built, named)

@@ -13,6 +13,7 @@ from typing import List
 
 from ..base import IPostprocessor, DetectionResult, PreprocessContext
 from .nms_utils import per_class_nms as _per_class_nms
+from ..utility.labels import name_for
 
 
 class DamoYoloPostprocessor(IPostprocessor):
@@ -102,7 +103,7 @@ class DamoYoloPostprocessor(IPostprocessor):
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(filtered_scores[idx]),
-                class_id=int(filtered_cls_ids[idx]),
+                class_id=int(filtered_cls_ids[idx]), class_name=name_for(self, int(filtered_cls_ids[idx])),
             ))
 
         return results

@@ -14,6 +14,7 @@ from typing import List, Any
 from ..base import IPostprocessor, PreprocessContext, DetectionResult
 from .nms_utils import cxcywh_to_x1y1x2y2 as _cxcywh_to_x1y1x2y2
 from .nms_utils import nms as _nms_impl
+from ..utility.labels import name_for
 
 
 def _nms(boxes, scores, class_ids, conf_threshold, nms_threshold):
@@ -292,7 +293,7 @@ class YOLOv5Postprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(confidences[idx]),
                 class_id=int(cls_ids[idx])
-            ))
+            , class_name=name_for(self, int(cls_ids[idx]))))
         
         return results
     
@@ -389,7 +390,7 @@ class YOLOv5Postprocessor(IPostprocessor):
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(filtered_scores[idx]),
-                class_id=int(filtered_cls_ids[idx]),
+                class_id=int(filtered_cls_ids[idx]), class_name=name_for(self, int(filtered_cls_ids[idx])),
             ))
         return results
 
@@ -543,7 +544,7 @@ class YOLOv8Postprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(cls_max_scores[idx]),
                 class_id=int(cls_ids[idx])
-            ))
+            , class_name=name_for(self, int(cls_ids[idx]))))
         
         return results
     
@@ -590,7 +591,7 @@ class YOLOv8Postprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores_f[idx]),
                 class_id=int(class_ids[idx])
-            ))
+            , class_name=name_for(self, int(class_ids[idx]))))
         
         return results
     
@@ -730,7 +731,7 @@ class YOLOXPostprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(confidences[idx]),
                 class_id=int(cls_ids[idx])
-            ))
+            , class_name=name_for(self, int(cls_ids[idx]))))
 
         return results
 
@@ -805,7 +806,7 @@ class YOLOXPostprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(confidences[idx]),
                 class_id=int(cls_ids[idx])
-            ))
+            , class_name=name_for(self, int(cls_ids[idx]))))
         return results
 
     def get_model_name(self) -> str:

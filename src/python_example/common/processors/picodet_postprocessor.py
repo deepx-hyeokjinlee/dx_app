@@ -33,6 +33,7 @@ from typing import List, Sequence, Tuple
 import numpy as np
 
 from ..base import DetectionResult, IPostprocessor, PreprocessContext
+from ..utility.labels import name_for
 
 
 def _shapes(outputs: Sequence[np.ndarray]) -> str:
@@ -165,7 +166,7 @@ class PicoDetPostprocessor(IPostprocessor):
         return [
             DetectionResult(box=[float(v) for v in boxes_all[i]],
                             confidence=float(conf_all[i]),
-                            class_id=int(class_all[i]))
+                            class_id=int(class_all[i]), class_name=name_for(self, int(class_all[i])))
             for i in kept
         ]
 

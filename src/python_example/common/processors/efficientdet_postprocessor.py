@@ -19,6 +19,7 @@ import cv2
 from typing import List
 
 from ..base import IPostprocessor, DetectionResult, PreprocessContext
+from ..utility.labels import name_for
 
 
 # EfficientDet (automl) scores have 90 columns: column c is COCO category id
@@ -319,7 +320,7 @@ class EfficientDetPostprocessor(IPostprocessor):
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores[idx]),
-                class_id=int(class_ids[idx]),
+                class_id=int(class_ids[idx]), class_name=name_for(self, int(class_ids[idx])),
             ))
         return results
 
@@ -399,7 +400,7 @@ class EfficientDetPostprocessor(IPostprocessor):
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores[idx]),
-                class_id=int(class_ids[idx]),
+                class_id=int(class_ids[idx]), class_name=name_for(self, int(class_ids[idx])),
             ))
 
         return results

@@ -16,6 +16,7 @@ from typing import List
 
 from ..base import IPostprocessor, DetectionResult, PreprocessContext
 from .nms_utils import per_class_nms as _per_class_nms
+from ..utility.labels import name_for
 
 
 class SSDPostprocessor(IPostprocessor):
@@ -107,7 +108,7 @@ class SSDPostprocessor(IPostprocessor):
             DetectionResult(
                 box=[float(b) for b in self._scale_box(filtered_boxes[idx], ctx)],
                 confidence=float(filtered_scores[idx]),
-                class_id=int(filtered_cls_ids[idx]),
+                class_id=int(filtered_cls_ids[idx]), class_name=name_for(self, int(filtered_cls_ids[idx])),
             )
             for idx in indices
         ]

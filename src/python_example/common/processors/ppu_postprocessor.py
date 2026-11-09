@@ -30,6 +30,7 @@ from typing import List
 
 from ..base import IPostprocessor, PreprocessContext, DetectionResult, Keypoint, PoseResult
 from .face_postprocessor import FaceResult
+from ..utility.labels import name_for
 
 
 def _reinterpret(tensor: np.ndarray, lo: int, hi: int, dtype) -> np.ndarray:
@@ -178,7 +179,7 @@ class PPUPostprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores[idx]),
                 class_id=int(labels[idx])
-            ))
+            , class_name=name_for(self, int(labels[idx]))))
 
         return results
 
@@ -311,7 +312,7 @@ class YOLOv8PPUPostprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores[idx]),
                 class_id=int(labels[idx])
-            ))
+            , class_name=name_for(self, int(labels[idx]))))
 
         return results
 
@@ -682,7 +683,7 @@ class YOLOv10PPUPostprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores[idx]),
                 class_id=int(labels[idx])
-            ))
+            , class_name=name_for(self, int(labels[idx]))))
 
         return results
 
@@ -807,7 +808,7 @@ class YOLOXPPUPostprocessor(IPostprocessor):
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores[idx]),
                 class_id=int(labels[idx])
-            ))
+            , class_name=name_for(self, int(labels[idx]))))
 
         return results
 

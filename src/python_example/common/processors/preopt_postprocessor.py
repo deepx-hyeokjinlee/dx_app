@@ -46,6 +46,7 @@ import numpy as np
 
 from ..base import (InstanceSegResult, IPostprocessor, DetectionResult, Keypoint,
                     PoseResult, PreprocessContext)
+from ..utility.labels import name_for
 
 X1, Y1, X2, Y2, SCORE, CLASS, EXTRA = 0, 1, 2, 3, 4, 5, 6
 
@@ -171,7 +172,7 @@ class PreoptDetectionPostprocessor(_PreoptBase):
             results.append(DetectionResult(
                 box=_scale_box(row, ctx),
                 confidence=float(row[SCORE]),
-                class_id=int(row[CLASS]),
+                class_id=int(row[CLASS]), class_name=name_for(self, int(row[CLASS])),
             ))
         return results
 
@@ -272,7 +273,7 @@ class PreoptSegPostprocessor(_PreoptBase):
             results.append(InstanceSegResult(
                 box=_scale_box(row, ctx),
                 confidence=float(row[SCORE]),
-                class_id=int(row[CLASS]),
+                class_id=int(row[CLASS]), class_name=name_for(self, int(row[CLASS])),
                 mask=(mask > self.mask_threshold).astype(np.uint8),
             ))
         return results

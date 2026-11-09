@@ -2,7 +2,7 @@
 Label definitions for common datasets.
 """
 
-from typing import List, Dict
+from typing import Optional, List, Dict
 
 # Label string constants to avoid duplication
 _TRAFFIC_LIGHT = "traffic light"
@@ -50,6 +50,24 @@ def get_coco_class_name(class_id: int) -> str:
     if 0 <= class_id < len(labels):
         return labels[class_id]
     return f"class_{class_id}"
+
+
+def resolve_class_name(class_id: int, custom_names: Optional[List[str]] = None) -> str:
+    """dxapp::common::resolve_class_name: the config's class_names when given
+    (out of range -> "class_<id>"), else the COCO-80 name."""
+    if custom_names:
+        if 0 <= class_id < len(custom_names):
+            return str(custom_names[class_id])
+        return f"class_{class_id}"
+    return get_coco_class_name(class_id)
+
+
+def name_for(processor, class_id: int) -> str:
+    """The class_name a postprocessor's result gets: its config's class_names,
+    else COCO -- what the C++ processor of the same model writes."""
+    cfg = getattr(processor, "config", None)
+    names = cfg.get("class_names") if isinstance(cfg, dict) else None
+    return resolve_class_name(int(class_id), list(names) if names else None)
 
 
 def get_coco_91_labels() -> Dict[int, str]:

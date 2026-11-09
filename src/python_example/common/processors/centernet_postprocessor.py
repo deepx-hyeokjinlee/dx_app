@@ -18,6 +18,7 @@ import cv2
 from typing import List
 
 from ..base import IPostprocessor, DetectionResult, PreprocessContext
+from ..utility.labels import name_for
 
 
 class CenterNetPostprocessor(IPostprocessor):
@@ -149,7 +150,7 @@ class CenterNetPostprocessor(IPostprocessor):
             results.append(DetectionResult(
                 box=[float(bx1), float(by1), float(bx2), float(by2)],
                 confidence=float(top_scores[idx]),
-                class_id=int(class_ids[idx]),
+                class_id=int(class_ids[idx]), class_name=name_for(self, int(class_ids[idx])),
             ))
 
         return results

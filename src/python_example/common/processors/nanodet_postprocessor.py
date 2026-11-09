@@ -23,6 +23,7 @@ import numpy as np
 from typing import List
 
 from ..base import IPostprocessor, DetectionResult, PreprocessContext
+from ..utility.labels import name_for
 
 
 class NanoDetPostprocessor(IPostprocessor):
@@ -238,7 +239,7 @@ class NanoDetPostprocessor(IPostprocessor):
             results.append(DetectionResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(filtered_scores[idx]),
-                class_id=int(filtered_cls_ids[idx]),
+                class_id=int(filtered_cls_ids[idx]), class_name=name_for(self, int(filtered_cls_ids[idx])),
             ))
 
         return results

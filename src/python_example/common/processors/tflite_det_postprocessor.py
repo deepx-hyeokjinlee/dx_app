@@ -15,6 +15,7 @@ import numpy as np
 from typing import List
 
 from ..base import IPostprocessor, DetectionResult, PreprocessContext
+from ..utility.labels import name_for
 
 
 class TFLiteDetectionPostprocessor(IPostprocessor):
@@ -90,7 +91,7 @@ class TFLiteDetectionPostprocessor(IPostprocessor):
             results.append(DetectionResult(
                 box=[float(x1), float(y1), float(x2), float(y2)],
                 confidence=float(scores[i]),
-                class_id=int(class_ids[i]),
+                class_id=int(class_ids[i]), class_name=name_for(self, int(class_ids[i])),
             ))
 
         return results

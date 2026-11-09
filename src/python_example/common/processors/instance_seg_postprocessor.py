@@ -26,6 +26,7 @@ from functools import partial
 from typing import List
 
 from ..base import IPostprocessor, PreprocessContext, InstanceSegResult
+from ..utility.labels import name_for
 
 
 class InstanceSegPostprocessor(IPostprocessor):
@@ -178,7 +179,7 @@ class InstanceSegPostprocessor(IPostprocessor):
             results.append(InstanceSegResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(confidences[idx]),
-                class_id=int(cls_ids[idx]),
+                class_id=int(cls_ids[idx]), class_name=name_for(self, int(cls_ids[idx])),
                 mask=(orig_mask > 0.5).astype(np.uint8),
             ))
         return results

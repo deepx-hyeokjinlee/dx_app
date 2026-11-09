@@ -22,6 +22,7 @@ import cv2
 from typing import List
 
 from ..base import IPostprocessor, PreprocessContext, InstanceSegResult
+from ..utility.labels import name_for
 
 
 class YOLACTPostprocessor(IPostprocessor):
@@ -290,7 +291,7 @@ class YOLACTPostprocessor(IPostprocessor):
             results.append(InstanceSegResult(
                 box=[float(box[0]), float(box[1]), float(box[2]), float(box[3])],
                 confidence=float(scores_f[idx]),
-                class_id=int(cls_ids_f[idx]),
+                class_id=int(cls_ids_f[idx]), class_name=name_for(self, int(cls_ids_f[idx])),
                 mask=(orig_mask > 0.5).astype(np.uint8),
             ))
 

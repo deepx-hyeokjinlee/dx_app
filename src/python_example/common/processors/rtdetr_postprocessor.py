@@ -41,6 +41,7 @@ import numpy as np
 
 from ..base import (DetectionResult, InstanceSegResult, IPostprocessor,
                     PreprocessContext)
+from ..utility.labels import name_for
 
 LAYOUT_SPLIT = "split"
 LAYOUT_PADDLE = "paddle_nms"
@@ -245,7 +246,7 @@ class RTDETRPostprocessor(_RTDETRBase):
         return [
             DetectionResult(box=[float(v) for v in boxes[i]],
                             confidence=float(scores[i]),
-                            class_id=int(class_ids[i]))
+                            class_id=int(class_ids[i]), class_name=name_for(self, int(class_ids[i])))
             for i in self._merge_duplicates(boxes)
         ]
 
@@ -320,7 +321,7 @@ class MaskRTDETRPostprocessor(_RTDETRBase):
             results.append(InstanceSegResult(
                 box=[float(v) for v in box],
                 confidence=float(scores[i]),
-                class_id=int(class_ids[i]),
+                class_id=int(class_ids[i]), class_name=name_for(self, int(class_ids[i])),
                 mask=binary,
             ))
         return results
