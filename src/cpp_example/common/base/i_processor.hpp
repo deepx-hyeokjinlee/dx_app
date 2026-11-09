@@ -45,6 +45,10 @@ struct PreprocessContext {
 
     cv::Mat source_image;
 
+    // Token-input models (CLIP text): index of the end-of-text token in the
+    // input sequence, the row the postprocessor projects. -1 = not a text input.
+    int eot_position{-1};
+
     PreprocessContext() = default;
     ~PreprocessContext() = default;
     PreprocessContext(const PreprocessContext&) = default;

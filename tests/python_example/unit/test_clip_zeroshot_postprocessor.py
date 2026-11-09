@@ -1,11 +1,11 @@
 # Copyright (C) 2018- DEEPX Ltd. All rights reserved.
 """CLIP zero-shot classification against a precomputed prompt bank.
 
-The zoo ships no usable text tower: ``clip-text_resnet50_77x512_openai`` emits the
-text transformer's 77x512 HIDDEN STATES, not a joint embedding -- turning those into
-one needs `ln_final` and `text_projection`, which are not in the .dxnn -- and it is an
-OpenAI RN50 checkpoint, a different space from every image tower we ship. So text is
-encoded ONCE at build time by ``scripts/build_clip_prompt_bank.py`` and shipped as
+The zoo's only text tower, ``clip-text_resnet50_77x512_openai``, is an OpenAI RN50
+checkpoint: its embedding space is clip-img_resnet50_224x224_openai's and no
+zero-shot tower's here (and its .dxnn emits the transformer's hidden states;
+`ln_final` and `text_projection` run on the CPU, see test_clip_text_encoder.py). So
+for these towers text is encoded ONCE at build time by ``scripts/build_clip_prompt_bank.py`` and shipped as
 ``prompt_bank.json``; at runtime this postprocessor does one (N,D) @ (D,) dot product
 in numpy.
 

@@ -131,9 +131,11 @@ def test_the_text_tower_promises_no_image_input():
 
     MEASURED: its input is float32 [1,77,512] token embeddings. Feeding it what an
     image preprocessor produces fails with "Input dtype mismatch for 'x': expected
-    float32, got uint8", so ANY default image is a promise the example cannot keep --
-    and the 49408x512 token-embedding table needed to encode text on device is far too
-    large to ship. It stays as the embedding-contract example.
+    float32, got uint8", so ANY default image is a promise the example cannot keep.
+    The example takes prompts (-t / --text-file) and encodes them with the CPU half
+    of the text tower (clip_text_encoder.py / .hpp), whose 49408x512 token table is
+    exported next to the .dxnn by scripts/export_clip_text_assets.py rather than
+    shipped.
     """
     for tree in (PY_TREE, CPP_TREE):
         cfg = (tree / "image_retrieval" / "clip_rn50"

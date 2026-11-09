@@ -2442,17 +2442,19 @@ PYBIND11_MODULE(dx_postprocess, m)
 
     // --- CLIP text encoder ---
     py::class_<CLIPTextPostProcess>(m, "CLIPTextPostProcess")
-        .def(py::init<bool>(), py::arg("normalize") = true)
-        .def("postprocess", [](CLIPTextPostProcess& self, py::list ie_output) {
+        .def(py::init<bool, const std::string&>(), py::arg("normalize") = true,
+             py::arg("weights_path") = "")
+        .def("postprocess", [](CLIPTextPostProcess& self, py::list ie_output, int eot_position) {
             auto tensors = numpy_to_dxrt_tensors(ie_output);
             std::vector<float> embedding;
             {
                 py::gil_scoped_release release;
-                embedding = self.postprocess(tensors);
+                embedding = self.postprocess(tensors, eot_position);
             }
             py::array_t<float> out(static_cast<py::ssize_t>(embedding.size()));
             std::copy(embedding.begin(), embedding.end(), out.mutable_data());
             return out;
-        }, py::arg("ie_output"))
-        .def("get_normalize", &CLIPTextPostProcess::get_normalize);
+        }, py::arg("ie_output"), py::arg("eot_position") = -1)
+        .def("get_normalize", &CLIPTextPostProcess::get_normalize)
+        .def("get_embed_dim", &CLIPTextPostProcess::get_embed_dim);
 }

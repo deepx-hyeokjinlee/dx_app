@@ -3,8 +3,8 @@
   "dxnn_file": "clip-text_resnet50_77x512_openai.dxnn",
   "task": "image_retrieval",
   "family": "clip",
-  "input_width": 77,
-  "input_height": 512,
+  "input_width": 512,
+  "input_height": 77,
   "image_only": true,
   "registry_image_only": true,
   "default_image": null,
@@ -16,16 +16,20 @@
   "cli": {
     "include_kitti_paths": false,
     "include_output": false,
-    "include_stream_inputs": false
+    "include_stream_inputs": false,
+    "include_text_inputs": true
   },
   "preprocessor": {
-    "class": "SimpleResizePreprocessor",
+    "class": "ClipTextPreprocessor",
     "args": [
       {
         "token": "input_width"
       },
       {
         "token": "input_height"
+      },
+      {
+        "token": "config"
       }
     ],
     "kwargs": {},
@@ -52,5 +56,6 @@
     "args": [],
     "kwargs": {},
     "config_overrides": {}
-  }
+  },
+  "text_assets": null
 }

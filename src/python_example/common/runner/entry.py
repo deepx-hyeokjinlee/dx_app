@@ -153,6 +153,7 @@ def run_entry(
         include_stream_inputs=cli.get("include_stream_inputs", True),
         include_output=cli.get("include_output", False),
         include_kitti_paths=cli.get("include_kitti_paths", False),
+        include_text_inputs=cli.get("include_text_inputs", False),
     )
     factory = factory_cls(variant=variant)
     if on_engine_init is None:

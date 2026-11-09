@@ -8,20 +8,31 @@ Image Encoder:
   Output: [1, D]         — image feature vector (D=512, 768, 1024 depending on backbone)
   → Uses GenericEmbeddingPostprocessor (same algorithm as ArcFace)
 
-Text Encoder:
-  Input:  [1, 77]  or [1, 77, D_token]  — tokenized text
-  Output: [1, D]   — text feature vector
-  → Specialized: needs EOS token extraction from 3D tensor
+Text Encoder (clip-text_resnet50_77x512_openai: the transformer only):
+  Input:  [1, 77, 512] — token + position embedding (ClipTextPreprocessor)
+  Output: [1, 77, 512] — hidden states; ln_final at the end-of-text token,
+          @ text_projection -> [1024] (CLIPTextPostprocessor)
+  The CPU half is clip_text_encoder.py, the same algorithm as the C++ tree.
 
 The output embedding is L2-normalized for cosine similarity computation.
 Image-text similarity = dot(image_embedding, text_embedding)
 """
 
 import numpy as np
-from typing import List
+from typing import List, Tuple
 
-from ..base import IPostprocessor, PreprocessContext, EmbeddingResult
+from ..base import IPostprocessor, IPreprocessor, PreprocessContext, EmbeddingResult
+from .clip_text_encoder import eot_position, load_clip_text_assets
 from .embedding_postprocessor import GenericEmbeddingPostprocessor
+
+
+def _assets_from(config: dict):
+    directory = (config or {}).get("text_assets")
+    if not directory:
+        raise ValueError(
+            "[DXAPP] [ERROR] CLIP text: config has no 'text_assets' directory (the runner "
+            "sets it from --text-assets, the config, or the .dxnn directory)")
+    return load_clip_text_assets(str(directory))
 
 
 class CLIPImagePostprocessor(GenericEmbeddingPostprocessor):
@@ -42,67 +53,73 @@ class CLIPImagePostprocessor(GenericEmbeddingPostprocessor):
         )
 
 
-class CLIPTextPostprocessor(IPostprocessor):
-    """
-    Postprocessor for CLIP text encoder.
+class ClipTextPreprocessor(IPreprocessor):
+    """Text -> 77 token ids -> the [1, 77, 512] float32 model input.
 
-    Extracts and L2-normalizes the text feature embedding.
+    ``process`` takes the prompt string (the text runner passes it where the
+    image runners pass an image) and records the end-of-text position in the
+    context; the postprocessor projects the hidden state at that row.
     """
 
-    def __init__(self, input_width: int = 77, input_height: int = 512, config: dict = None):
-        self.input_width = input_width
-        self.input_height = input_height
+    def __init__(self, input_width: int = 512, input_height: int = 77, config: dict = None):
         self.config = config or {}
-        self.normalize = self.config.get('normalize', True)
+        self.assets = _assets_from(self.config)
+        self.last_token_count = 0
+        self.last_truncated = False
+
+    def process(self, text) -> Tuple[np.ndarray, PreprocessContext]:
+        if not isinstance(text, str):
+            raise TypeError(
+                "[DXAPP] [ERROR] clip-text takes text, not an image: give prompts with "
+                "-t / --text or --text-file")
+        ids, self.last_truncated = self.assets.tokenizer.tokenize(text)
+        self.last_token_count = sum(1 for i in ids if i != 0)
+        tensor = self.assets.weights.embed(ids)[np.newaxis]
+        ctx = PreprocessContext(input_width=self.assets.weights.width,
+                                input_height=self.assets.weights.context)
+        ctx.eot_position = eot_position(ids)
+        return tensor, ctx
+
+    def get_input_width(self) -> int:
+        return self.assets.weights.width
+
+    def get_input_height(self) -> int:
+        return self.assets.weights.context
+
+
+class CLIPTextPostprocessor(IPostprocessor):
+    """Hidden states -> the L2-normalised joint-space text embedding.
+
+    The end-of-text row is the arg-max of the token ids (CLIP's
+    ``text.argmax(dim=-1)``), carried in ``ctx.eot_position``. It cannot be
+    recovered from the hidden states: all 77 rows are non-zero. A [1, D] output
+    (a graph that already ends in the projection) is L2-normalised as it is.
+    """
+
+    def __init__(self, input_width: int = 512, input_height: int = 77, config: dict = None):
+        self.config = config or {}
+        self.assets = _assets_from(self.config)
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[EmbeddingResult]:
-        """
-        Process CLIP text encoder output.
-
-        Args:
-            outputs: [feature_vector] shape [1, D] or [1, seq_len, D]
-            ctx: PreprocessContext
-
-        Returns:
-            List with single EmbeddingResult
-        """
-        output = outputs[0]
-
-        # If output is [1, seq_len, D], take the EOS token embedding
+        output = np.asarray(outputs[0], dtype=np.float32)
+        w = self.assets.weights
         if output.ndim == 3:
-            # CLIP text encoder: EOS token is at the position of the highest token ID
-            # (end-of-text token = 49407 in CLIP tokenizer)
-            # If we have token IDs in a second output, use those; otherwise use heuristic
-            if len(outputs) > 1 and outputs[1].ndim >= 2:
-                # Token IDs available — find EOS position
-                token_ids = outputs[1].flatten()
-                eos_pos = int(np.argmax(token_ids))  # EOS has highest token ID
-                embedding = output[0, eos_pos, :].flatten().astype(np.float32)
-            else:
-                # Heuristic: CLIP pads with zeros after EOS.
-                # Find last non-zero row by L2 norm of each position
-                seq_norms = np.linalg.norm(output[0], axis=1)  # [seq_len]
-                nonzero_mask = seq_norms > 1e-6
-                if np.any(nonzero_mask):
-                    # EOS is typically the last non-zero position
-                    eos_pos = int(np.where(nonzero_mask)[0][-1])
-                    embedding = output[0, eos_pos, :].flatten().astype(np.float32)
-                else:
-                    # Fallback to last position
-                    embedding = output[0, -1, :].flatten().astype(np.float32)
+            if output.shape[1:] != (w.context, w.width):
+                raise ValueError(
+                    f"[DXAPP] [ERROR] CLIPTextPostprocessor: hidden states {output.shape} do "
+                    f"not match the text weights (1, {w.context}, {w.width})")
+            eot = getattr(ctx, "eot_position", -1)
+            if not 0 <= eot < w.context:
+                raise ValueError(
+                    "[DXAPP] [ERROR] CLIPTextPostprocessor: no end-of-text position in the "
+                    "context (the input must come from ClipTextPreprocessor)")
+            embedding = w.project(output[0], eot)
         else:
-            embedding = output.flatten().astype(np.float32)
-
-        # L2 normalize
-        if self.normalize:
+            embedding = output.flatten()
             norm = np.linalg.norm(embedding)
             if norm > 0:
                 embedding = embedding / norm
-
-        return [EmbeddingResult(
-            embedding=embedding,
-            model_type="text_encoder",
-        )]
+        return [EmbeddingResult(embedding=embedding.astype(np.float32), model_type="text_encoder")]
 
     def get_model_name(self) -> str:
         return "clip_text"

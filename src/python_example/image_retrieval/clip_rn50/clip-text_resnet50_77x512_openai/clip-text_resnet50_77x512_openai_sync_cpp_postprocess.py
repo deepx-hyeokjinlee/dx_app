@@ -8,7 +8,7 @@ Post-processing runs in C++ through the dx_postprocess pybind11 module
 
 The variant is fixed to this folder. Run it from here with no PYTHONPATH::
 
-    python clip-text_resnet50_77x512_openai_sync_cpp_postprocess.py -i <image>
+    python clip-text_resnet50_77x512_openai_sync_cpp_postprocess.py -t "a photo of a dog"
 """
 import sys
 from pathlib import Path
@@ -28,7 +28,7 @@ install_import_paths(_script)
 
 from common.utility import convert_cpp_text_embedding
 from factory import ClipFactory
-from common.runner import SyncRunner
+from common.runner.clip_text_runner import ClipTextRunner
 
 # Directory name is the .dxnn stem this script always builds.
 _FIXED_VARIANT = "clip-text_resnet50_77x512_openai"
@@ -42,8 +42,12 @@ def on_engine_init(runner):
     """
     from dx_postprocess import CLIPTextPostProcess
 
+    from common.processors.clip_text_encoder import WEIGHTS_FILE
+
+    # ln_final + text_projection come from the same weights file the
+    # Python preprocessor reads; the end-of-text row from the context.
     runner._cpp_postprocessor = CLIPTextPostProcess(
-        bool(runner.factory.config.get("normalize", True)))
+        True, str(Path(runner.text_assets_dir) / WEIGHTS_FILE))
     runner._cpp_convert_fn = convert_cpp_text_embedding
 
 
@@ -51,7 +55,7 @@ def main():
     run_entry(
         _script,
         factory_cls=ClipFactory,
-        runner_cls=SyncRunner,
+        runner_cls=ClipTextRunner,
         description="clip-text_resnet50_77x512_openai sync_cpp_postprocess inference",
         fixed_variant=_FIXED_VARIANT,
         on_engine_init=on_engine_init,

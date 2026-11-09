@@ -34,6 +34,9 @@ class PreprocessContext:
     input_height: int = 0
     original_image: Optional[np.ndarray] = None  # BGR original for color restoration
     normalized_input: Optional[np.ndarray] = None  # [C,H,W] float32 [0,1] for enhancement models
+    # Token-input models (CLIP text): index of the end-of-text token in the input
+    # sequence, the row the postprocessor projects. -1 = not a text input.
+    eot_position: int = -1
 
 
 @dataclass

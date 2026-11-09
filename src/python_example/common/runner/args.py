@@ -60,6 +60,7 @@ def parse_common_args(
     include_output: bool = False,
     include_stream_inputs: bool = True,
     include_kitti_paths: bool = False,
+    include_text_inputs: bool = False,
 ) -> argparse.Namespace:
     """Parse common inference arguments.
 
@@ -139,6 +140,24 @@ def parse_common_args(
         )
         input_group.add_argument(
             "--rtsp", "-r", type=str, default=None, help="RTSP stream URL"
+        )
+
+    # ---- Text input (CLIP text tower) ----
+    # Registered only for text-input models (config "cli": include_text_inputs).
+    if include_text_inputs:
+        parser.add_argument(
+            "--text", "-t", action="append", default=None, metavar="PROMPT",
+            help="Prompt to encode (repeatable). Default: three built-in prompts.",
+        )
+        parser.add_argument(
+            "--text-file", type=str, default=None,
+            help="File with one prompt per line",
+        )
+        parser.add_argument(
+            "--text-assets", type=str, default=None, metavar="DIR",
+            help="Directory holding clip_rn50_text.nxclip and clip_bpe_merges.txt "
+                 "(default: config text_assets, else the .dxnn directory; "
+                 "scripts/export_clip_text_assets.py writes them)",
         )
 
     # ---- Display ----

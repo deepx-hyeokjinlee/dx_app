@@ -4,7 +4,7 @@
 
 The variant is fixed to this folder. Run it from here with no PYTHONPATH::
 
-    python clip-text_resnet50_77x512_openai_async.py -i <image>
+    python clip-text_resnet50_77x512_openai_async.py -t "a photo of a dog"
 """
 import sys
 from pathlib import Path
@@ -23,7 +23,7 @@ from common.runner.entry import install_import_paths, run_entry
 install_import_paths(_script)
 
 from factory import ClipFactory
-from common.runner import AsyncRunner
+from common.runner.clip_text_runner import AsyncClipTextRunner
 
 # Directory name is the .dxnn stem this script always builds.
 _FIXED_VARIANT = "clip-text_resnet50_77x512_openai"
@@ -33,7 +33,7 @@ def main():
     run_entry(
         _script,
         factory_cls=ClipFactory,
-        runner_cls=AsyncRunner,
+        runner_cls=AsyncClipTextRunner,
         description="clip-text_resnet50_77x512_openai async inference",
         fixed_variant=_FIXED_VARIANT,
     )

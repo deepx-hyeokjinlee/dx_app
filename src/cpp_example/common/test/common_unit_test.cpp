@@ -68,6 +68,7 @@
 #include "common/processors/anchor_face_postprocessor.hpp"
 #include "common/processors/classification_postprocessor.hpp"
 #include "common/processors/letterbox_preprocessor.hpp"
+#include "common/processors/clip_text_postprocessor.hpp"
 #include "common/processors/hand_landmark_postprocessor.hpp"
 #include "common/processors/picodet_postprocessor.hpp"
 #include "common/processors/pose_postprocessor.hpp"
@@ -573,6 +574,144 @@ void TestClassificationDistributionGuardToleratesQuantizedSums() {
         COMMON_CHECK(results[0].class_id == peak);
         COMMON_CHECK(std::fabs(results[0].confidence - 0.234f) < 1e-5f);
     }
+}
+
+// --- CLIP text (clip-text_resnet50_77x512_openai) -------------------------------
+// The example used to feed the model an image resize, take hidden-state row 76 as
+// the end-of-text token (all 77 rows are non-zero: min row norm 8.6 measured), and
+// return that 512-d row without ln_final / text_projection. These tests pin the CPU
+// half with synthetic files: rank-0 merge "h e</w>", so "He" tokenizes to
+// [SOT, 512, EOT], and random weights whose projection is checked by formula.
+
+namespace clip_text_test {
+
+const int kMerges = 49152 - 256 - 2;
+const int kVocab = 512 + kMerges + 2;
+
+std::string TempDir() {
+    std::string dir = (fs::temp_directory_path() / ("dxapp_clip_text_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))).string();
+    fs::create_directories(dir);
+    return dir;
+}
+
+void WriteMerges(const std::string& path) {
+    std::ofstream out(path);
+    out << "h e</w>\n";
+    for (int i = 0; i < kMerges - 1; ++i) out << "\xC4\x80" << i << " \xC4\x81\n";
+}
+
+std::vector<std::vector<float>> WriteWeights(const std::string& path, int vocab, int context,
+                                             int width, int embed) {
+    std::mt19937 rng(7);
+    std::normal_distribution<float> n(0.0f, 1.0f);
+    std::vector<std::vector<float>> arrays;
+    for (std::size_t sz : {static_cast<std::size_t>(vocab) * width, static_cast<std::size_t>(context) * width,
+                           static_cast<std::size_t>(width), static_cast<std::size_t>(width),
+                           static_cast<std::size_t>(width) * embed}) {
+        std::vector<float> a(sz);
+        for (auto& v : a) v = n(rng);
+        arrays.push_back(a);
+    }
+    std::ofstream out(path, std::ios::binary);
+    out.write("NXCLIPT1", 8);
+    const uint32_t h[4] = {static_cast<uint32_t>(vocab), static_cast<uint32_t>(context),
+                           static_cast<uint32_t>(width), static_cast<uint32_t>(embed)};
+    out.write(reinterpret_cast<const char*>(h), sizeof(h));
+    for (const auto& a : arrays) out.write(reinterpret_cast<const char*>(a.data()), a.size() * sizeof(float));
+    return arrays;
+}
+
+}  // namespace clip_text_test
+
+void TestClipTextTokenizerMergesAndPads() {
+    const std::string dir = clip_text_test::TempDir();
+    clip_text_test::WriteMerges(dir + "/m.txt");
+    dxapp::clip::ClipTokenizer tok;
+    std::string error;
+    COMMON_CHECK(tok.load(dir + "/m.txt", error));
+    COMMON_CHECK(static_cast<int>(tok.vocab_size()) == clip_text_test::kVocab);
+    bool cut = true;
+    const auto ids = tok.tokenize("  He ", &cut);
+    COMMON_CHECK(ids.size() == 77 && !cut);
+    COMMON_CHECK(ids[0] == tok.sot() && ids[1] == 512 && ids[2] == tok.eot() && ids[3] == 0);
+    COMMON_CHECK(dxapp::clip::eot_position(ids) == 2);
+    const auto long_ids = tok.tokenize(std::string(300, 'x'), &cut);
+    COMMON_CHECK(cut == false || long_ids.back() == tok.eot());
+    std::string words;
+    for (int i = 0; i < 100; ++i) words += "he ";
+    const auto cut_ids = tok.tokenize(words, &cut);
+    COMMON_CHECK(cut && cut_ids.back() == tok.eot() && dxapp::clip::eot_position(cut_ids) == 76);
+    fs::remove_all(dir);
+}
+
+void TestClipTextProjectsTheEotRowThroughLnFinal() {
+    const std::string dir = clip_text_test::TempDir();
+    clip_text_test::WriteMerges(dir + "/" + dxapp::clip::kMergesFile);
+    const auto w = clip_text_test::WriteWeights(dir + "/" + dxapp::clip::kWeightsFile,
+                                                clip_text_test::kVocab, 77, 4, 3);
+    auto assets = dxapp::clip::ClipTextAssets::load(dir);
+    dxapp::ClipTextPreprocessor pre(assets);
+    dxapp::CLIPTextPostprocessor post(assets);
+    cv::Mat input;
+    dxapp::PreprocessContext ctx;
+    pre.encode("He", input, ctx);
+    COMMON_CHECK(input.rows == 77 && input.cols == 4 && input.type() == CV_32F);
+    COMMON_CHECK(ctx.eot_position == 2 && pre.lastTokenCount() == 3);
+    // Row 1 is token 512 + position 1.
+    COMMON_CHECK(input.at<float>(1, 3) == w[0][512 * 4 + 3] + w[1][1 * 4 + 3]);
+
+    std::vector<float> hidden(77 * 4);
+    for (std::size_t i = 0; i < hidden.size(); ++i) hidden[i] = std::sin(static_cast<float>(i));
+    dxrt::TensorPtrs outputs;
+    outputs.push_back(std::make_shared<dxrt::Tensor>(
+        "hidden", std::vector<int64_t>{1, 77, 4}, dxrt::DataType::FLOAT, hidden.data()));
+    const auto results = post.process(outputs, ctx);
+    COMMON_CHECK(results.size() == 1 && results[0].dimension == 3);
+    // Formula: ln_final(hidden[2]) @ projection, L2-normalised.
+    const float* x = hidden.data() + 2 * 4;
+    double mean = 0, var = 0;
+    for (int d = 0; d < 4; ++d) mean += x[d];
+    mean /= 4;
+    for (int d = 0; d < 4; ++d) var += (x[d] - mean) * (x[d] - mean);
+    var /= 4;
+    std::vector<double> want(3, 0.0);
+    for (int d = 0; d < 4; ++d) {
+        const double v = (x[d] - mean) / std::sqrt(var + 1e-5) * w[2][d] + w[3][d];
+        for (int e = 0; e < 3; ++e) want[e] += v * w[4][d * 3 + e];
+    }
+    const double nrm = std::sqrt(want[0] * want[0] + want[1] * want[1] + want[2] * want[2]);
+    for (int e = 0; e < 3 && !results.empty(); ++e) {
+        COMMON_CHECK(std::fabs(results[0].embedding[e] - want[e] / nrm) < 1e-5);
+    }
+
+    // No end-of-text row in the context: refused, never a guessed row.
+    bool threw = false;
+    try {
+        post.process(outputs, dxapp::PreprocessContext{});
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    COMMON_CHECK(threw);
+    // An image is refused too.
+    threw = false;
+    try {
+        cv::Mat out;
+        pre.process(cv::Mat(4, 4, CV_8UC3), out, ctx);
+    } catch (const std::logic_error&) {
+        threw = true;
+    }
+    COMMON_CHECK(threw);
+    fs::remove_all(dir);
+}
+
+void TestClipTextMissingAssetsNameTheExportCommand() {
+    bool named = false;
+    try {
+        dxapp::clip::ClipTextAssets::load("/nonexistent_dxapp_clip_dir");
+    } catch (const std::runtime_error& e) {
+        named = std::string(e.what()).find("export_clip_text_assets.py") != std::string::npos;
+    }
+    COMMON_CHECK(named);
 }
 
 /// Equal probabilities rank by class id, as the library and Python's stable
@@ -3106,6 +3245,9 @@ int main() {
     TestClassificationDistributionGuardToleratesQuantizedSums();
     TestClassificationTiesGoToTheLowerClassId();
     TestLetterboxRoundsLikePython();
+    TestClipTextTokenizerMergesAndPads();
+    TestClipTextProjectsTheEotRowThroughLnFinal();
+    TestClipTextMissingAssetsNameTheExportCommand();
     TestClassificationNonImageNetClassCountLeavesNameEmpty();
     TestClassificationTopKFieldFilled();
     TestClassificationShortTensorNeverReadPast();

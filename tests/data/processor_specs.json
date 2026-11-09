@@ -1440,7 +1440,8 @@
     "cli": {
       "include_kitti_paths": false,
       "include_output": false,
-      "include_stream_inputs": false
+      "include_stream_inputs": false,
+      "include_text_inputs": true
     },
     "dir_config": {},
     "extra_methods": [],
@@ -1451,7 +1452,7 @@
     "family": "clip_rn50",
     "imports": [
       "from common.base import IEmbeddingFactory",
-      "from common.processors import SimpleResizePreprocessor, CLIPTextPostprocessor",
+      "from common.processors import ClipTextPreprocessor, CLIPTextPostprocessor",
       "from common.visualizers import EmbeddingVisualizer"
     ],
     "model_name": "clip_text_resnet50_77x512_openai",
@@ -1472,13 +1473,16 @@
       "config_overrides": {}
     },
     "preprocessor": {
-      "class": "SimpleResizePreprocessor",
+      "class": "ClipTextPreprocessor",
       "args": [
         {
           "token": "input_width"
         },
         {
           "token": "input_height"
+        },
+        {
+          "token": "config"
         }
       ],
       "kwargs": {},

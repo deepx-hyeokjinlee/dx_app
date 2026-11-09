@@ -79,7 +79,7 @@ from .yolact_postprocessor import YOLACTPostprocessor
 from .fast_yolact_postprocessor import FastYOLACTPostprocessor
 from .espcn_postprocessor import ESPCNPostprocessor
 from .zero_dce_postprocessor import ZeroDCEPostprocessor
-from .clip_postprocessor import CLIPImagePostprocessor, CLIPTextPostprocessor
+from .clip_postprocessor import CLIPImagePostprocessor, CLIPTextPostprocessor, ClipTextPreprocessor
 from .clip_zeroshot_postprocessor import CLIPZeroShotPostprocessor
 from .arcface_postprocessor import ArcFacePostprocessor
 from .segformer_postprocessor import SegFormerPostprocessor
@@ -190,6 +190,7 @@ __all__ = [
     # CLIP Postprocessors
     'CLIPImagePostprocessor',
     'CLIPTextPostprocessor',
+    'ClipTextPreprocessor',
     'CLIPZeroShotPostprocessor',
     # ArcFace Postprocessor
     'ArcFacePostprocessor',
