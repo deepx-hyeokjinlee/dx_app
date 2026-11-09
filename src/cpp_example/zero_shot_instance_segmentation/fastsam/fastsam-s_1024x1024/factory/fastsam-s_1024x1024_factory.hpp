@@ -21,8 +21,8 @@ namespace v_fastsam_s_1024x1024 {
 class FastsamFactory : public IInstanceSegmentationFactory {
 public:
 
-    FastsamFactory(float score_threshold = 0.5f,
-                      float nms_threshold = 0.65f)
+    FastsamFactory(float score_threshold = 0.7f,
+                      float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}
 

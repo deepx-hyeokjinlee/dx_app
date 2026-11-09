@@ -21,7 +21,7 @@ namespace v_yolo26_s_seg_640x640 {
 class Yolo26SegFactory : public IInstanceSegmentationFactory {
 public:
 
-    Yolo26SegFactory(float score_threshold = 0.3f,
+    Yolo26SegFactory(float score_threshold = 0.4f,
                       float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

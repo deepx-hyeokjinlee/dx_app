@@ -21,7 +21,7 @@ namespace v_mediapipe_hands_lite_224x224 {
 class MediapipeHandsLiteFactory : public IHandLandmarkFactory {
 public:
 
-    MediapipeHandsLiteFactory(float confidence_threshold = 0.5f)
+    MediapipeHandsLiteFactory(float confidence_threshold = 0.3f)
         : confidence_threshold_(confidence_threshold) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {

@@ -23,7 +23,7 @@ namespace v_yolov8_s_640x640_decode {
 class Yolov8Factory : public IDetectionFactory {
 public:
 
-    Yolov8Factory(float score_threshold = 0.3f,
+    Yolov8Factory(float score_threshold = 0.4f,
                   float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

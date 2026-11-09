@@ -24,7 +24,7 @@ namespace v_efficientdet_d2_768x768 {
 class EfficientdetFactory : public IDetectionFactory {
 public:
 
-    EfficientdetFactory(float score_threshold = 0.3f,
+    EfficientdetFactory(float score_threshold = 0.4f,
                   float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

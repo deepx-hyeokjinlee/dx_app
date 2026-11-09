@@ -21,7 +21,7 @@ namespace v_yolo26_m_640x640 {
 class Yolo26Factory : public IDetectionFactory {
 public:
 
-    Yolo26Factory(float score_threshold = 0.3f,
+    Yolo26Factory(float score_threshold = 0.25f,
                    float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

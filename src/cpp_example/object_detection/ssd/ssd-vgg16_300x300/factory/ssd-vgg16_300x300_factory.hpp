@@ -23,7 +23,7 @@ namespace v_ssd_vgg16_300x300 {
 class SsdFactory : public IDetectionFactory {
 public:
 
-    SsdFactory(float score_threshold = 0.3f,
+    SsdFactory(float score_threshold = 0.4f,
                   float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

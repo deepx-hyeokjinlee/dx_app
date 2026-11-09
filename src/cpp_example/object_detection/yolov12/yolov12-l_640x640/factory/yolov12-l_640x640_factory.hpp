@@ -28,8 +28,8 @@ namespace v_yolov12_l_640x640 {
 class Yolov12Factory : public IDetectionFactory {
 public:
 
-    Yolov12Factory(float score_threshold = 0.3f,
-                  float nms_threshold = 0.45f)
+    Yolov12Factory(float score_threshold = 0.4f,
+                  float nms_threshold = 0.5f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}
 

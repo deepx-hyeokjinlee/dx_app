@@ -23,7 +23,7 @@ namespace v_yolo26_x_pose_640x640 {
 class Yolo26PoseFactory : public IPoseFactory {
 public:
 
-    Yolo26PoseFactory(float score_threshold = 0.3f,
+    Yolo26PoseFactory(float score_threshold = 0.4f,
                       float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

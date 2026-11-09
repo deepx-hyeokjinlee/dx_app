@@ -23,7 +23,7 @@ class Yolov5Factory : public IDetectionFactory {
 public:
 
     Yolov5Factory(float obj_threshold = 0.25f,
-                  float score_threshold = 0.25f,
+                  float score_threshold = 0.3f,
                   float nms_threshold = 0.45f)
         : obj_threshold_(obj_threshold),
           score_threshold_(score_threshold),

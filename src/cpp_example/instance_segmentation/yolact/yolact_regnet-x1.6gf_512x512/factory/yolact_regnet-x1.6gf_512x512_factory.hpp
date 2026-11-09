@@ -23,8 +23,8 @@ namespace v_yolact_regnet_x1_6gf_512x512 {
 class YolactFactory : public IInstanceSegmentationFactory {
 public:
 
-    YolactFactory(float score_threshold = 0.3f,
-                  float nms_threshold = 0.5f,
+    YolactFactory(float score_threshold = 0.4f,
+                  float nms_threshold = 0.45f,
                   int num_classes = 81,
                   int num_protos = 32,
                   int top_k = 200)

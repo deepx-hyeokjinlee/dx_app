@@ -26,7 +26,7 @@ namespace v_yolov12_seg_m_640x640_pre_optimized {
 class Yolov12SegFactory : public IInstanceSegmentationFactory {
 public:
 
-    Yolov12SegFactory(float score_threshold = 0.5f, float nms_threshold = 0.65f)
+    Yolov12SegFactory(float score_threshold = 0.4f, float nms_threshold = 0.5f)
         : score_threshold_(score_threshold), nms_threshold_(nms_threshold) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {

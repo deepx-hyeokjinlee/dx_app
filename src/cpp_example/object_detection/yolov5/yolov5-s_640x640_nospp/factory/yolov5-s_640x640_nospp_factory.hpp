@@ -23,7 +23,7 @@ class Yolov5Factory : public IDetectionFactory {
 public:
 
     Yolov5Factory(float obj_threshold = 0.25f,
-                  float score_threshold = 0.25f,
+                  float score_threshold = 0.4f,
                   float nms_threshold = 0.45f)
         : obj_threshold_(obj_threshold),
           score_threshold_(score_threshold),
@@ -55,6 +55,7 @@ public:
         nms_threshold_ = config.get<float>("nms_threshold", nms_threshold_);
         class_names_ = config.get_string_list("class_names");
         num_classes_ = config.get<int>("num_classes", num_classes_);
+        max_nms_candidates_ = config.get<int>("max_nms_candidates", max_nms_candidates_);
     }
 
     std::string getModelName() const override {
@@ -63,7 +64,9 @@ public:
     std::string getTaskType() const override { return "object_detection"; }
 
 private:
-    int max_nms_candidates_{0};  // from a sibling variant in this family
+    // config.json max_nms_candidates (300). It was 0 here -- "no cap" -- and
+    // loadConfig() never read the key (survey item F5).
+    int max_nms_candidates_{300};
     float obj_threshold_;
     float score_threshold_;
     float nms_threshold_;

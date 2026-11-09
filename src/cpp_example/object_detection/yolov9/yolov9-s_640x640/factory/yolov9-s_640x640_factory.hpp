@@ -23,7 +23,7 @@ namespace v_yolov9_s_640x640 {
 class Yolov9Factory : public IDetectionFactory {
 public:
 
-    Yolov9Factory(float score_threshold = 0.3f,
+    Yolov9Factory(float score_threshold = 0.25f,
                   float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

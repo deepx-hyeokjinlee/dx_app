@@ -26,8 +26,8 @@ namespace v_nanodet_repvgg_a_224x224 {
 class NanodetFactory : public IDetectionFactory {
 public:
 
-    NanodetFactory(float score_threshold = 0.35f,
-                   float nms_threshold = 0.6f,
+    NanodetFactory(float score_threshold = 0.3f,
+                   float nms_threshold = 0.45f,
                    int reg_max = 7)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold),

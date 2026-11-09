@@ -26,8 +26,8 @@ namespace v_scrfd_500m_640x640 {
 class ScrfdFactory : public IFaceDetectionFactory {
 public:
 
-    ScrfdFactory(float score_threshold = 0.5f,
-                         float nms_threshold = 0.45f)
+    ScrfdFactory(float score_threshold = 0.3f,
+                         float nms_threshold = 0.4f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}
 

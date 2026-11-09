@@ -26,7 +26,7 @@ namespace v_retinaface_mobilenet_0_25_640x640 {
 class RetinafaceFactory : public IFaceDetectionFactory {
 public:
 
-    RetinafaceFactory(float score_threshold = 0.5f,
+    RetinafaceFactory(float score_threshold = 0.3f,
                       float nms_threshold = 0.4f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

@@ -24,8 +24,8 @@ class YoloPpuFactory : public IDetectionFactory {
 public:
 
     YoloPpuFactory(float obj_threshold = 0.25f,
-                       float score_threshold = 0.4f,
-                       float nms_threshold = 0.5f)
+                       float score_threshold = 0.25f,
+                       float nms_threshold = 0.45f)
         : obj_threshold_(obj_threshold),
           score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

@@ -25,7 +25,7 @@ namespace v_yolov4_leaky_512x512 {
 class Yolov4Factory : public IDetectionFactory {
 public:
 
-    Yolov4Factory(float score_threshold = 0.25f,
+    Yolov4Factory(float score_threshold = 0.4f,
                   float nms_threshold = 0.45f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

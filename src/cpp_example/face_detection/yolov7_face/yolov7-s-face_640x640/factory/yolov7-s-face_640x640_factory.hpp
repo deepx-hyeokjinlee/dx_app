@@ -21,9 +21,9 @@ namespace v_yolov7_s_face_640x640 {
 class Yolov7FaceFactory : public IFaceDetectionFactory {
 public:
 
-    Yolov7FaceFactory(float obj_threshold = 0.25f,
-                      float score_threshold = 0.25f,
-                      float nms_threshold = 0.45f)
+    Yolov7FaceFactory(float obj_threshold = 0.3f,
+                      float score_threshold = 0.3f,
+                      float nms_threshold = 0.4f)
         : obj_threshold_(obj_threshold),
           score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}

@@ -23,7 +23,7 @@ class UlfgfdFactory : public IFaceDetectionFactory {
 public:
 
     UlfgfdFactory(float score_threshold = 0.5f,
-                 float nms_threshold = 0.45f)
+                 float nms_threshold = 0.3f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}
 

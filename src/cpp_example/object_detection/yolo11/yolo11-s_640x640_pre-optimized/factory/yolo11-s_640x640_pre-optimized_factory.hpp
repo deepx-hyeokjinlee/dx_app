@@ -23,8 +23,8 @@ namespace v_yolo11_s_640x640_pre_optimized {
 class Yolo11Factory : public IDetectionFactory {
 public:
 
-    Yolo11Factory(float score_threshold = 0.3f,
-                  float nms_threshold = 0.45f)
+    Yolo11Factory(float score_threshold = 0.4f,
+                  float nms_threshold = 0.5f)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold) {}
 
