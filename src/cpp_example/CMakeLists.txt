@@ -320,9 +320,12 @@ option(DXAPP_BUILD_COMMON_TESTS "Build the common/ unit test binary" ON)
 if(DXAPP_BUILD_COMMON_TESTS)
     add_executable(common_unit_test
         ${COMMON_DIR}/test/common_unit_test.cpp
+        ${COMMON_DIR}/test/yolo_anchor_align_test.cpp
         ${PROJECT_ROOT}/src/utility/common_util.cpp
         ${PROJECT_ROOT}/src/postprocess/yolopv2/yolopv2_postprocess.cpp
         ${PROJECT_ROOT}/src/postprocess/superpoint/superpoint_postprocess.cpp
+        ${PROJECT_ROOT}/src/postprocess/yolov5/yolov5_postprocess.cpp
+        ${PROJECT_ROOT}/src/postprocess/yolov7/yolov7_postprocess.cpp
     )
     target_compile_options(common_unit_test PRIVATE ${COMMON_COMPILE_FLAGS})
     target_compile_definitions(common_unit_test PRIVATE ${COMMON_COMPILE_DEFINITIONS})
@@ -333,6 +336,8 @@ if(DXAPP_BUILD_COMMON_TESTS)
         ${CPP_EXAMPLE_DIR}
         ${CPP_EXAMPLE_DIR}/common/processors
         ${DXAPP_POSTPROCESS_INCLUDES}
+        ${PROJECT_ROOT}/src/postprocess/yolov5
+        ${PROJECT_ROOT}/src/postprocess/yolov7
     )
     target_link_libraries(common_unit_test ${COMMON_LIBS})
     if(NOT MSVC)

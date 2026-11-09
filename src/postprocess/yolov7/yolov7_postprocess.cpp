@@ -116,7 +116,7 @@ dxrt::TensorPtrs YOLOv7PostProcess::align_tensors(const dxrt::TensorPtrs& output
             const int64_t gh = input_height_ / as.first;
             for (const auto& output : outputs) {
                 const auto& s = output->shape();
-                const bool match_4d = (s.size() == 4 && s[2] == gw && s[3] == gh &&
+                const bool match_4d = (s.size() == 4 && s[2] == gh && s[3] == gw &&  // NCHW: [.., H, W]
                                        s[1] == (num_classes_ + 5) * anchors);
                 const bool match_5d = (s.size() == 5 && s[1] == anchors && s[2] == gh &&
                                        s[3] == gw && s[4] == (num_classes_ + 5));

@@ -112,7 +112,7 @@ dxrt::TensorPtrs YOLOv5PostProcess::align_tensors(const dxrt::TensorPtrs& output
         const int64_t gh = input_height_ / as.first;
         for (const auto& output : outputs) {
             const auto& s = output->shape();
-            const bool match_4d = (s.size() == 4 && s[2] == gw && s[3] == gh &&
+            const bool match_4d = (s.size() == 4 && s[2] == gh && s[3] == gw &&  // NCHW: [.., H, W]
                                    s[1] == (num_classes_ + 5) * anchors);
             // 4D NHWC [1, gh, gw, (5+C)*A] (e.g. YOLOv3-Gluon feature maps).
             const bool match_4d_nhwc = (s.size() == 4 && s[1] == gh && s[2] == gw &&

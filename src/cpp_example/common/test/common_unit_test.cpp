@@ -2912,6 +2912,15 @@ void TestPoseVisualizerDrawsUnorderedPointsOnly() {
 
 
 // ---------------------------------------------------------------------------
+// YOLOv5/YOLOv7 anchor maps on a non-square input: in yolo_anchor_align_test.cpp
+// (its library headers' result types clash with the processors' aliases here).
+// ---------------------------------------------------------------------------
+int YoloAnchorMapsAlignFailures(const char* which);  // 0 = aligned correctly
+
+void TestYolov5AlignsNonSquareNCHWMaps() { COMMON_CHECK(YoloAnchorMapsAlignFailures("yolov5") == 0); }
+void TestYolov7AlignsNonSquareNCHWMaps() { COMMON_CHECK(YoloAnchorMapsAlignFailures("yolov7") == 0); }
+
+// ---------------------------------------------------------------------------
 // PicoDetPostprocessor: PP-PicoDet's per-level score and box tensors.
 // ---------------------------------------------------------------------------
 
@@ -2983,6 +2992,8 @@ int main() {
     // Must stay first of the postprocess tests: see the ORDER NOTE on this test.
     TestAnchorFaceDebugHeaderOncePerInstance();
     TestPicoDetDecodesPerLevelTensors();
+    TestYolov5AlignsNonSquareNCHWMaps();
+    TestYolov7AlignsNonSquareNCHWMaps();
     TestPicoDetIgnoresASingleConcatenatedTensor();
 
     TestUnserializedProbeSeesOverlap();
