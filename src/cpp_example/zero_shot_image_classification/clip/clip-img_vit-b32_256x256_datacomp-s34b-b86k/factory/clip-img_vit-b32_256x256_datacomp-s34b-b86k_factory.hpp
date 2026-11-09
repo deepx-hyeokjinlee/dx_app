@@ -24,7 +24,14 @@ public:
     ClipFactory() = default;
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // open_clip's normalisation on 0-255 pixels, as the Python config: this float32
+        // [1,3,H,W] input has none baked in, and a plain x/255 moves the embedding
+        // into another space (Python measured host-FP32 p5 cosine 0.47 -> 0.84).
+        auto pre = std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        pre->setMeanStd({static_cast<float>(0.48145466 * 255.0), static_cast<float>(0.4578275 * 255.0), static_cast<float>(0.40821073 * 255.0)},
+                        {static_cast<float>(0.26862954 * 255.0), static_cast<float>(0.26130258 * 255.0), static_cast<float>(0.27577711 * 255.0)},
+                        /*nchw=*/true);
+        return pre;
     }
 
     PostprocessorPtr<EmbeddingResult> createPostprocessor(

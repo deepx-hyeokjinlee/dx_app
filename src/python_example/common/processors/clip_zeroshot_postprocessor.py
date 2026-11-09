@@ -95,7 +95,9 @@ class CLIPZeroShotPostprocessor(IPostprocessor):
                 "  Rebuild the bank for THIS model: "
                 "python scripts/build_clip_prompt_bank.py --variant <dxnn-stem>"
             )
-        embedding /= max(float(np.linalg.norm(embedding)), 1e-12)
+        # Not in place: `embedding` is a view of the engine's output buffer, and
+        # --dump-tensors (and anything else after this) must see the raw tensor.
+        embedding = embedding / max(float(np.linalg.norm(embedding)), 1e-12)
 
         logits = self.logit_scale * (vectors @ embedding)
         probs = np.exp(logits - logits.max())

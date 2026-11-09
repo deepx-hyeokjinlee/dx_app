@@ -103,6 +103,29 @@ public:
             ctx.source_image = resized.clone();
         }
 
+        if (norm_enabled_) {
+            // Element by element, (v - mean) / std in float, as numpy does: cv::divide
+            // by a scalar multiplies by its reciprocal, and that 1-ulp difference
+            // was enough to move metaclip's embedding (cos 0.988 to the Python one).
+            const int h = resized.rows, w = resized.cols;
+            const std::size_t plane = static_cast<std::size_t>(h) * w;
+            output.create(norm_nchw_ ? 1 : h, norm_nchw_ ? static_cast<int>(3 * plane) : w,
+                          norm_nchw_ ? CV_32F : CV_32FC3);
+            float* dst = output.ptr<float>();
+            for (int y = 0; y < h; ++y) {
+                const auto* row = resized.ptr<cv::Vec3b>(y);
+                for (int x = 0; x < w; ++x) {
+                    for (int c = 0; c < 3; ++c) {
+                        const float v = (static_cast<float>(row[x][c]) - norm_mean_[c]) / norm_std_[c];
+                        const std::size_t i = static_cast<std::size_t>(y) * w + x;
+                        if (norm_nchw_) dst[c * plane + i] = v;
+                        else dst[i * 3 + c] = v;
+                    }
+                }
+            }
+            return;
+        }
+
         // Optional float32 output with mean subtraction
         if (output_float_) {
             resized.convertTo(output, CV_32FC3);
@@ -122,6 +145,17 @@ public:
     /// short_side > 0: shorter side to short_side keeping the aspect
     /// (torchvision Resize(int)); else resize_w x resize_h. interpolation:
     /// cv::INTER_LINEAR or cv::INTER_CUBIC. Not called: the plain stretch.
+    /// Python's `mean=` / `std=` kwargs: the output is float32 (pixel - mean) / std
+    /// on the RAW 0-255 resized pixels (after the colour conversion), CHW when `nchw`
+    /// (Python's default, nhwc=False) else HWC. A CHW output is a 1 x (C*H*W) Mat so
+    /// the runners hand its bytes to the engine as they are.
+    void setMeanStd(const std::array<float, 3>& mean, const std::array<float, 3>& stdv, bool nchw) {
+        norm_mean_ = mean;
+        norm_std_ = stdv;
+        norm_nchw_ = nchw;
+        norm_enabled_ = true;
+    }
+
     void setCenterCrop(int short_side, int resize_w, int resize_h, int interpolation) {
         crop_short_ = short_side;
         crop_resize_w_ = resize_w;
@@ -157,6 +191,10 @@ private:
         return resized(cv::Rect(left, top, input_width_, input_height_)).clone();
     }
 
+    bool norm_enabled_{false};
+    bool norm_nchw_{true};
+    std::array<float, 3> norm_mean_{{0.f, 0.f, 0.f}};
+    std::array<float, 3> norm_std_{{1.f, 1.f, 1.f}};
     int crop_short_{0};
     int crop_resize_w_{0};
     int crop_resize_h_{0};
