@@ -95,11 +95,9 @@ def resolve_registry(entries):
     return models, aliases, errors
 
 
-# Example sources kept on disk. They are not registry rows and are not built.
-KEPT_UNREGISTERED = {
-    ("face_detection", "scrfd", "SCRFD500M_PPU"),
-    ("pose_estimation", "yolov5_pose", "YOLOV5Pose_PPU"),
-}
+# Example sources kept on disk that are not registry rows and are not built.
+# Empty since SCRFD500M_PPU and YOLOV5Pose_PPU were removed with their sources.
+KEPT_UNREGISTERED: set = set()
 
 
 def factory_dirs(base, suffix):

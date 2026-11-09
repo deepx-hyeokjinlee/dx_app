@@ -99,7 +99,8 @@ TASK_IMAGE_MAP: dict[str, str] = {
 # Per-model image overrides  (model_name → relative image path)
 # ======================================================================
 # Example sources kept on disk, excluded from the build, the registry, and tests.
-EXCLUDED_EXAMPLE_VARIANTS = frozenset({"SCRFD500M_PPU", "YOLOV5Pose_PPU"})
+# Empty since SCRFD500M_PPU and YOLOV5Pose_PPU were removed with their sources.
+EXCLUDED_EXAMPLE_VARIANTS: frozenset = frozenset()
 
 MODEL_IMAGE_OVERRIDE: dict[str, str] = {
     # Keyed by variant name (the binary / script stem), which is what

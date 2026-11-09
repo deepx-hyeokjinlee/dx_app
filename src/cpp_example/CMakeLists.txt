@@ -513,9 +513,10 @@ function(add_variant_example VARIANT_DIR VARIANT_NAME KIND)
     endif()
 endfunction()
 
-# Sources stay under src/cpp_example. These variants are not registered and
-# are not built (SCRFD500M_PPU, YOLOV5Pose_PPU).
-set(DXAPP_EXCLUDED_VARIANTS SCRFD500M_PPU YOLOV5Pose_PPU)
+# Example directories that are not registry rows and must not be built. Empty:
+# SCRFD500M_PPU and YOLOV5Pose_PPU, the last two, were removed with their
+# sources (they left the registry and the Model Zoo earlier).
+set(DXAPP_EXCLUDED_VARIANTS "")
 
 foreach(CATEGORY ${CATEGORIES})
     file(GLOB _FAMILY_DIRS RELATIVE ${CPP_EXAMPLE_DIR}/${CATEGORY}

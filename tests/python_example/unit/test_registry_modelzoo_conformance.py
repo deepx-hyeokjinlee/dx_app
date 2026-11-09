@@ -33,8 +33,8 @@ NEW_FIELDS = ("variant", "family", "task", "task_legacy", "image_only",
 PUBLICATION_FIELDS = ("published",)
 
 # model_name -> (variant, task, family). The ONLY entries allowed to miss the
-# dx-modelzoo snapshot. SCRFD500M_PPU and YOLOV5Pose_PPU are no longer rows;
-# their example sources stay on disk and are listed in EXCLUDED_EXAMPLE_VARIANTS.
+# dx-modelzoo snapshot. SCRFD500M_PPU and YOLOV5Pose_PPU are no longer rows, and
+# their example sources were removed too (EXCLUDED_EXAMPLE_VARIANTS is empty).
 EXCEPTIONS: dict[str, tuple[str, str, str]] = {}
 # efficientnet_lite0 was here while dx_app called the model 256x256 and the snapshot
 # called it 224x224. The two .dxnn files are BYTE-IDENTICAL on the CDN (md5
