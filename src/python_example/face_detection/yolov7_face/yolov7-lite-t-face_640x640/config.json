@@ -11,7 +11,11 @@
   "default_video": "assets/videos/dance-group.mov",
   "zoo_canonical": true,
   "published": true,
-  "config": {},
+  "config": {
+    "nms_threshold": 0.4,
+    "obj_threshold": 0.3,
+    "score_threshold": 0.3
+  },
   "registry_config": {
     "obj_threshold": 0.3,
     "score_threshold": 0.3,
@@ -47,7 +51,7 @@
         "token": "config"
       }
     ],
-    "class": "YOLOv7FacePostprocessor",
+    "class": "YOLOv5FacePostprocessor",
     "config_overrides": {},
     "kwargs": {}
   },
