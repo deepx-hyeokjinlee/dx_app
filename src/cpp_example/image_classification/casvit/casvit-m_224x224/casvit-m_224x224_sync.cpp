@@ -7,10 +7,10 @@
  */
 
 #include "factory/casvit-m_224x224_factory.hpp"
-#include "common/runner/sync_embedding_runner.hpp"
+#include "common/runner/sync_classification_runner.hpp"
 
 int main(int argc, char* argv[]) {
     auto factory = std::make_unique<dxapp::v_casvit_m_224x224::CasvitFactory>();
-    dxapp::SyncEmbeddingRunner<dxapp::v_casvit_m_224x224::CasvitFactory> runner(std::move(factory));
+    dxapp::SyncClassificationRunner<dxapp::v_casvit_m_224x224::CasvitFactory> runner(std::move(factory));
     return runner.run(argc, argv);
 }

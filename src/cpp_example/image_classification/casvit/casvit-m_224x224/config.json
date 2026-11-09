@@ -5,18 +5,22 @@
   "family": "casvit",
   "input_width": 224,
   "input_height": 224,
-  "image_only": true,
-  "registry_image_only": true,
-  "default_image": "sample/img/person_pair",
-  "default_video": null,
+  "image_only": false,
+  "registry_image_only": false,
+  "default_image": "sample/img/sample_dog.jpg",
+  "default_video": "assets/videos/dogs.mp4",
   "zoo_canonical": true,
   "published": true,
-  "config": {},
-  "registry_config": {},
+  "config": {
+    "top_k": 5
+  },
+  "registry_config": {
+    "top_k": 5
+  },
   "cli": {
     "include_kitti_paths": false,
     "include_output": false,
-    "include_stream_inputs": false
+    "include_stream_inputs": true
   },
   "preprocessor": {
     "args": [
@@ -43,13 +47,13 @@
         "token": "config"
       }
     ],
-    "class": "ArcFacePostprocessor",
+    "class": "ClassificationPostprocessor",
     "config_overrides": {},
     "kwargs": {}
   },
   "visualizer": {
     "args": [],
-    "class": "EmbeddingVisualizer",
+    "class": "ClassificationVisualizer",
     "config_overrides": {},
     "kwargs": {}
   }

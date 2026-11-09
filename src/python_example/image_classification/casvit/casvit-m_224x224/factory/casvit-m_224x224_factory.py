@@ -7,7 +7,7 @@ differences -- processor classes and their non-default arguments -- live in
 """
 from pathlib import Path
 
-from common.base import IEmbeddingFactory
+from common.base import IClassificationFactory
 from common.variant_config import (
     build_processor,
     default_variant,
@@ -16,7 +16,7 @@ from common.variant_config import (
 _FAMILY_DIR = str(Path(__file__).resolve().parent.parent)
 
 
-class CasvitFactory(IEmbeddingFactory):
+class CasvitFactory(IClassificationFactory):
     """Config-driven factory for the casvit family."""
 
     def __init__(self, config: dict = None, variant: str = None):

@@ -143,8 +143,8 @@ def test_multi_loop_video(script: Path, model: Path):
     task = py_script_task(script)
     if task in IMAGE_ONLY_TASKS:
         pytest.skip(f"[{task}] {script.name}: image-only task; no video/stream path")
-    # A variant of a video-capable task can still be image-only (casvit under
-    # image_classification): the runner reads the variant's config.json.
+    # A variant of a video-capable task can still be image-only (clip-img under
+    # zero_shot_image_classification): the runner reads the variant's config.json.
     if py_variant_image_only(script):
         pytest.skip(f"[{task}] {script.name}: image-only variant (config.json); "
                     "no video/stream path")

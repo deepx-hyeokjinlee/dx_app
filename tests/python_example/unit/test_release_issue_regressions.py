@@ -66,7 +66,7 @@ def test_python_image_only_wrappers_mark_stream_inputs_unsupported():
     """Embedding/ReID Python wrappers should mark stream inputs unsupported for runtime rejection."""
     for root in [
         ROOT / "src/python_example/face_recognition",
-        ROOT / "src/python_example/image_classification/casvit",
+        ROOT / "src/python_example/person_reid/repvgg_reid",
     ]:
         # The guarantee moved from a source literal to the variant config: one family
         # entry script serves every variant, so it reads include_stream_inputs from
@@ -90,7 +90,7 @@ def test_python_image_only_help_hides_stream_options():
     """
     scripts = [
         "src/python_example/face_recognition/arcface/arcface_mobilefacenet_112x112/arcface_mobilefacenet_112x112_sync.py",
-        "src/python_example/image_classification/casvit/casvit-t_224x224/casvit-t_224x224_sync.py",
+        "src/python_example/person_reid/repvgg_reid/repvgg-a0-reid_256x128/repvgg-a0-reid_256x128_sync.py",
     ]
     for relpath in scripts:
         result = run_bounded(

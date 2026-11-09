@@ -3,7 +3,7 @@
 """casvit-t_224x224 async_cpp_postprocess inference.
 
 Post-processing runs in C++ through the dx_postprocess pybind11 module
-(``EmbeddingPostProcess``) instead of the Python postprocessor that
+(``ClassificationPostProcess``) instead of the Python postprocessor that
 ``casvit-t_224x224_async.py`` uses.
 
 The variant is fixed to this folder. Run it from here with no PYTHONPATH::
@@ -26,7 +26,7 @@ from common.runner.entry import install_import_paths, run_entry
 
 install_import_paths(_script)
 
-from common.utility import convert_cpp_embedding
+from common.utility import convert_cpp_classification
 from factory import CasvitFactory
 from common.runner import AsyncRunner
 
@@ -40,10 +40,11 @@ def on_engine_init(runner):
     Imported here rather than at module level so ``--help`` works before
     the pybind11 module is built (``./build.sh``).
     """
-    from dx_postprocess import EmbeddingPostProcess
+    from dx_postprocess import ClassificationPostProcess
 
-    runner._cpp_postprocessor = EmbeddingPostProcess()
-    runner._cpp_convert_fn = convert_cpp_embedding
+    config = runner.factory.config
+    runner._cpp_postprocessor = ClassificationPostProcess(config.get("top_k", 5))
+    runner._cpp_convert_fn = convert_cpp_classification
 
 
 def main():

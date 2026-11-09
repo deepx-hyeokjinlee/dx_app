@@ -427,9 +427,9 @@ def cpp_variant_image_only_reason(executable: str) -> Optional[str]:
     Two facts of the source tree make it image-only:
 
     * its variant ``config.json`` says ``image_only`` -- a variant of a
-      video-capable task can still be image-only (casvit-t under
-      ``image_classification``), and a variant whose name merely looks like one
-      (casvit-t-fpn-resnet50, semantic segmentation) is not;
+      video-capable task can still be image-only (the clip-img towers under
+      ``zero_shot_image_classification``), and a variant whose name merely looks
+      like one is not;
     * the runner its ``.cpp`` instantiates registers no ``-v/--video_path``
       option, so the binary rejects ``-v`` ("Option 'v' does not exist") whatever
       the config says. The config is the one the Python tree uses, and the Python

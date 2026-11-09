@@ -675,19 +675,21 @@
     "cli": {
       "include_kitti_paths": false,
       "include_output": false,
-      "include_stream_inputs": false
+      "include_stream_inputs": true
     },
-    "dir_config": {},
+    "dir_config": {
+      "top_k": 5
+    },
     "extra_methods": [],
     "factory_bases": [
-      "IEmbeddingFactory"
+      "IClassificationFactory"
     ],
     "factory_class": "Casvit_mFactory",
     "family": "casvit",
     "imports": [
-      "from common.base import IEmbeddingFactory",
-      "from common.processors import SimpleResizePreprocessor, ArcFacePostprocessor",
-      "from common.visualizers import EmbeddingVisualizer"
+      "from common.base import IClassificationFactory",
+      "from common.processors import SimpleResizePreprocessor, ClassificationPostprocessor",
+      "from common.visualizers import ClassificationVisualizer"
     ],
     "model_name": "casvit_m",
     "postprocessor": {
@@ -702,7 +704,7 @@
           "token": "config"
         }
       ],
-      "class": "ArcFacePostprocessor",
+      "class": "ClassificationPostprocessor",
       "config_overrides": {},
       "kwargs": {}
     },
@@ -719,14 +721,16 @@
       "config_overrides": {},
       "kwargs": {}
     },
-    "registry_config": {},
+    "registry_config": {
+      "top_k": 5
+    },
     "source_dir": "casvit_m",
-    "source_task": "reid",
+    "source_task": "classification",
     "task": "image_classification",
     "variant": "casvit-m_224x224",
     "visualizer": {
       "args": [],
-      "class": "EmbeddingVisualizer",
+      "class": "ClassificationVisualizer",
       "config_overrides": {},
       "kwargs": {}
     }
@@ -795,19 +799,21 @@
     "cli": {
       "include_kitti_paths": false,
       "include_output": false,
-      "include_stream_inputs": false
+      "include_stream_inputs": true
     },
-    "dir_config": {},
+    "dir_config": {
+      "top_k": 5
+    },
     "extra_methods": [],
     "factory_bases": [
-      "IEmbeddingFactory"
+      "IClassificationFactory"
     ],
     "factory_class": "Casvit_tFactory",
     "family": "casvit",
     "imports": [
-      "from common.base import IEmbeddingFactory",
-      "from common.processors import SimpleResizePreprocessor, ArcFacePostprocessor",
-      "from common.visualizers import EmbeddingVisualizer"
+      "from common.base import IClassificationFactory",
+      "from common.processors import SimpleResizePreprocessor, ClassificationPostprocessor",
+      "from common.visualizers import ClassificationVisualizer"
     ],
     "model_name": "casvit_t",
     "postprocessor": {
@@ -822,7 +828,7 @@
           "token": "config"
         }
       ],
-      "class": "ArcFacePostprocessor",
+      "class": "ClassificationPostprocessor",
       "config_overrides": {},
       "kwargs": {}
     },
@@ -839,14 +845,16 @@
       "config_overrides": {},
       "kwargs": {}
     },
-    "registry_config": {},
+    "registry_config": {
+      "top_k": 5
+    },
     "source_dir": "casvit_t",
-    "source_task": "reid",
+    "source_task": "classification",
     "task": "image_classification",
     "variant": "casvit-t_224x224",
     "visualizer": {
       "args": [],
-      "class": "EmbeddingVisualizer",
+      "class": "ClassificationVisualizer",
       "config_overrides": {},
       "kwargs": {}
     }

@@ -139,7 +139,7 @@ def test_cpp_e2e_uses_the_shared_task_map():
 
 
 # ---------------------------------------------------------------------------
-# Image-only variants of video-capable tasks (casvit, clip-img).
+# Image-only variants of video-capable tasks (clip-img zero-shot).
 # ---------------------------------------------------------------------------
 
 def test_py_variant_image_only_matches_every_variant_config():
@@ -160,7 +160,7 @@ def test_task_rule_alone_misses_image_only_variants():
     missed = sorted(d.name for d, task in PY_VARIANTS
                     if task not in IMAGE_ONLY_TASKS
                     and utils.py_variant_image_only(next(d.glob("*_sync.py"))))
-    assert "casvit-t_224x224" in missed, missed
+    assert "clip-img_vit-b16-quickgelu_224x224_metaclip-fullcc" in missed, missed
 
 
 def test_py_variant_image_only_without_config(tmp_path):
@@ -211,10 +211,15 @@ def test_cpp_runner_stream_option_follows_aliases():
     assert utils._cpp_runner_takes_stream("NoSuchRunner", runner_dir) is None
 
 
-def test_cpp_variant_image_only_tells_casvit_classifier_from_casvit_segmenter():
-    """The keyword "casvit" matched both; only the classifier is image-only."""
-    assert utils.cpp_variant_image_only("casvit-t_224x224_sync") is True
+def test_cpp_variant_image_only_reads_the_variant_not_a_keyword():
+    """A keyword match ("casvit", "clip") is not the answer; the variant is.
+
+    casvit-t is a video-capable ImageNet classifier (until 2026-11-09 it was
+    wired as an image-only ReID embedding), its segmenter sibling never was
+    image-only, and the clip-img zero-shot towers are."""
+    assert utils.cpp_variant_image_only("casvit-t_224x224_sync") is False
     assert utils.cpp_variant_image_only("casvit-t-fpn-resnet50_512x512_sync") is False
+    assert utils.cpp_variant_image_only("clip-img_vit-b16-quickgelu_224x224_metaclip-fullcc_sync") is True
 
 
 def test_cpp_variant_image_only_of_an_unknown_executable_is_false():

@@ -5,7 +5,8 @@
 dx-modelzoo task alignment (Phase 1) deletes three of those task names and moves
 two of their models into video-capable tasks:
 
-    reid/casvit_*           -> image_classification  (110 other models need video)
+    reid/casvit_*           -> image_classification  (110 other models need video;
+                               since 2026-11-09 casvit is an ordinary classifier there)
     embedding/eigenplaces-* -> super_resolution      (6 other models need video)
 
 So the flag has to move to the variant before the tasks are renamed. This test
@@ -53,7 +54,8 @@ def test_image_only_matches_legacy_task_membership(registry):
 
 
 def test_image_only_count_is_pinned(registry):
-    """17 at the Phase 0 migration, 22 after the 2_5_0 additions.
+    """17 at the Phase 0 migration, 22 after the 2_5_0 additions, 20 since casvit-t
+    and casvit-m were rewired as the ImageNet classifiers they are (2026-11-09).
 
     The five new ones all land in a legacy task the runner already treats as
     image-only, so the count moves without the RULE moving -- which is exactly what
@@ -69,8 +71,8 @@ def test_image_only_count_is_pinned(registry):
     variant silently becoming image-only loses video input with no error.
     """
     flagged = [e["variant"] for e in registry if e["image_only"]]
-    assert len(flagged) == 22, (
-        f"expected 22 image-only variants, got {len(flagged)}: {sorted(flagged)}"
+    assert len(flagged) == 20, (
+        f"expected 20 image-only variants, got {len(flagged)}: {sorted(flagged)}"
     )
 
 
@@ -107,8 +109,6 @@ def test_relocated_comparison_models_keep_image_only(registry):
     """
     by_variant = {e["variant"]: e for e in registry}
     movers = [
-        ("casvit-t_224x224", "image_classification"),
-        ("casvit-m_224x224", "image_classification"),
         ("eigenplaces-resnet18_512x512", "visual_place_recognition"),
         ("eigenplaces-resnet50_512x512", "visual_place_recognition"),
     ]
