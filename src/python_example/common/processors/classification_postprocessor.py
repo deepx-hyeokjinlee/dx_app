@@ -18,12 +18,14 @@ from ..utility.labels import IMAGENET_1000
 
 # Same tolerances as the C++ detail::IsAlreadyDistribution().
 _DIST_MIN_VALUE = -1e-4
-_DIST_SUM_TOLERANCE = 1e-3
+# 1e-2, not 1e-3: a quantized softmax head sums to 0.993-1.004 (18 ModelZoo classifiers measured
+# 2026-11-09), which 1e-3 missed and softmaxed again to ~1/1000 per class.
+_DIST_SUM_TOLERANCE = 1e-2
 
 
 def _is_already_distribution(values: np.ndarray) -> bool:
     """True when *values* already are probabilities (network ends in softmax):
-    every value >= -1e-4 and the sum within 1e-3 of 1."""
+    every value >= -1e-4 and the sum within 1e-2 of 1."""
     if values.size == 0:
         return False
     if np.any(values < _DIST_MIN_VALUE):

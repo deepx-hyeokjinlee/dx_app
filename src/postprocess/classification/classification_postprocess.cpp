@@ -8,7 +8,7 @@
 namespace {
 
 // True when the network already ends in softmax: every value >= -1e-4 and the
-// sum within 1e-3 of 1. Same tolerances as detail::IsAlreadyDistribution() in
+// sum within 1e-2 of 1 (1e-3 missed: a quantized softmax head sums to 0.993-1.004 (18 ModelZoo classifiers measured 2026-11-09), which 1e-3 missed and softmaxed again to ~1/1000 per class). Same tolerances as detail::IsAlreadyDistribution() in
 // the C++ example and _is_already_distribution() in the Python postprocessor,
 // so all three report the same confidences.
 bool is_already_distribution(const float* data, int size) {
@@ -18,7 +18,7 @@ bool is_already_distribution(const float* data, int size) {
         if (data[i] < -1e-4f) return false;
         sum += data[i];
     }
-    return std::fabs(sum - 1.0) <= 1e-3;
+    return std::fabs(sum - 1.0) <= 1e-2;
 }
 
 }  // namespace

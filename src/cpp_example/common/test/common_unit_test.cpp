@@ -552,6 +552,50 @@ void TestClassificationDistributionGuardAvoidsDoubleSoftmax() {
     }
 }
 
+/// A QUANTIZED softmax head does not sum to exactly 1: pphgnet-tiny's sums to
+/// 1.0022, yolov12-cls-l's to 0.9934 (2026-11-09). The guard's 1e-3 tolerance
+/// missed them and softmaxed again (top-1 0.234 -> 0.0012). 1.006 must pass.
+void TestClassificationDistributionGuardToleratesQuantizedSums() {
+    std::vector<float> dist(1000, 0.0f);
+    const int peak = 248;
+    dist[peak] = 0.234f;
+    const float remainder = (1.006f - 0.234f) / 999.0f;
+    for (std::size_t i = 0; i < dist.size(); ++i) {
+        if (static_cast<int>(i) != peak) dist[i] = remainder;
+    }
+    dxapp::EfficientNetPostprocessor pp(1000, 1);
+    dxapp::PreprocessContext ctx;
+    std::vector<dxapp::ClassificationResult> results =
+        pp.process(MakeFloatClassificationOutput(dist), ctx);
+    COMMON_CHECK(results.size() == 1);
+    if (!results.empty()) {
+        COMMON_CHECK(results[0].class_id == peak);
+        COMMON_CHECK(std::fabs(results[0].confidence - 0.234f) < 1e-5f);
+    }
+}
+
+/// Equal probabilities rank by class id, as the library and Python's stable
+/// sort do (squeezenet-1.1 on sample_dog: 260 and 267 tie at 0.1572 and the
+/// example reported 267).
+void TestClassificationTiesGoToTheLowerClassId() {
+    std::vector<float> dist(1000, 0.0f);
+    dist[260] = 0.25f;
+    dist[267] = 0.25f;
+    dist[100] = 0.25f;
+    dist[999] = 0.25f;
+    dxapp::EfficientNetPostprocessor pp(1000, 4);
+    dxapp::PreprocessContext ctx;
+    std::vector<dxapp::ClassificationResult> results =
+        pp.process(MakeFloatClassificationOutput(dist), ctx);
+    COMMON_CHECK(results.size() == 4);
+    if (results.size() == 4) {
+        COMMON_CHECK(results[0].class_id == 100);
+        COMMON_CHECK(results[1].class_id == 260);
+        COMMON_CHECK(results[2].class_id == 267);
+        COMMON_CHECK(results[3].class_id == 999);
+    }
+}
+
 void TestClassificationNonImageNetClassCountLeavesNameEmpty() {
     std::vector<float> logits(10, 0.0f);
     logits[3] = 5.0f;
@@ -3035,6 +3079,8 @@ int main() {
     TestClassificationSoftmaxProbabilitiesInRangeSumToOneOrderPreserved();
     TestClassificationTopClassNameMatchesImageNetLabelZero();
     TestClassificationDistributionGuardAvoidsDoubleSoftmax();
+    TestClassificationDistributionGuardToleratesQuantizedSums();
+    TestClassificationTiesGoToTheLowerClassId();
     TestClassificationNonImageNetClassCountLeavesNameEmpty();
     TestClassificationTopKFieldFilled();
     TestClassificationShortTensorNeverReadPast();

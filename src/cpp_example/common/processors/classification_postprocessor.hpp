@@ -28,7 +28,9 @@ namespace detail {
 // A model whose network already ends in softmax hands us a distribution,
 // not raw logits. Re-applying softmax to that would flatten it towards
 // uniform (double softmax) - detect it (non-negative, sums to ~1 over the
-// full class count) and pass it through unchanged instead.
+// full class count) and pass it through unchanged instead. Sum tolerance 1e-2:
+// a quantized softmax head sums to 0.993-1.004 (18 ModelZoo classifiers measured
+// 2026-11-09), which 1e-3 missed and softmaxed again to ~1/1000 per class.
 inline bool IsAlreadyDistribution(const float* data, int size) {
     if (size <= 0) return false;
     double sum = 0.0;
@@ -36,7 +38,7 @@ inline bool IsAlreadyDistribution(const float* data, int size) {
         if (data[i] < -1e-4f) return false;
         sum += data[i];
     }
-    return std::fabs(sum - 1.0) <= 1e-3;
+    return std::fabs(sum - 1.0) <= 1e-2;
 }
 
 /// Elements in `tensor`, from its shape (0 for an empty or non-positive
@@ -124,9 +126,15 @@ public:
             std::vector<int> indices(classes);
             std::iota(indices.begin(), indices.end(), 0);
             const int k = std::max(0, std::min(top_k_, classes));
+            // Ties go to the lower class id, like the library and the Python
+            // postprocessor's stable sort: a quantized head ties often
+            // (squeezenet-1.1 on sample_dog: classes 260 and 267 at 0.1572).
             std::partial_sort(indices.begin(), indices.begin() + k, indices.end(),
                               [&probabilities](int a, int b) {
-                                  return probabilities[a] > probabilities[b];
+                                  if (probabilities[a] != probabilities[b]) {
+                                      return probabilities[a] > probabilities[b];
+                                  }
+                                  return a < b;
                               });
 
             std::vector<std::pair<int, float>> top_k_list;

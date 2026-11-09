@@ -2,7 +2,8 @@
 
 C++ (src/cpp_example/common/processors/classification_postprocessor.hpp):
 stable softmax over the logits, skipped when the output already is a
-distribution (every value >= -1e-4 and |sum - 1| <= 1e-3); ImageNet class
+distribution (every value >= -1e-4 and |sum - 1| <= 1e-2: a quantized softmax
+head sums to 1.0022 / 0.9934, measured); ImageNet class
 names when num_classes == 1000; the first result carries the ranked top-k.
 The on-NPU comparison of both on the same image is
 tests/python_example/test_classification_parity.py.
@@ -78,12 +79,12 @@ def test_a_distribution_is_not_softmaxed_again():
 
 def test_distribution_tolerances_match_cpp():
     near = np.full(1000, 0.4 / 999, dtype=np.float32)
-    near[10] = 0.6 + 5e-4          # |sum - 1| = 5e-4 <= 1e-3
+    near[10] = 0.6 + 5e-3          # |sum - 1| = 5e-3 <= 1e-2
     near[11] = -5e-5               # >= -1e-4
-    assert _run(near)[0].confidence == pytest.approx(0.6 + 5e-4, abs=1e-6)
+    assert _run(near)[0].confidence == pytest.approx(0.6 + 5e-3, abs=1e-6)
 
     off = near.copy()
-    off[10] = 0.6 + 5e-3           # sum off by 5e-3: logits, softmax applies
+    off[10] = 0.6 + 5e-2           # sum off by 5e-2: logits, softmax applies
     assert _run(off)[0].confidence == pytest.approx(_reference_softmax(off)[10], rel=1e-5)
 
     neg = near.copy()
