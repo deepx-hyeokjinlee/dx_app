@@ -53,6 +53,7 @@ public:
     }
 
     void loadConfig(const dxapp::ModelConfig& config) override {
+        obj_threshold_ = config.get<float>("obj_threshold", obj_threshold_);
         score_threshold_ = config.get<float>("score_threshold", score_threshold_);
         nms_threshold_ = config.get<float>("nms_threshold", nms_threshold_);
         num_classes_ = config.get<int>("num_classes", num_classes_);
@@ -66,7 +67,10 @@ public:
     std::string getTaskType() const override { return "object_detection"; }
 
 private:
-    float obj_threshold_;  // from a sibling variant in this family
+    // YOLOXPostprocessor reads an objectness threshold; it was declared here and
+    // never set (undefined value passed to the postprocessor). 0.25 is the
+    // YOLOXPostprocessor default.
+    float obj_threshold_{0.25f};
     float score_threshold_;
     float nms_threshold_;
     int num_classes_{80};

@@ -144,6 +144,32 @@ def private_members(text: str) -> list[str]:
     return out
 
 
+_SCALAR_DECL = re.compile(r"^(float|double|int|bool|size_t|int64_t|uint32_t|int32_t)\s+(\w+_)\s*;$")
+
+
+def initialised_member(decl: str, text: str) -> str:
+    """``decl`` with an in-class initialiser when it is a bare scalar.
+
+    A member unioned in from a sibling variant is initialised only by THAT
+    variant's constructor; the generated class has its own constructor, so a
+    bare ``float obj_threshold_;`` reached the postprocessor uninitialised
+    (nanodet x5, 2026-11-09). The sibling's own default is used: the
+    constructor parameter that initialises the member, and that parameter's
+    default argument. Without one, value-initialise (``{}``).
+    """
+    m = _SCALAR_DECL.match(decl.strip())
+    if not m:
+        return decl
+    typ, name = m.groups()
+    default = ""
+    p = re.search(r"\b" + re.escape(name) + r"\(\s*(\w+)\s*\)", text)
+    if p:
+        d = re.search(r"\b" + re.escape(p.group(1)) + r"\s*=\s*([^,)\n]+)", text)
+        if d:
+            default = d.group(1).strip()
+    return f"{typ} {name}{{{default}}};"
+
+
 def member_name(decl: str) -> str:
     m = re.search(r"(\w+)_\s*(?:\{[^}]*\})?\s*;", decl)
     return m.group(1) + "_" if m else decl
@@ -753,7 +779,7 @@ def main(argv: list[str] | None = None) -> int:
                 if blk:
                     bodies[r][e["variant"]] = blk[2]
             for decl in private_members(txt):
-                priv_members.setdefault(member_name(decl), decl)
+                priv_members.setdefault(member_name(decl), initialised_member(decl, txt))
             for inc in re.findall(r'#include\s+(["<][^">]+[">])', txt):
                 extra_includes.add(inc)
         if donor is None:
