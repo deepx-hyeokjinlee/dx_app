@@ -27,7 +27,8 @@ public:
     Deeplabv3Factory() = default;
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        return std::make_unique<DetectionPreprocessor>(input_width, input_height);
+        // Stretch, as the Python config and the other deeplab variants (it used a letterbox here).
+        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
     }
 
     PostprocessorPtr<SegmentationResult> createPostprocessor(

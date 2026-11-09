@@ -27,8 +27,9 @@ public:
     EspcnFactory() = default;
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        // default: espcn-x2_17x17
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // One-channel input with the BGR source kept for CbCr, as espcn-x3/x4 and the
+        // Python config (GrayscaleResizePreprocessor).
+        return std::make_unique<GrayscaleResizePreprocessor>(input_width, input_height, true);
     }
 
     PostprocessorPtr<RestorationResult> createPostprocessor(
