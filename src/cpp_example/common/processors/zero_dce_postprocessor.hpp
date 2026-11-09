@@ -158,7 +158,7 @@ private:
         cv::Mat merged;
         cv::merge(std::vector<cv::Mat>{plane2, plane1, plane0}, merged);
         cv::Mat restored;
-        merged.convertTo(restored, CV_8UC3, 255.0, 0.5);
+        merged.convertTo(restored, CV_8UC3, 255.0);  // convertTo rounds; a +0.5 offset biased every pixel up
         return restored;
     }
 

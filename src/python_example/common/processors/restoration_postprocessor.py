@@ -100,13 +100,13 @@ class DnCNNPostprocessor(IPostprocessor):
             denoised_uint8 = np.zeros_like(denoised, dtype=np.uint8)
         elif dmin >= -0.1 and dmax <= 1.1:
             # [0, 1] range — standard DnCNN output
-            denoised_uint8 = (np.clip(denoised, 0.0, 1.0) * 255.0).astype(np.uint8)
+            denoised_uint8 = np.round(np.clip(denoised, 0.0, 1.0) * 255.0).astype(np.uint8)
         elif dmin >= -1.0 and dmax <= 256.0:
             # Roughly [0, 255] range
-            denoised_uint8 = np.clip(denoised, 0.0, 255.0).astype(np.uint8)
+            denoised_uint8 = np.round(np.clip(denoised, 0.0, 255.0)).astype(np.uint8)
         else:
             # Arbitrary range — min-max normalize to [0, 255]
-            denoised_uint8 = ((denoised - dmin) / (dmax - dmin) * 255.0).astype(np.uint8)
+            denoised_uint8 = np.round((denoised - dmin) / (dmax - dmin) * 255.0).astype(np.uint8)
 
         return [RestorationResult(output_image=denoised_uint8)]
 

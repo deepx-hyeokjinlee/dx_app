@@ -73,7 +73,7 @@ class ESPCNPostprocessor(IPostprocessor):
         # YCbCr color restoration for single-channel (Y) output
         if output.ndim == 2 and hasattr(ctx, 'original_image') and ctx.original_image is not None:
             # ESPCN works on Y channel; restore color using Cb/Cr from original
-            sr_y = (output * 255.0).astype(np.uint8)
+            sr_y = np.round(np.clip(output, 0.0, 1.0) * 255.0).astype(np.uint8)
             out_h, out_w = sr_y.shape
 
             # The model emits a limited-range Y (it was trained on MATLAB
@@ -90,7 +90,7 @@ class ESPCNPostprocessor(IPostprocessor):
             merged_ycrcb = np.stack([sr_y, cr_upscaled, cb_upscaled], axis=2)
             output_uint8 = ycrcb_limited_to_bgr(merged_ycrcb)
         else:
-            output_uint8 = (output * 255.0).astype(np.uint8)
+            output_uint8 = np.round(np.clip(output, 0.0, 1.0) * 255.0).astype(np.uint8)
 
         return [SuperResolutionResult(
             output_image=output_uint8,

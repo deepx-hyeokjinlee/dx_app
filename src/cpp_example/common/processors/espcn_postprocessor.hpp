@@ -80,7 +80,7 @@ public:
         // Extract Y-channel (first channel) — clamp to [0, 1] and convert to uint8
         cv::Mat float_y(out_h, out_w, CV_32FC1, const_cast<float*>(data));
         cv::Mat sr_y;
-        float_y.convertTo(sr_y, CV_8UC1, 255.0, 0.5);
+        float_y.convertTo(sr_y, CV_8UC1, 255.0);  // convertTo rounds; a +0.5 offset biased every pixel up
 
         cv::Mat restored;
 
@@ -114,7 +114,7 @@ public:
             cv::Mat b_ch(out_h, out_w, CV_32FC1, const_cast<float*>(data + 2 * hw));
             cv::Mat merged;
             cv::merge(std::vector<cv::Mat>{b_ch, g_ch, r_ch}, merged);
-            merged.convertTo(restored, CV_8UC3, 255.0, 0.5);
+            merged.convertTo(restored, CV_8UC3, 255.0);  // convertTo rounds; a +0.5 offset biased every pixel up
         } else {
             // Grayscale-only fallback (no source image)
             cv::cvtColor(sr_y, restored, cv::COLOR_GRAY2BGR);

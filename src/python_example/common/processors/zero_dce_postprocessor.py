@@ -65,14 +65,14 @@ class ZeroDCEPostprocessor(IPostprocessor):
                 enhanced_bgr = cv2.resize(
                     enhanced_bgr, (ctx.original_width, ctx.original_height),
                     interpolation=cv2.INTER_LINEAR)
-        return np.clip(enhanced_bgr * 255.0, 0, 255).astype(np.uint8)
+        return np.round(np.clip(enhanced_bgr * 255.0, 0, 255)).astype(np.uint8)
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext):
         """Process Zero-DCE output."""
         params = np.squeeze(outputs[0])  # [C, H, W] where C is 3 or 24
 
         if params.ndim == 2:
-            enhanced_uint8 = (np.clip(params, 0.0, 1.0) * 255.0).astype(np.uint8)
+            enhanced_uint8 = np.round(np.clip(params, 0.0, 1.0) * 255.0).astype(np.uint8)
             return [EnhancedImageResult(output_image=enhanced_uint8)]
 
         h, w = params.shape[1], params.shape[2]

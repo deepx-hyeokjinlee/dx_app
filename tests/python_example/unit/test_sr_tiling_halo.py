@@ -125,7 +125,7 @@ class TestTileGeometry:
         sr_y, tiles_done = assemble_tiles(plans, outputs, 34, 34, 1, 1)
 
         assert tiles_done == 2
-        assert sr_y[0, 0] == 127 and sr_y[17, 17] == 127   # stitched tiles
+        assert sr_y[0, 0] == 128 and sr_y[17, 17] == 128   # stitched tiles (0.5 * 255 rounds to 128)
         assert sr_y[0, 17] == 0 and sr_y[17, 0] == 0       # skipped tiles stay black
         assert "2 of 4 tiles produced no usable output" in caplog.text
 

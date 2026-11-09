@@ -310,7 +310,8 @@ def assemble_tile(sr_y: np.ndarray, p: TilePlan, outputs: Optional[list],
     if arr is None or arr.ndim == 0:
         return False
     arr2d = arr[0] if arr.ndim == 3 else arr
-    tile_u8 = (np.clip(arr2d, 0.0, 1.0) * 255.0).astype(np.uint8)
+    # Round, as the C++ tiler (v * 255 + 0.5): truncating made every SR pixel ~0.5 dark.
+    tile_u8 = np.round(np.clip(arr2d, 0.0, 1.0) * 255.0).astype(np.uint8)
 
     sy, sx = p.src_y * scale_y, p.src_x * scale_x
     vh, vw = p.valid_h * scale_y, p.valid_w * scale_x

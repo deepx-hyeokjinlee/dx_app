@@ -108,7 +108,7 @@ public:
             // Grayscale output
             cv::Mat float_img(h, w, CV_32FC1, const_cast<float*>(data));
             cv::Mat gray_u8;
-            float_img.convertTo(gray_u8, CV_8UC1, 255.0, 0.5);
+            float_img.convertTo(gray_u8, CV_8UC1, 255.0);  // convertTo rounds; a +0.5 offset biased every pixel up
             cv::cvtColor(gray_u8, restored, cv::COLOR_GRAY2BGR);
         } else if (channels == 3) {
             int hw = h * w;
@@ -117,7 +117,7 @@ public:
                 cv::Mat rgb(h, w, CV_32FC3, const_cast<float*>(data));
                 cv::Mat bgr;
                 cv::cvtColor(rgb, bgr, cv::COLOR_RGB2BGR);
-                bgr.convertTo(restored, CV_8UC3, 255.0, 0.5);
+                bgr.convertTo(restored, CV_8UC3, 255.0);  // convertTo rounds; a +0.5 offset biased every pixel up
             } else {
                 // NCHW: data is [R-plane, G-plane, B-plane]
                 cv::Mat r_ch(h, w, CV_32FC1, const_cast<float*>(data));
@@ -125,7 +125,7 @@ public:
                 cv::Mat b_ch(h, w, CV_32FC1, const_cast<float*>(data + 2 * hw));
                 cv::Mat merged;
                 cv::merge(std::vector<cv::Mat>{b_ch, g_ch, r_ch}, merged);
-                merged.convertTo(restored, CV_8UC3, 255.0, 0.5);
+                merged.convertTo(restored, CV_8UC3, 255.0);  // convertTo rounds; a +0.5 offset biased every pixel up
             }
         } else {
             return {};

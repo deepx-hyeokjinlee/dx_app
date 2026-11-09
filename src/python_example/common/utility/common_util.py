@@ -672,11 +672,11 @@ def convert_cpp_restoration(image: np.ndarray, ctx=None) -> list:
     if dmax - dmin < 1e-6:
         out = np.zeros_like(raw, dtype=np.uint8)
     elif dmin >= -0.1 and dmax <= 1.1:
-        out = (np.clip(raw, 0.0, 1.0) * 255.0).astype(np.uint8)
+        out = np.round(np.clip(raw, 0.0, 1.0) * 255.0).astype(np.uint8)
     elif dmin >= -1.0 and dmax <= 256.0:
-        out = np.clip(raw, 0.0, 255.0).astype(np.uint8)
+        out = np.round(np.clip(raw, 0.0, 255.0)).astype(np.uint8)
     else:
-        out = ((raw - dmin) / (dmax - dmin) * 255.0).astype(np.uint8)
+        out = np.round((raw - dmin) / (dmax - dmin) * 255.0).astype(np.uint8)
 
     out = restore_source_geometry(out, ctx,
                                   int(getattr(ctx, "input_width", 0) or 0),
@@ -720,7 +720,7 @@ def convert_cpp_super_resolution(image: np.ndarray, ctx=None) -> list:
     if output.ndim == 2 and original_image is not None:
         from .colorspace import bgr_to_ycrcb_limited, ycrcb_limited_to_bgr
 
-        sr_y = (output * 255.0).astype(np.uint8)
+        sr_y = np.round(np.clip(output, 0.0, 1.0) * 255.0).astype(np.uint8)
         out_h, out_w = sr_y.shape
         # ESPCN's Y is limited range (MATLAB rgb2ycbcr) — keep the chroma
         # planes and the inverse matrix on the same convention.
@@ -732,7 +732,7 @@ def convert_cpp_super_resolution(image: np.ndarray, ctx=None) -> list:
         merged = np.stack([sr_y, cr_up, cb_up], axis=2)
         out = ycrcb_limited_to_bgr(merged)
     else:
-        out = (output * 255.0).astype(np.uint8)
+        out = np.round(np.clip(output, 0.0, 1.0) * 255.0).astype(np.uint8)
 
     return [SuperResolutionResult(output_image=out, scale_factor=scale)]
 
@@ -767,7 +767,7 @@ def convert_cpp_zero_dce(image: np.ndarray, ctx=None) -> list:
         img = np.clip(img, 0.0, 1.0)
         if img.ndim == 3 and img.shape[2] == 3:
             img = img[:, :, ::-1]  # RGB → BGR
-        img = (img * 255.0).astype(np.uint8)
+        img = np.round(np.clip(img, 0.0, 1.0) * 255.0).astype(np.uint8)
 
     return [EnhancedImageResult(output_image=img)]
 
@@ -937,7 +937,7 @@ def _apply_le_curves_from_params(params: np.ndarray, ctx) -> list:
             img_out = cv2.resize(img_out, (ctx.original_width, ctx.original_height),
                                  interpolation=cv2.INTER_LINEAR)
 
-    return [EnhancedImageResult(output_image=(img_out * 255.0).astype(np.uint8))]
+    return [EnhancedImageResult(output_image=np.round(np.clip(img_out, 0.0, 1.0) * 255.0).astype(np.uint8))]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
