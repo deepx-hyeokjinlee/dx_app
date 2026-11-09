@@ -37,6 +37,7 @@
 #include <dxrt/dxrt_api.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <deque>
 #include <opencv2/opencv.hpp>
@@ -47,6 +48,7 @@
 #include <vector>
 
 #include "common/utility/colorspace.hpp"
+#include "common/utility/run_dir.hpp"
 
 namespace dxapp {
 namespace srtiling {
@@ -337,11 +339,22 @@ inline int runAndAssembleTiles(Engine& ie, const cv::Mat& lr_plane,
                                int tile_h, int tile_w,
                                int padded_out_h, int padded_out_w,
                                int scale_y, int scale_x, int out_tile_w,
-                               cv::Mat& sr_y, int inflight = kDefaultInflight) {
+                               cv::Mat& sr_y, int inflight = kDefaultInflight,
+                               const std::string& dump_dir = std::string()) {
     sr_y = cv::Mat::zeros(padded_out_h, padded_out_w, CV_8UC1);
     int tiles_done = 0;
     pipelineTiles(ie, lr_plane, plans, tile_h, tile_w, inflight,
                   [&](size_t i, dxrt::TensorPtrs tile_outputs) {
+                      // --dump-tensors: each tile is one inference; its input is
+                      // the LR window and its outputs what the NPU returned.
+                      if (!dump_dir.empty() && !tile_outputs.empty()) {
+                          char name[24];
+                          std::snprintf(name, sizeof(name), "tile%05zu", i);
+                          const TilePlan& p = plans[i];
+                          dumpTensorsToFiles(dump_dir + "/" + name,
+                                             lr_plane(cv::Rect(p.win_x, p.win_y, tile_w, tile_h)).clone(),
+                                             tile_outputs);
+                      }
                       if (assembleTile(plans[i], tile_outputs, scale_y, scale_x,
                                        out_tile_w, sr_y)) {
                           ++tiles_done;

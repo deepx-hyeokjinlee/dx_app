@@ -79,13 +79,6 @@ public:
         int processCount = 0;
 
         CommandLineArgs args = parseCommandLine(argc, argv);
-        // The async pipelines have no tensor-dump path: refusing the flag beats
-        // accepting it and writing nothing (the sync examples dump).
-        if (args.dumpTensors) {
-            dxapp::fatal_error("[DXAPP] [ERROR] --dump-tensors is not supported by the async "
-                               "example (it would write no tensors); run the _sync example "
-                               "to dump them.");
-        }
 
         dxapp::configureDisplayPump(display_pump_, args.drop_frames);
         verbose_ = args.verbose;
@@ -191,7 +184,7 @@ public:
                 std::cout << "[DXAPP] [INFO] Input source FPS: " << std::fixed << std::setprecision(2) << fps << std::endl;
                 std::cout << std::endl;
             }
-            if (args.saveMode) {
+            if (args.saveMode || args.dumpTensors) {
                 std::string run_name;
                 if (args.cameraIndex >= 0) run_name = "camera" + std::to_string(args.cameraIndex);
                 else if (!args.rtspUrl.empty()) run_name = "rtsp";
@@ -202,12 +195,13 @@ public:
                                      "stream", run_name);
                 fs::create_directories(run_dir);
                 writeRunInfo(run_dir, argv[0], args.modelPath, input_src);
+                if (args.dumpTensors) dump_run_dir_ = run_dir;
 
-                writer = initVideoWriter(
+                if (args.saveMode) writer = initVideoWriter(
                     run_dir, fps > 0 ? fps : 30.0,
                     cv::Size(SHOW_WINDOW_SIZE_W, SHOW_WINDOW_SIZE_H),
                     video_save_path);
-                if (!writer.isOpened()) {
+                if (args.saveMode && !writer.isOpened()) {
                     std::cerr << "[DXAPP] [ERROR] Failed to open video writer." << std::endl;
                     return -1;
                 }
@@ -263,6 +257,7 @@ public:
             display_args.save_path = std::move(ud->save_path);
             display_args.frame_index = ud->frame_index;
             display_queue_.push(std::move(display_args));
+            writeAsyncDump(*ud, outputs);
             delete ud;
             return 0;
         };
@@ -285,7 +280,7 @@ public:
         auto pipeline = [&]() {
             if (is_image) {
                 // Prepare run directory for image-mode saves
-                if (args.saveMode) {
+                if (args.saveMode || args.dumpTensors) {
                     std::string run_kind = fs::is_directory(args.imageFilePath) ? "image-dir" : "image";
                     std::string run_name = fs::path(args.imageFilePath).filename().string();
                     std::string input_src = buildInputSourceString(
@@ -294,6 +289,7 @@ public:
                                          run_kind, run_name);
                     fs::create_directories(run_dir);
                     writeRunInfo(run_dir, argv[0], args.modelPath, input_src);
+                    if (args.dumpTensors) dump_run_dir_ = run_dir;
                 }
 
                 for (int i = 0; i < loopTest && running_ && !g_interrupted(); ++i) {
@@ -308,16 +304,18 @@ public:
                     const std::string& cur_img_path = imageFiles[i % imageFiles.size()];
                     if (is_sr_) {
                         std::string sr_save_path;
-                        if (!run_dir.empty()) {
+                        if (!run_dir.empty() && args.saveMode) {
                             sr_save_path = dxapp::buildPerImageSavePath(run_dir, factory_->getModelName() + "_async", cur_img_path, i);
                         }
-                        processFrameSR(img, frame_params.ie, frame_params.processCount, sr_save_path);
+                        const std::string sr_dump_dir = dump_run_dir_.empty() ? std::string()
+                            : dump_run_dir_ + "/" + fs::path(cur_img_path).filename().string() + "/dump_tensors";
+                        processFrameSR(img, frame_params.ie, frame_params.processCount, sr_save_path, sr_dump_dir);
                     } else {
                         std::string save_path;
-                        if (!run_dir.empty()) {
+                        if (!run_dir.empty() && args.saveMode) {
                             save_path = dxapp::buildPerImageSavePath(run_dir, factory_->getModelName() + "_async", cur_img_path, i);
                         }
-                        submitDenoisingFrame(img, display_image, frame_params, std::move(save_path));
+                        submitDenoisingFrame(img, display_image, frame_params, std::move(save_path), cur_img_path);
                     }
                     // display is pumped by the main thread (runPipelineWithDisplay)
                     if (!running_) break;
@@ -461,6 +459,7 @@ public:
     }
 
 private:
+    std::string dump_run_dir_;  // the run dir when --dump-tensors, else empty
     std::unique_ptr<FactoryT> factory_;
     std::string model_path_;
     std::atomic<bool> running_{true};
@@ -496,7 +495,9 @@ private:
     /** Dispatch a frame to SR tiled or denoising async path. */
     void processFrameAsync(const cv::Mat& frame, AsyncFrameParams& p) {
         if (is_sr_) {
-            processFrameSR(frame, p.ie, p.processCount);
+            processFrameSR(frame, p.ie, p.processCount, std::string(),
+                           dump_run_dir_.empty() ? std::string()
+                               : frameDumpDir(dump_run_dir_ + "/dump_tensors", p.processCount, true));
         } else {
             processFrameDenoiseAsync(frame, p);
         }
@@ -504,7 +505,8 @@ private:
 
     /** Denoising: preprocess and submit a single frame to async inference. */
     void submitDenoisingFrame(const cv::Mat& img, cv::Mat& display_image,
-                              AsyncFrameParams& p, std::string save_path) {
+                              AsyncFrameParams& p, std::string save_path,
+                              const std::string& image_path = std::string()) {
         auto t_pre_start = std::chrono::high_resolution_clock::now();
         PreprocessContext ctx;
         cv::Mat preprocessed;
@@ -523,6 +525,7 @@ private:
             std::memcpy(buf.data(), preprocessed.data, preprocessed.total() * preprocessed.elemSize());
         }
         auto ud = std::make_unique<AsyncUserData>(AsyncUserData{display_image.clone(), ctx, std::move(save_path), {}});
+        armAsyncDump(*ud, dump_run_dir_, preprocessed, image_path, p.buffer_index);
         void* user_data = ud.release();
         metrics_.waitForSlot();
         updateInflightMetrics();
@@ -535,7 +538,7 @@ private:
 
     /** Super-Resolution: synchronous tiled inference path. */
     void processFrameSR(const cv::Mat& frame, dxrt::InferenceEngine& ie, int& processCount,
-                         const std::string& save_path = "") {
+                         const std::string& save_path = "", const std::string& dump_dir = "") {
         auto t_pre_start = std::chrono::high_resolution_clock::now();
         int orig_w = frame.cols;
         int orig_h = frame.rows;
@@ -586,7 +589,8 @@ private:
         auto ti0 = std::chrono::high_resolution_clock::now();
         int tiles_done = dxapp::srtiling::runAndAssembleTiles(
             ie, lr_gray, plans, tile_h_, tile_w_, padded_out_h, padded_out_w,
-            scale_y_, scale_x_, out_tile_w_, sr_y_padded);
+            scale_y_, scale_x_, out_tile_w_, sr_y_padded,
+            dxapp::srtiling::kDefaultInflight, dump_dir);
         auto ti1 = std::chrono::high_resolution_clock::now();
 
         auto t_post_start = std::chrono::high_resolution_clock::now();
@@ -713,6 +717,7 @@ private:
             std::memcpy(buf.data(), preprocessed.data, preprocessed.total() * preprocessed.elemSize());
         }
         auto user_data_ptr = std::make_unique<AsyncUserData>(AsyncUserData{p.display_image.clone(), ctx, std::string(), {}});
+        armAsyncDump(*user_data_ptr, dump_run_dir_, preprocessed, std::string(), p.buffer_index);
         void* user_data = user_data_ptr.release();
         metrics_.waitForSlot();
         updateInflightMetrics();
@@ -815,7 +820,7 @@ private:
             ("r, rtsp_url", "RTSP stream URL", cxxopts::value<std::string>(args.rtspUrl))
             ("s, save", "Save rendered output to disk", cxxopts::value<bool>(args.saveMode)->default_value("false"))
             ("save-dir", "Base directory for run outputs when using --save/--dump-tensors.", cxxopts::value<std::string>(args.saveDir)->default_value("artifacts/cpp_example"))
-            ("dump-tensors", "(Debug) Not supported here: the _sync example dumps tensors.", cxxopts::value<bool>(args.dumpTensors)->default_value("false"))
+            ("dump-tensors", "(Debug) Always dump input/output tensors as .bin files.", cxxopts::value<bool>(args.dumpTensors)->default_value("false"))
             ("l, loop", "Number of inference iterations", cxxopts::value<int>(args.loopTest)->default_value("-1"))
             ("no-display", "will not visualize, only show fps", cxxopts::value<bool>(args.no_display)->default_value("false"))
             ("drop-frames", "display: drop stale frames instead of pacing the pipeline (default: off, every frame is shown)",

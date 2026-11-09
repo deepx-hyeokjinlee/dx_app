@@ -166,6 +166,8 @@ struct AsyncUserData {
     std::chrono::high_resolution_clock::time_point submit_ts{};  // For inference time measurement
     std::string source_bin_path{};  // Original velodyne .bin path for multi-view viz (SFA3D 3D detection)
     uint64_t frame_index = 0;  // Monotonic submit order; used for in-order display reordering
+    std::string dump_dir{};    // --dump-tensors: where this frame's tensors go (empty = no dump)
+    cv::Mat dump_input{};      // --dump-tensors: the preprocessed input, kept until completion
 
     AsyncUserData() = default;
     AsyncUserData(const AsyncUserData&) = default;
@@ -174,6 +176,23 @@ struct AsyncUserData {
     AsyncUserData& operator=(AsyncUserData&&) noexcept = default;
     ~AsyncUserData() = default;
 };
+
+/// --dump-tensors in the async runners, laid out as the sync runners do:
+/// run_dir/<image file>/dump_tensors for an image, run_dir/dump_tensors/
+/// frameNNNNNN for a stream frame. The input is copied at submit time (the
+/// ring buffer it was written to is reused); the callback writes both.
+inline void armAsyncDump(AsyncUserData& ud, const std::string& dumpRunDir, const cv::Mat& input,
+                         const std::string& imagePath, int frameIdx) {
+    if (dumpRunDir.empty()) return;
+    ud.dump_dir = imagePath.empty()
+        ? frameDumpDir(dumpRunDir + "/dump_tensors", frameIdx, true)
+        : dumpRunDir + "/" + fs::path(imagePath).filename().string() + "/dump_tensors";
+    ud.dump_input = input.clone();
+}
+
+inline void writeAsyncDump(const AsyncUserData& ud, const dxrt::TensorPtrs& outputs) {
+    if (!ud.dump_dir.empty()) dumpTensorsToFiles(ud.dump_dir, ud.dump_input, outputs);
+}
 
 // Display arguments for async processing
 template <typename ResultT>
@@ -219,13 +238,6 @@ public:
 
         // Parse command line arguments
         CommandLineArgs args = parseCommandLine(argc, argv);
-        // The async pipelines have no tensor-dump path: refusing the flag beats
-        // accepting it and writing nothing (the sync examples dump).
-        if (args.dumpTensors) {
-            dxapp::fatal_error("[DXAPP] [ERROR] --dump-tensors is not supported by the async "
-                               "example (it would write no tensors); run the _sync example "
-                               "to dump them.");
-        }
         dxapp::configureDisplayPump(display_pump_, args.drop_frames);
         verbose_ = args.verbose;
         // Apply default sample image if no input specified
@@ -311,15 +323,16 @@ public:
             args.imageFilePath, args.videoFile, args.cameraIndex, args.rtspUrl);
 
         if (is_image) {
-            // Image Save Setup
-            if (args.saveMode) {
+            // Image Save Setup (--dump-tensors needs the run directory too)
+            if (args.saveMode || args.dumpTensors) {
                 std::string run_kind = fs::is_directory(args.imageFilePath) ? "image-dir" : "image";
                 std::string run_name = fs::path(args.imageFilePath).filename().string();
                 run_dir = makeRunDir(args.saveDir, factory_->getModelName() + "_async",
                                      run_kind, run_name);
                 fs::create_directories(run_dir);
-                image_save_dir = run_dir;
+                if (args.saveMode) image_save_dir = run_dir;
                 writeRunInfo(run_dir, argv[0], args.modelPath, input_source_str);
+                if (args.dumpTensors) dump_run_dir_ = run_dir;
             }
         } else {
             // Open video capture
@@ -357,7 +370,7 @@ public:
             std::cout << std::endl;
 
             // Video Save Setup with run_dir + avc1→mp4v→MJPG fallback
-            if (args.saveMode) {
+            if (args.saveMode || args.dumpTensors) {
                 std::string run_name;
                 if (args.cameraIndex >= 0) {
                     run_name = "camera" + std::to_string(args.cameraIndex);
@@ -370,12 +383,13 @@ public:
                                      "stream", run_name);
                 fs::create_directories(run_dir);
                 writeRunInfo(run_dir, argv[0], args.modelPath, input_source_str);
+                if (args.dumpTensors) dump_run_dir_ = run_dir;
 
-                writer = initVideoWriter(
+                if (args.saveMode) writer = initVideoWriter(
                     run_dir, fps > 0 ? fps : 30.0,
                     cv::Size(SHOW_WINDOW_SIZE_W, SHOW_WINDOW_SIZE_H),
                     video_save_path);
-                if (!writer.isOpened()) {
+                if (args.saveMode && !writer.isOpened()) {
                     std::cerr << "[DXAPP] [ERROR] Failed to open video writer." << std::endl;
                     return -1;
                 }
@@ -471,6 +485,7 @@ public:
 
                     // can render using original-pixel coordinates (not the resized display image).
                     auto ud = std::make_unique<AsyncUserData>(AsyncUserData{img.clone(), ctx, std::move(save_path), {}});
+                    armAsyncDump(*ud, dump_run_dir_, preprocessed, currentImagePath, buffer_index);
 
                     // Back-pressure: wait for available slot
                     metrics_.waitForSlot();
@@ -519,6 +534,7 @@ public:
 
                         // Use the original video frame (not the resized display image)
                         auto ud = std::make_unique<AsyncUserData>(AsyncUserData{frame.clone(), ctx, "", {}});
+                        armAsyncDump(*ud, dump_run_dir_, preprocessed, std::string(), buffer_index);
                         // Back-pressure: wait for available slot
                         metrics_.waitForSlot();
                         updateInflightMetrics();
@@ -654,6 +670,7 @@ public:
     }
 
 private:
+    std::string dump_run_dir_;  // the run dir when --dump-tensors, else empty
     std::unique_ptr<FactoryT> factory_;
     std::string model_path_;
     std::atomic<bool> running_{true};
@@ -673,6 +690,7 @@ private:
         IPostprocessor<ResultT>& postprocessor) {
         auto* ud = static_cast<AsyncUserData*>(user_data);
         auto t_callback_start = std::chrono::high_resolution_clock::now();
+        writeAsyncDump(*ud, outputs);
 
         // Measure inference time (submit → callback)
         {
@@ -820,7 +838,7 @@ private:
              cxxopts::value<bool>(args.saveMode)->default_value("false"))
             ("save-dir", "Base directory for run outputs when using --save/--dump-tensors.",
              cxxopts::value<std::string>(args.saveDir)->default_value("artifacts/cpp_example"))
-            ("dump-tensors", "(Debug) Not supported here: the _sync example dumps tensors.",
+            ("dump-tensors", "(Debug) Always dump input/output tensors as .bin files.",
              cxxopts::value<bool>(args.dumpTensors)->default_value("false"))
             ("l, loop", "Number of inference iterations to run",
              cxxopts::value<int>(args.loopTest)->default_value("-1"))

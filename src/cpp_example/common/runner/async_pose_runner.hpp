@@ -67,13 +67,6 @@ public:
         int processCount = 0;
 
         CommandLineArgs args = parseCommandLine(argc, argv);
-        // The async pipelines have no tensor-dump path: refusing the flag beats
-        // accepting it and writing nothing (the sync examples dump).
-        if (args.dumpTensors) {
-            dxapp::fatal_error("[DXAPP] [ERROR] --dump-tensors is not supported by the async "
-                               "example (it would write no tensors); run the _sync example "
-                               "to dump them.");
-        }
 
         dxapp::configureDisplayPump(display_pump_, args.drop_frames);
         verbose_ = args.verbose;
@@ -169,7 +162,7 @@ public:
                 if (!args.videoFile.empty()) std::cout << "[DXAPP] [INFO] Total frames: " << total_frames << std::endl;
                 std::cout << std::endl;
             }
-            if (args.saveMode) {
+            if (args.saveMode || args.dumpTensors) {
                 std::string run_name;
                 if (args.cameraIndex >= 0) run_name = "camera" + std::to_string(args.cameraIndex);
                 else if (!args.rtspUrl.empty()) run_name = "rtsp";
@@ -180,11 +173,12 @@ public:
                                      "stream", run_name);
                 fs::create_directories(run_dir);
                 writeRunInfo(run_dir, argv[0], args.modelPath, input_src);
-                writer = initVideoWriter(
+                if (args.dumpTensors) dump_run_dir_ = run_dir;
+                if (args.saveMode) writer = initVideoWriter(
                     run_dir, fps > 0 ? fps : 30.0,
                     cv::Size(SHOW_WINDOW_SIZE_W, SHOW_WINDOW_SIZE_H),
                     video_save_path);
-                if (!writer.isOpened()) {
+                if (args.saveMode && !writer.isOpened()) {
                     std::cerr << "[DXAPP] [ERROR] Failed to open video writer." << std::endl;
                     return -1;
                 }
@@ -250,6 +244,7 @@ public:
             display_args.save_path = std::move(ud->save_path);
             display_args.frame_index = ud->frame_index;
             display_queue_.push(std::move(display_args));
+            writeAsyncDump(*ud, outputs);
             delete ud;
             return 0;
         });
@@ -271,6 +266,7 @@ public:
             auto& buf = input_buffers[buffer_index % ASYNC_BUFFER_SIZE];
             fillModelInputBuffer(ie, buf, preprocessed);
             auto user_data_ptr = std::make_unique<AsyncUserData>(AsyncUserData{display_image.clone(), ctx, std::string(), {}});
+            armAsyncDump(*user_data_ptr, dump_run_dir_, preprocessed, std::string(), buffer_index);
             void* user_data = user_data_ptr.release();
             metrics_.waitForSlot();
             {
@@ -307,7 +303,7 @@ public:
         auto pipeline = [&]() {
             if (is_image) {
                 // Prepare run dir for image saves
-                if (args.saveMode) {
+                if (args.saveMode || args.dumpTensors) {
                     std::string run_kind = fs::is_directory(args.imageFilePath) ? "image-dir" : "image";
                     std::string run_name = fs::path(args.imageFilePath).filename().string();
                     std::string input_src = buildInputSourceString(
@@ -316,6 +312,7 @@ public:
                                          run_kind, run_name);
                     fs::create_directories(run_dir);
                     writeRunInfo(run_dir, argv[0], args.modelPath, input_src);
+                    if (args.dumpTensors) dump_run_dir_ = run_dir;
                 }
 
                 for (int i = 0; i < loopTest && running_ && !g_interrupted(); ++i) {
@@ -337,10 +334,11 @@ public:
                     auto& buf = input_buffers[buffer_index % ASYNC_BUFFER_SIZE];
                     fillModelInputBuffer(ie, buf, preprocessed);
                     std::string save_path;
-                    if (!run_dir.empty()) {
+                    if (!run_dir.empty() && args.saveMode) {
                         save_path = dxapp::buildPerImageSavePath(run_dir, factory_->getModelName() + "_async", imageFiles[i % imageFiles.size()], i);
                     }
                     auto ud = std::make_unique<AsyncUserData>(AsyncUserData{display_image.clone(), ctx, std::move(save_path), {}});
+                    armAsyncDump(*ud, dump_run_dir_, preprocessed, imageFiles[i % imageFiles.size()], buffer_index);
                     metrics_.waitForSlot();
                     {
                         std::lock_guard<std::mutex> lock(metrics_.metrics_mutex);
@@ -500,6 +498,7 @@ public:
     }
 
 private:
+    std::string dump_run_dir_;  // the run dir when --dump-tensors, else empty
     std::unique_ptr<FactoryT> factory_;
     std::string model_path_;
     std::atomic<bool> running_{true};
@@ -525,7 +524,7 @@ private:
             ("r, rtsp_url", "RTSP stream URL", cxxopts::value<std::string>(args.rtspUrl))
             ("s, save", "Save rendered output to disk", cxxopts::value<bool>(args.saveMode)->default_value("false"))
             ("save-dir", "Base directory for run outputs when using --save/--dump-tensors.", cxxopts::value<std::string>(args.saveDir)->default_value("artifacts/cpp_example"))
-            ("dump-tensors", "(Debug) Not supported here: the _sync example dumps tensors.", cxxopts::value<bool>(args.dumpTensors)->default_value("false"))
+            ("dump-tensors", "(Debug) Always dump input/output tensors as .bin files.", cxxopts::value<bool>(args.dumpTensors)->default_value("false"))
             ("l, loop", "Number of inference iterations", cxxopts::value<int>(args.loopTest)->default_value("-1"))
             ("no-display", "will not visualize, only show fps", cxxopts::value<bool>(args.no_display)->default_value("false"))
             ("drop-frames", "display: drop stale frames instead of pacing the pipeline (default: off, every frame is shown)",

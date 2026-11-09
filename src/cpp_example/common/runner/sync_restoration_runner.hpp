@@ -405,7 +405,8 @@ private:
         dxrt::InferenceEngine& ie, const cv::Mat& lr_bgr, const cv::Mat& lr_gray,
         int tile_w, int tile_h, int out_tile_w, int out_tile_h,
         int target_out_w, int target_out_h, int orig_w, int orig_h,
-        double& t_inference_total, double& t_postprocess_total) {
+        double& t_inference_total, double& t_postprocess_total,
+        const std::string& dumpDir = std::string()) {
         int scale_x = out_tile_w / tile_w, scale_y = out_tile_h / tile_h;
         int lr_w = lr_bgr.cols, lr_h = lr_bgr.rows;
         int padded_out_w = lr_w * scale_x, padded_out_h = lr_h * scale_y;
@@ -420,7 +421,8 @@ private:
         auto ti0 = std::chrono::high_resolution_clock::now();
         tiles_done = dxapp::srtiling::runAndAssembleTiles(
             ie, lr_gray, tile_plans_, tile_h, tile_w, padded_out_h, padded_out_w,
-            scale_y, scale_x, out_tile_w, sr_y_padded);
+            scale_y, scale_x, out_tile_w, sr_y_padded,
+            dxapp::srtiling::kDefaultInflight, dumpDir);
         t_inference_total = std::chrono::duration<double, std::milli>(
             std::chrono::high_resolution_clock::now() - ti0).count();
 
@@ -471,7 +473,8 @@ private:
         IPostprocessor<RestorationResult>& postprocessor,
         IVisualizer<RestorationResult>& visualizer,
         bool is_float_input, bool is_nhwc,
-        double& t_preprocess, double& t_inference_total, double& t_postprocess_total) {
+        double& t_preprocess, double& t_inference_total, double& t_postprocess_total,
+        const std::string& dumpDir = std::string()) {
         // Preprocess using the ORIGINAL input frame so that PreprocessContext::source_image
         // (when stored by preprocessors like GrayscaleResizePreprocessor) contains the
         // full-resolution BGR image required by postprocessors (ESPCN color restoration).
@@ -499,6 +502,7 @@ private:
 
         if (outputs.empty())
             return {true, cv::Mat{}};  // signal: no outputs, continue normally
+        if (!dumpDir.empty()) dumpTensorsToFiles(dumpDir, preprocessed, outputs);
 
         auto tpp0 = std::chrono::high_resolution_clock::now();
         std::vector<RestorationResult> results;
@@ -549,6 +553,11 @@ private:
         cv::Mat result_frame;
         double t_preprocess = 0.0, t_inference_total = 0.0, t_postprocess_total = 0.0;
 
+        // --dump-tensors: the model's input and output tensors (per tile for tiled
+        // SR), as the other runners write them -- it used to write the source
+        // frame only.
+        const std::string dumpDir = dumpTensorsDir.empty() ? std::string()
+            : frameDumpDir(dumpTensorsDir, frameIdx, dumpPerFrameDir);
         bool is_sr = false;
         if (input_channels <= 1) {
             auto t0 = std::chrono::high_resolution_clock::now();
@@ -601,7 +610,7 @@ private:
                 int target_out_h = orig_h * scale_y;
                 result_frame = runSuperResolution(ie, lr_bgr, lr_gray, tile_w, tile_h,
                     out_tile_w, out_tile_h, target_out_w, target_out_h, orig_w, orig_h,
-                    t_inference_total, t_postprocess_total);
+                    t_inference_total, t_postprocess_total, dumpDir);
                 display_image = result_frame;
             } else {
                 t_preprocess = std::chrono::duration<double, std::milli>(
@@ -613,7 +622,7 @@ private:
             auto maybe = runSingleInference(input_frame, display_image, ie,
                 preprocessor, postprocessor, visualizer,
                 is_float_input, is_nhwc,
-                t_preprocess, t_inference_total, t_postprocess_total);
+                t_preprocess, t_inference_total, t_postprocess_total, dumpDir);
             if (!maybe.first) return false;  // postprocess error
             if (maybe.second.empty()) {
                 // outputs were empty: accumulate metrics and continue
@@ -627,22 +636,6 @@ private:
             result_frame = std::move(maybe.second);
         }
 
-        // Dump tensors if enabled
-        if (!dumpTensorsDir.empty()) {
-            std::string dumpDir = dumpTensorsDir;
-            if (dumpPerFrameDir) {
-                dumpDir = dumpTensorsDir + "/frame" + std::to_string(frameIdx);
-            }
-            // Dump input frame as .bin
-            fs::create_directories(dumpDir);
-            std::string input_path = dumpDir + "/input_frame.bin";
-            std::ofstream ofs(input_path, std::ios::binary);
-            if (ofs.is_open()) {
-                ofs.write(static_cast<const char*>(static_cast<const void*>(input_frame.data)),
-                          input_frame.total() * input_frame.elemSize());
-                ofs.close();
-            }
-        }
 
         auto render_start = std::chrono::high_resolution_clock::now();
         const std::tuple<bool, double, double> render_result =
