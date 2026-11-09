@@ -21,6 +21,26 @@ from typing import List
 from ..base import IPostprocessor, DetectionResult, PreprocessContext
 
 
+# EfficientDet (automl) scores have 90 columns: column c is COCO category id
+# c + 1, and the ids 1..90 have ten gaps (12, 26, 29, 30, 45, 66, 68, 69, 71,
+# 83). There is no background column. Taken with has_background (the default)
+# every class came out one id low; taken as COCO-80 indices every class after
+# the first gap was off. Column -> COCO-80 index, -1 for an id with no class.
+_COCO90_TO_80 = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, -1, 24, 25, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, -1, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, -1, 60, -1, -1, 61, -1, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, -1, 73, 74, 75, 76, 77, 78, 79])
+
+
+def _scores_and_classes(scores_2d: np.ndarray, has_background: bool):
+    """(max score, class id) per row; a 90-column COCO head maps to COCO-80 and
+    rows whose class has no COCO-80 category get score -1 (never kept)."""
+    if scores_2d.shape[-1] == 90:
+        scores = np.max(scores_2d, axis=1)
+        classes = _COCO90_TO_80[np.argmax(scores_2d, axis=1)]
+        scores = np.where(classes >= 0, scores, -1.0)
+        return scores, np.maximum(classes, 0)
+    fg = scores_2d[:, 1:] if has_background and scores_2d.shape[-1] > 1 else scores_2d
+    return np.max(fg, axis=1), np.argmax(fg, axis=1)
+
+
 class EfficientDetPostprocessor(IPostprocessor):
     """
     Postprocessor for EfficientDet detection models.
@@ -145,8 +165,7 @@ class EfficientDetPostprocessor(IPostprocessor):
         if scores_raw.ndim == 1:
             return scores_raw, np.zeros(len(scores_raw), dtype=int)
         if scores_raw.ndim == 2 and scores_raw.shape[-1] > 1:
-            fg = scores_raw[:, 1:] if self.has_background else scores_raw
-            return np.max(fg, axis=1), np.argmax(fg, axis=1)
+            return _scores_and_classes(scores_raw, self.has_background)
         scores = scores_raw.flatten()
         return scores, np.zeros(len(scores), dtype=int)
 
@@ -185,12 +204,7 @@ class EfficientDetPostprocessor(IPostprocessor):
 
         # Parse scores from 2D tensor if no 1D score tensor found
         if scores_cand is None and scores_2d is not None:
-            if self.has_background and scores_2d.shape[-1] > 1:
-                fg = scores_2d[:, 1:]
-            else:
-                fg = scores_2d
-            scores_cand = np.max(fg, axis=1)
-            class_ids = np.argmax(fg, axis=1)
+            scores_cand, class_ids = _scores_and_classes(scores_2d, self.has_background)
         elif scores_cand is not None:
             class_ids = np.zeros(len(scores_cand), dtype=int)
         else:

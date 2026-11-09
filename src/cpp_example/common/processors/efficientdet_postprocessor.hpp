@@ -92,6 +92,16 @@ public:
     std::string getModelName() const override { return "EfficientDet"; }
 
 private:
+    // EfficientDet (automl) scores have 90 columns: column c is COCO category id
+    // c + 1, and the ids 1..90 have ten gaps (12, 26, 29, 30, 45, 66, 68, 69, 71,
+    // 83). Read as an index into the 80-class COCO list, every class after the
+    // first gap came out one or more places off -- a dog (id 18) was reported as
+    // "horse" (2026-11-09). Column -> COCO-80 index, -1 for an id with no class.
+    static int coco90ColumnToCoco80(int column) {
+        static const int kTable[90] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, -1, 24, 25, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, -1, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, -1, 60, -1, -1, 61, -1, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, -1, 73, 74, 75, 76, 77, 78, 79};
+        return (column >= 0 && column < 90) ? kTable[column] : -1;
+    }
+
     /**
      * @brief Process TF-style 4-tensor format:
      *   [boxes(1,N,4), classes(1,N), scores(1,N), num_detections(1)]
@@ -219,6 +229,10 @@ private:
                 if (s > max_score) { max_score = s; max_cls = c; }
             }
             if (max_score < score_threshold_) continue;
+            if (C == 90) {
+                max_cls = coco90ColumnToCoco80(max_cls);
+                if (max_cls < 0) continue;  // a COCO id with no category
+            }
 
             float v0 = boxes[i * 4 + 0];
             float v1 = boxes[i * 4 + 1];

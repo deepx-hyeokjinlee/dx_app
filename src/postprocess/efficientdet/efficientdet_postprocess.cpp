@@ -55,6 +55,16 @@ static std::vector<int> nms(const std::vector<EfficientDetResult>& dets, float t
 }
 
 namespace {
+// EfficientDet (automl) scores have 90 columns: column c is COCO category id
+// c + 1, and the ids 1..90 have ten gaps (12, 26, 29, 30, 45, 66, 68, 69, 71,
+// 83). Read as an index into the 80-class COCO list, every class after the
+// first gap came out one or more places off -- a dog (id 18) was reported as
+// "horse" (2026-11-09). Column -> COCO-80 index, -1 for an id with no class.
+int coco90ColumnToCoco80(int column) {
+    static const int kTable[90] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, -1, 24, 25, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, -1, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, -1, 60, -1, -1, 61, -1, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, -1, 73, 74, 75, 76, 77, 78, 79};
+    return (column >= 0 && column < 90) ? kTable[column] : -1;
+}
+
 // Product of every dimension: the element count of a tensor shape.
 template <typename Shape>
 int64_t element_count(const Shape& shape) {
@@ -151,7 +161,11 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::processMultiOutputAncho
 
     const int n = std::min(num_anchors, static_cast<int>(anchors_.size()));
     // Foreground classes start at index 1 when a background class is present.
-    const int cls_start = (has_background_ && score_cols > 1) ? 1 : 0;
+    // 90 columns are the automl COCO ids 1..90 themselves: no background
+    // column, whatever has_background says (with it, every class came out one
+    // id low), and each column maps to a COCO-80 index.
+    const bool coco90 = (score_cols == 90);
+    const int cls_start = (!coco90 && has_background_ && score_cols > 1) ? 1 : 0;
 
     // Collect candidates above the score threshold (mirrors the golden order:
     // score-extract -> threshold -> top-K limit -> decode -> NMS).
@@ -170,6 +184,10 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::processMultiOutputAncho
                 best = sc[c];
                 best_cls = c - cls_start;
             }
+        }
+        if (coco90) {
+            best_cls = coco90ColumnToCoco80(best_cls);
+            if (best_cls < 0) continue;  // a COCO id with no category
         }
         if (best >= score_threshold_) {
             cands.push_back({i, best, best_cls});
@@ -340,13 +358,18 @@ std::vector<EfficientDetResult> EfficientDetPostProcess::process2Tensor(
         int best_cls = 0;
 
         if (num_score_cols > 1) {
-            int start = has_background_ ? 1 : 0;
+            const bool coco90 = (num_score_cols == 90);  // see processMultiOutputAnchors
+            int start = (!coco90 && has_background_) ? 1 : 0;
             for (int c = start; c < num_score_cols; ++c) {
                 float s = scores_data[i * num_score_cols + c];
                 if (s > best_score) {
                     best_score = s;
-                    best_cls = c - (has_background_ ? 1 : 0);
+                    best_cls = c - start;
                 }
+            }
+            if (coco90) {
+                best_cls = coco90ColumnToCoco80(best_cls);
+                if (best_cls < 0) continue;
             }
         } else {
             best_score = scores_data[i];
