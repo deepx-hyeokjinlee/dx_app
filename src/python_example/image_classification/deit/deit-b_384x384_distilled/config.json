@@ -34,7 +34,12 @@
     "class": "SimpleResizePreprocessor",
     "config_overrides": {},
     "kwargs": {
-      "normalize_float": true
+      "normalize_float": true,
+      "crop_resize": {
+        "short": 438,
+        "interpolation": "bicubic",
+        "resampler": "pillow"
+      }
     }
   },
   "postprocessor": {

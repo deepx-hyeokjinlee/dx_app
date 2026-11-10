@@ -29,8 +29,11 @@ public:
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
         // default: efficientnet-b2_288x288
-        // Stretch, as the Python config says (it used a letterbox here).
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // The compile JSON's evaluation transform (q-lite-json/2_5_0/efficientnet-b3_300x300.json):
+        // torchvision Resize(320, bicubic) + CenterCrop(300).
+        auto pre = std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        pre->setCenterCrop(320, 0, 0, cv::INTER_CUBIC, /*pillow=*/true);
+        return pre;
     }
 
     PostprocessorPtr<ClassificationResult> createPostprocessor(

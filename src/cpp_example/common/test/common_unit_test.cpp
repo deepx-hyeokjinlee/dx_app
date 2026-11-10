@@ -73,6 +73,7 @@
 #include "common/processors/clip_text_postprocessor.hpp"
 #include "common/processors/hand_landmark_postprocessor.hpp"
 #include "common/processors/picodet_postprocessor.hpp"
+#include "common/processors/nanodet_postprocessor.hpp"
 #include "common/processors/pose_postprocessor.hpp"
 #include "common/processors/serialized_postprocessor.hpp"
 #include "common/third_party/nlohmann_json.hpp"
@@ -80,6 +81,7 @@
 #include "common/utility/common_util.hpp"
 #include "common/utility/frame_reorder.hpp"
 #include "common/utility/lidar_util.hpp"
+#include "common/utility/pil_resample.hpp"
 #include "common/utility/labels.hpp"
 #include "common/utility/ordered_queue.hpp"
 #include "common/utility/roi_crop.hpp"
@@ -790,6 +792,37 @@ void TestBoxesAndKeypointsClipToTheImage() {
 // SFA3D's BEV (maudzung/SFA3D makeBEVMap): row = floor(x / res) forward DOWN,
 // col = floor(y / res) + 304, the cell's HIGHEST point gives intensity (raw)
 // and height ((z - z_min) / 4.0), density = min(1, log(n + 1) / log 64).
+// Pillow's resize, byte for byte (pil_resample.hpp). The expected bytes are
+// PIL 13.0.0's Image.fromarray(src).resize(size, BILINEAR | BICUBIC) of the
+// same 13x9 RGB pattern: a 2.6x shrink (the kernel widens) and an upscale.
+void TestPilResampleMatchesPillow() {
+    const int w = 13, h = 9;
+    std::vector<uint8_t> src(static_cast<size_t>(w) * h * 3);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            for (int c = 0; c < 3; ++c)
+                src[(static_cast<size_t>(y) * w + x) * 3 + c] =
+                    static_cast<uint8_t>((x * 37 + y * 91 + c * 53) % 256);
+    const std::vector<uint8_t> bl{99,132,137,134,151,134,116,120,140,111,125,131,140,124,103,108,127,139,114,141,125,132,137,137,112,128,142,120,116,122,132,138,134,112,127,142,117,143,122,129,135,140,115,128,146,151,130,114,123,129,143,114,134,138,120,139,120,117,130,155};
+    const std::vector<uint8_t> bc{19,72,127,96,159,223,192,179,110,65,49,101,76,141,188,166,225,45,87,154,183,188,200,86,117,88,112,75,133,187,170,140,97,157,77,79,161,145,111,109,124,84,90,118,189,153,174,148,118,83,82,105,89,165,129,95,76,49,100,159,148,190,166,160,128,97,57,88,149,117,149,158,44,107,168,130,175,167,187,176,49,80,79,147,113,172,191,169,115,62,138,197,205,165,104,68,33,76,139,115,178,221,186,150,89,49,57,116,192,139,85,63,83,141,107,176,174,205,187,67,87,77,124,86,147,210,96,105,137,105,166,197,157,127,94,88,108,106,95,145,205,178,159,125,89,165,149,172,171,136,106,79,101,65,133,164,170,187,145,143,106,93,175,177,97,157,114,84,67,120,179,142,174,137,168,148,66,71,95,167,209,29,88,66,113,178,153,205,189,144,74,62,31,90,158,127,182,235};
+    COMMON_CHECK(pil_resample::resize(src.data(), w, h, 3, 0, 5, 4,
+                                      pil_resample::Filter::kBilinear) == bl);
+    COMMON_CHECK(pil_resample::resize(src.data(), w, h, 3, 0, 6, 11,
+                                      pil_resample::Filter::kBicubic) == bc);
+    // torchvision Resize(short) + CenterCrop: 13x9 -> short 6 -> 8x6 (int(6*13/9)),
+    // crop 4x4 from round((8-4)/2) = 2, round((6-4)/2) = 1.
+    const auto crop = pil_resample::resize_short_center_crop(
+        src.data(), w, h, 3, 0, 6, 4, 4, pil_resample::Filter::kBilinear);
+    const auto full = pil_resample::resize(src.data(), w, h, 3, 0, 8, 6,
+                                           pil_resample::Filter::kBilinear);
+    bool same = crop.size() == 4u * 4u * 3u;
+    for (int y = 0; y < 4 && same; ++y)
+        for (int x = 0; x < 4 * 3; ++x)
+            same = same && crop[static_cast<size_t>(y) * 12 + x] ==
+                               full[(static_cast<size_t>(y + 1) * 8 + 2) * 3 + x];
+    COMMON_CHECK(same);
+}
+
 void TestSfa3dBevFollowsUpstream() {
     const float res = 50.0f / 608.0f;
     cv::Mat pts = (cv::Mat_<float>(7, 4) <<

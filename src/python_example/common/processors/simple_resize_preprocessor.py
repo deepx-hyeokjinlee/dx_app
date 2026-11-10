@@ -10,6 +10,7 @@ import cv2
 from typing import Tuple, List, Optional
 
 from ..base import IPreprocessor, PreprocessContext
+from ..utility import pil_resample
 
 
 class SimpleResizePreprocessor(IPreprocessor):
@@ -105,7 +106,11 @@ class SimpleResizePreprocessor(IPreprocessor):
         # (default_loader.preprocessings). {"short": S} resizes the shorter side
         # to S keeping the aspect (torchvision Resize(int)); {"width": W,
         # "height": H} resizes to W x H. "interpolation": "bilinear" (default)
-        # or "bicubic". None: the plain stretch to the input size, as before.
+        # or "bicubic". "resampler": "pillow" runs Pillow's antialiased resize,
+        # byte for byte (utility/pil_resample.py) -- what torchvision's Resize
+        # does, the JSON's {resize: {mode: torchvision}}; "opencv" (default)
+        # cv2.resize -- the JSON's plain {width, height} and pycls' resize.
+        # None: the plain stretch to the input size.
         self._crop_resize = crop_resize
         if crop_resize is not None:
             if not (("short" in crop_resize) or ("width" in crop_resize and "height" in crop_resize)):
@@ -114,6 +119,9 @@ class SimpleResizePreprocessor(IPreprocessor):
             if interp not in ("bilinear", "bicubic"):
                 raise ValueError(f"crop_resize interpolation must be bilinear or bicubic: {interp!r}")
             self._crop_interp = cv2.INTER_CUBIC if interp == "bicubic" else cv2.INTER_LINEAR
+            self._crop_pillow = crop_resize.get("resampler", "opencv") == "pillow"
+            if crop_resize.get("resampler", "opencv") not in ("opencv", "pillow"):
+                raise ValueError(f"crop_resize resampler must be opencv or pillow: {crop_resize!r}")
 
     def _resize_center_crop(self, img: np.ndarray) -> np.ndarray:
         """Resize as crop_resize says, then crop the centre to the input size."""
@@ -126,7 +134,10 @@ class SimpleResizePreprocessor(IPreprocessor):
                 nw, nh = int(short * w / h), short
         else:
             nw, nh = int(self._crop_resize["width"]), int(self._crop_resize["height"])
-        resized = cv2.resize(img, (nw, nh), interpolation=self._crop_interp)
+        if self._crop_pillow:
+            resized = pil_resample.resize(img, nw, nh, self._crop_interp == cv2.INTER_CUBIC)
+        else:
+            resized = cv2.resize(img, (nw, nh), interpolation=self._crop_interp)
         iw, ih = self._input_width, self._input_height
         if nw < iw or nh < ih:
             return cv2.resize(resized, (iw, ih), interpolation=self._crop_interp)

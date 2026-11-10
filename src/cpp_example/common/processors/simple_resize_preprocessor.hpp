@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "common/base/i_processor.hpp"
+#include "common/utility/pil_resample.hpp"
 
 namespace dxapp {
 
@@ -156,11 +157,19 @@ public:
         norm_enabled_ = true;
     }
 
-    void setCenterCrop(int short_side, int resize_w, int resize_h, int interpolation) {
+    /// The model's evaluation resize, then a centre crop to the input size --
+    /// the compile JSON's default_loader. `pillow` selects Pillow's
+    /// antialiased resampler (pil_resample.hpp), which is what torchvision's
+    /// Resize runs ({resize: {mode: torchvision}}); false keeps OpenCV
+    /// (the JSON's plain {resize: {width, height}} and pycls' short-side
+    /// resize). `interpolation` is cv::INTER_LINEAR or cv::INTER_CUBIC.
+    void setCenterCrop(int short_side, int resize_w, int resize_h, int interpolation,
+                       bool pillow = false) {
         crop_short_ = short_side;
         crop_resize_w_ = resize_w;
         crop_resize_h_ = resize_h;
         crop_interp_ = interpolation;
+        crop_pillow_ = pillow;
     }
 
     int getInputWidth() const override { return input_width_; }
@@ -180,14 +189,25 @@ private:
             }
         }
         cv::Mat resized;
-        cv::resize(img, resized, cv::Size(nw, nh), 0, 0, crop_interp_);
+        if (crop_pillow_) {
+            const cv::Mat src = img.isContinuous() ? img : img.clone();
+            const auto bytes = pil_resample::resize(
+                src.data, src.cols, src.rows, src.channels(), src.step, nw, nh,
+                crop_interp_ == cv::INTER_CUBIC ? pil_resample::Filter::kBicubic
+                                                : pil_resample::Filter::kBilinear);
+            resized = cv::Mat(nh, nw, src.type(), const_cast<uint8_t*>(bytes.data())).clone();
+        } else {
+            cv::resize(img, resized, cv::Size(nw, nh), 0, 0, crop_interp_);
+        }
         if (nw < input_width_ || nh < input_height_) {
             cv::Mat out;
             cv::resize(resized, out, cv::Size(input_width_, input_height_), 0, 0, crop_interp_);
             return out;
         }
-        const int top = static_cast<int>(std::lround((nh - input_height_) / 2.0));
-        const int left = static_cast<int>(std::lround((nw - input_width_) / 2.0));
+        // Python's round(), half to even (torchvision CenterCrop): lround went
+        // the other way on every odd margin and moved the crop a pixel.
+        const int top = static_cast<int>(std::nearbyint((nh - input_height_) / 2.0));
+        const int left = static_cast<int>(std::nearbyint((nw - input_width_) / 2.0));
         return resized(cv::Rect(left, top, input_width_, input_height_)).clone();
     }
 
@@ -199,6 +219,7 @@ private:
     int crop_resize_w_{0};
     int crop_resize_h_{0};
     int crop_interp_{cv::INTER_LINEAR};
+    bool crop_pillow_{false};
     int input_width_;
     int input_height_;
     int color_conversion_;
