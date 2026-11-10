@@ -3,8 +3,8 @@
   "dxnn_file": "nanodet-plus-1.5x_224x224.dxnn",
   "task": "object_detection",
   "family": "nanodet",
-  "input_width": 224,
-  "input_height": 224,
+  "input_width": 416,
+  "input_height": 416,
   "image_only": false,
   "registry_image_only": false,
   "default_image": "sample/img/sample_street.jpg",
@@ -14,11 +14,13 @@
   "config": {
     "nms_threshold": 0.45,
     "reg_max": 7,
-    "score_threshold": 0.4
+    "score_threshold": 0.4,
+    "center_offset": 0.0
   },
   "registry_config": {
     "score_threshold": 0.4,
-    "nms_threshold": 0.45
+    "nms_threshold": 0.45,
+    "center_offset": 0.0
   },
   "cli": {
     "include_kitti_paths": false,

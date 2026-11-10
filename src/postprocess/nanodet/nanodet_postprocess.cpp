@@ -8,13 +8,14 @@
 NanoDetPostProcess::NanoDetPostProcess(
     int input_w, int input_h,
     float score_threshold, float nms_threshold,
-    int num_classes, int reg_max)
+    int num_classes, int reg_max, float center_offset)
     : input_width_(input_w),
       input_height_(input_h),
       score_threshold_(score_threshold),
       nms_threshold_(nms_threshold),
       num_classes_(num_classes),
-      reg_max_(reg_max) {
+      reg_max_(reg_max),
+      center_offset_(center_offset) {
     build_anchors();
 }
 
@@ -28,23 +29,38 @@ NanoDetPostProcess::NanoDetPostProcess()
     build_anchors();
 }
 
-void NanoDetPostProcess::build_anchors() {
-    anchor_cx_.clear();
-    anchor_cy_.clear();
-    anchor_stride_.clear();
+void NanoDetPostProcess::build_anchors() { build_anchors_for(-1); }
 
-    for (int stride : strides_) {
-        int h = input_height_ / stride;
-        int w = input_width_ / stride;
-        for (int y = 0; y < h; ++y) {
-            for (int x = 0; x < w; ++x) {
-                anchor_cx_.push_back((x + 0.5f) * stride);
-                anchor_cy_.push_back((y + 0.5f) * stride);
-                anchor_stride_.push_back(static_cast<float>(stride));
+// Priors at (x + center_offset_) * stride for the first level set whose grid
+// has `rows` cells (-1: the three-level floor grid): NanoDet's three levels
+// or NanoDet-Plus's four (ceil grid, 3598 rows at 416), searched as the
+// Python NanoDetPostprocessor does.
+bool NanoDetPostProcess::build_anchors_for(int rows) {
+    const std::vector<std::vector<int>> sets = {{8, 16, 32}, {8, 16, 32, 64}};
+    for (const auto& strides : sets) {
+        for (bool use_ceil : {false, true}) {
+            anchor_cx_.clear();
+            anchor_cy_.clear();
+            anchor_stride_.clear();
+            for (int stride : strides) {
+                int h = use_ceil ? (input_height_ + stride - 1) / stride : input_height_ / stride;
+                int w = use_ceil ? (input_width_ + stride - 1) / stride : input_width_ / stride;
+                for (int y = 0; y < h; ++y) {
+                    for (int x = 0; x < w; ++x) {
+                        anchor_cx_.push_back((x + center_offset_) * stride);
+                        anchor_cy_.push_back((y + center_offset_) * stride);
+                        anchor_stride_.push_back(static_cast<float>(stride));
+                    }
+                }
+            }
+            total_anchors_ = static_cast<int>(anchor_cx_.size());
+            if (rows < 0 || total_anchors_ == rows) {
+                strides_ = strides;
+                return true;
             }
         }
     }
-    total_anchors_ = static_cast<int>(anchor_cx_.size());
+    return false;
 }
 
 std::vector<float> NanoDetPostProcess::dfl_decode(const float* reg, int bins) const {
@@ -122,8 +138,14 @@ std::vector<NanoDetResult> NanoDetPostProcess::postprocess(
         return {};
     }
 
-    // Use min of actual anchors and predicted anchors
-    int n = std::min(num_anchors, total_anchors_);
+    // The prior grid must have one row per output row (a Plus head has a
+    // fourth, stride-64 level that the three-level grid silently dropped).
+    if (total_anchors_ != num_anchors && !build_anchors_for(num_anchors)) {
+        std::cerr << "NanoDetPostProcess: no stride set (8/16/32[/64]) gives " << num_anchors
+                  << " priors at " << input_width_ << "x" << input_height_ << std::endl;
+        return {};
+    }
+    int n = num_anchors;
 
     // Auto-detect whether class scores are already post-sigmoid (values in [0,1])
     // or raw logits (can be negative). Sample the first few rows.

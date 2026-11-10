@@ -1792,13 +1792,14 @@ PYBIND11_MODULE(dx_postprocess, m)
 
     // --- NanoDet ---
     py::class_<NanoDetPostProcess>(m, "NanoDetPostProcess")
-        .def(py::init<int, int, float, float, int, int>(),
+        .def(py::init<int, int, float, float, int, int, float>(),
             py::arg("input_w"),
             py::arg("input_h"),
             py::arg("score_threshold"),
             py::arg("nms_threshold"),
             py::arg("num_classes") = 80,
-            py::arg("reg_max") = 10)
+            py::arg("reg_max") = 10,
+            py::arg("center_offset") = 0.5f)
         .def("postprocess", [](NanoDetPostProcess& self, py::list ie_output) {
             auto tensors = numpy_to_dxrt_tensors(ie_output);
             std::vector<NanoDetResult> results;

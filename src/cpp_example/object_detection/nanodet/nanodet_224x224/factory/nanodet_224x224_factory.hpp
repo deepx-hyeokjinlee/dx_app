@@ -44,7 +44,7 @@ public:
         return std::make_unique<NanoDetPostprocessor>(
             input_width, input_height,
             score_threshold_, nms_threshold_, num_classes_, reg_max_,
-            false, class_names_
+            false, class_names_, center_offset_
         );
     }
 
@@ -59,6 +59,7 @@ public:
         num_classes_ = config.get<int>("num_classes", num_classes_);
         class_names_ = config.get_string_list("class_names");
         reg_max_ = config.get<int>("reg_max", reg_max_);
+        center_offset_ = config.get<float>("center_offset", center_offset_);
     }
 
     std::string getModelName() const override {
@@ -75,6 +76,7 @@ private:
     float nms_threshold_;
     int num_classes_{80};
     int reg_max_;
+    float center_offset_ = 0.5f;  // NanoDet-Plus: 0.0
     std::vector<std::string> class_names_;
 };
 

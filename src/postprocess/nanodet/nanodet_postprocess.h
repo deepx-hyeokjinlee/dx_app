@@ -46,6 +46,7 @@ class NanoDetPostProcess {
     int num_classes_{80};
     int reg_max_{10};
     std::vector<int> strides_{8, 16, 32};
+    float center_offset_{0.5f};  // NanoDet: cell centre; NanoDet-Plus: 0.0 (corner)
 
     // Pre-computed anchors
     std::vector<float> anchor_cx_;
@@ -54,6 +55,7 @@ class NanoDetPostProcess {
     int total_anchors_{0};
 
     void build_anchors();
+    bool build_anchors_for(int rows);
     std::vector<float> dfl_decode(const float* reg, int bins) const;
     std::vector<NanoDetResult> apply_nms(const std::vector<NanoDetResult>& detections) const;
 
@@ -62,7 +64,8 @@ class NanoDetPostProcess {
    public:
     NanoDetPostProcess(int input_w, int input_h,
                        float score_threshold, float nms_threshold,
-                       int num_classes = 80, int reg_max = 10);
+                       int num_classes = 80, int reg_max = 10,
+                       float center_offset = 0.5f);
     NanoDetPostProcess();
     ~NanoDetPostProcess() = default;
 

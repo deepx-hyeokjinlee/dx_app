@@ -37,13 +37,20 @@ class NanoDetPostprocessor(IPostprocessor):
         self.input_height = input_height
         self.config = config or {}
 
-        self.conf_threshold = self.config.get('conf_threshold', 0.3)
+        # config.json spells it score_threshold (the C++ factories read that key); conf_threshold is kept as the older spelling.
+        self.conf_threshold = self.config.get('score_threshold', self.config.get('conf_threshold', 0.3))
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
         self.num_classes = self.config.get('num_classes', 80)
 
         # reg_max / strides will be auto-detected from actual tensor shape
         self._hint_reg_max = self.config.get('reg_max', None)
         self._hint_strides = self.config.get('strides', None)
+        # Where a prior sits in its cell, in strides. NanoDet's GFL head: the
+        # centre, 0.5. NanoDet-Plus's head: the corner, 0.0 (upstream
+        # nanodet_plus_head.get_single_level_center_priors). Decoding a Plus
+        # model at 0.5 moved every box half a stride: COCO val2017 (150
+        # images) nanodet-plus 416 17.8 -> 29.5 mAP.
+        self._center_offset = float(self.config.get('center_offset', 0.5))
 
         # Lazy-built on first process() call
         self._anchor_centers = None
@@ -68,8 +75,8 @@ class NanoDetPostprocessor(IPostprocessor):
             else:
                 h = input_size // stride
                 w = input_size // stride
-            x = (np.arange(w) + 0.5) * stride
-            y = (np.arange(h) + 0.5) * stride
+            x = (np.arange(w) + self._center_offset) * stride
+            y = (np.arange(h) + self._center_offset) * stride
             xv, yv = np.meshgrid(x, y)
             centers_list.append(np.stack([xv.ravel(), yv.ravel()], axis=1))
             strides_list.append(np.full(h * w, stride, dtype=np.float32))

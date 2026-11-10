@@ -887,6 +887,70 @@ void TestSfa3dDecodesUpstreamConventions() {
     COMMON_CHECK(std::fabs(res[0].dim_l - 3.9f) < 1e-6f);
 }
 
+// A TF-slim head (inceptionv1: 1001 outputs, row 0 = background). With
+// background_class the rows are softmaxed together, row 0 is dropped, and the
+// ids are ImageNet's; without it the example read the first 1000 rows.
+/// Colour code -1 keeps the camera's BGR (YOLOX, NanoDet, RetinaFace-0.25:
+/// trained on cv2 images; fed RGB they lost 3.1-4.7 COCO mAP). cvtColor
+/// would throw on -1, so the letterbox must skip it.
+void TestLetterboxKeepsBgrOnMinusOne() {
+    cv::Mat img(64, 64, CV_8UC3, cv::Scalar(10, 0, 200));  // B=10, R=200
+    cv::Mat out;
+    dxapp::PreprocessContext ctx;
+    dxapp::DetectionPreprocessor rgb(64, 64);
+    rgb.process(img, out, ctx);
+    COMMON_CHECK(out.at<cv::Vec3b>(32, 32)[0] == 200);
+    dxapp::DetectionPreprocessor bgr(64, 64, -1);
+    bgr.process(img, out, ctx);
+    COMMON_CHECK(out.at<cv::Vec3b>(32, 32)[0] == 10 && out.at<cv::Vec3b>(32, 32)[2] == 200);
+}
+
+/// NanoDet-Plus 416: 52+26+13+7 = 3598 rows (fourth level, ceil grid), priors
+/// at the cell corner (center_offset 0). The three-level grid read only the
+/// first 3549 rows, and the centre offset moved every box half a stride
+/// (COCO val2017, 150 images: 17.8 -> 29.5 mAP).
+void TestNanoDetPlusPriors() {
+    const int row = 1 + 4 * 2;  // one class, reg_max 1
+    std::vector<float> data(3598 * row, 0.f);
+    for (int r = 0; r < 3598; ++r) data[r * row] = -10.f;
+    data[(3549 + 8) * row] = 10.f;  // stride-64 cell (1, 1)
+    std::vector<int64_t> shape{1, 3598, row};
+    dxrt::TensorPtrs outs{std::make_shared<dxrt::Tensor>("output", shape, dxrt::DataType::FLOAT, data.data())};
+    dxapp::PreprocessContext ctx;
+    ctx.scale = 1.f; ctx.pad_x = 0; ctx.pad_y = 0;
+    ctx.original_width = 416; ctx.original_height = 416;
+    dxapp::NanoDetPostprocessor plus(416, 416, 0.3f, 0.6f, 1, 1, false, {}, 0.0f);
+    auto r = plus.process(outs, ctx);
+    COMMON_CHECK(r.size() == 1);
+    if (r.size() == 1) COMMON_CHECK(std::fabs(r[0].box[0] - 32.f) < 1e-3f && std::fabs(r[0].box[2] - 96.f) < 1e-3f);
+    dxapp::NanoDetPostprocessor classic(416, 416, 0.3f, 0.6f, 1, 1);
+    r = classic.process(outs, ctx);
+    COMMON_CHECK(r.size() == 1);
+    if (r.size() == 1) COMMON_CHECK(std::fabs(r[0].box[0] - 64.f) < 1e-3f);
+}
+
+void TestClassificationBackgroundRowIsDropped() {
+    std::vector<float> logits(1001, 0.f);
+    logits[6] = 8.f;       // ImageNet 5 (row 6 = class 6 - 1)
+    logits[1000] = 7.f;    // ImageNet 999: the row the old reading cut off
+    std::vector<int64_t> shape{1, 1001};
+    dxrt::TensorPtrs outs{std::make_shared<dxrt::Tensor>(
+        "logits", shape, dxrt::DataType::FLOAT, logits.data())};
+    dxapp::PreprocessContext ctx;
+    dxapp::EfficientNetPostprocessor bg(1000, 2, true);
+    const auto r = bg.process(outs, ctx);
+    COMMON_CHECK(r.size() == 2);
+    if (r.size() != 2) return;
+    COMMON_CHECK(r[0].class_id == 5 && r[1].class_id == 999);
+    COMMON_CHECK(r[0].class_name == dxapp::getImageNetClassName(5));
+    // probabilities from the softmax over all 1001 rows
+    const double z = std::exp(8.0) + std::exp(7.0) + 999.0;
+    COMMON_CHECK(std::fabs(r[0].confidence - std::exp(8.0) / z) < 1e-5);
+    dxapp::EfficientNetPostprocessor plain(1000, 2, false);
+    const auto q = plain.process(outs, ctx);
+    COMMON_CHECK(!q.empty() && q[0].class_id == 6);  // unchanged without the flag
+}
+
 void TestClassMapGoesBackToTheImage() {
     dxapp::PreprocessContext ctx;
     ctx.pad_x = 0; ctx.pad_y = 16; ctx.scale = 0.32f;
@@ -3392,7 +3456,11 @@ int main() {
     TestLetterboxRoundsLikePython();
     TestBoxesAndKeypointsClipToTheImage();
     TestClassMapGoesBackToTheImage();
+    TestClassificationBackgroundRowIsDropped();
+    TestLetterboxKeepsBgrOnMinusOne();
+    TestNanoDetPlusPriors();
     TestSfa3dBevFollowsUpstream();
+    TestPilResampleMatchesPillow();
     TestSfa3dDecodesUpstreamConventions();
     TestClipTextTokenizerMergesAndPads();
     TestClipTextProjectsTheEotRowThroughLnFinal();

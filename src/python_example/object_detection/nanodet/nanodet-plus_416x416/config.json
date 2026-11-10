@@ -14,11 +14,13 @@
   "config": {
     "nms_threshold": 0.45,
     "reg_max": 7,
-    "score_threshold": 0.4
+    "score_threshold": 0.4,
+    "center_offset": 0.0
   },
   "registry_config": {
     "score_threshold": 0.4,
-    "nms_threshold": 0.45
+    "nms_threshold": 0.45,
+    "center_offset": 0.0
   },
   "cli": {
     "include_kitti_paths": false,

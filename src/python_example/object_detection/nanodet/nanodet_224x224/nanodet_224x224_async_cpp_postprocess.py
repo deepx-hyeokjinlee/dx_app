@@ -48,7 +48,8 @@ def on_engine_init(runner):
     score_thr = config.get("score_threshold", 0.3)
     nms_thr = config.get("nms_threshold", 0.45)
     runner._cpp_postprocessor = NanoDetPostProcess(
-        input_w, input_h, score_thr, nms_thr, 80, 10
+        input_w, input_h, score_thr, nms_thr, 80, 10,
+        float(config.get("center_offset", 0.5))
     )
     runner._cpp_convert_fn = convert_cpp_detections
 

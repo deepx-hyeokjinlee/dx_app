@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <iostream>
 #include <vector>
 
 namespace dxapp {
@@ -28,10 +29,12 @@ public:
                          int num_classes = 80,
                          int reg_max = 10,
                          bool /*is_ort_configured*/ = false,
-                         const std::vector<std::string>& class_names = {})
+                         const std::vector<std::string>& class_names = {},
+                         float center_offset = 0.5f)
         : input_width_(input_width), input_height_(input_height),
           conf_threshold_(conf_threshold), nms_threshold_(nms_threshold),
-          num_classes_(num_classes), reg_max_(reg_max), class_names_(class_names) {
+          num_classes_(num_classes), reg_max_(reg_max), class_names_(class_names),
+          center_offset_(center_offset) {
         // Pre-compute DFL weights [0, 1, ..., reg_max]
         dfl_weights_.resize(reg_max_ + 1);
         for (int i = 0; i <= reg_max_; ++i) {
@@ -79,6 +82,15 @@ public:
             }
         }
 
+        // The prior grid must have N rows: NanoDet's three levels or
+        // NanoDet-Plus's four (ceil grid, 3598 rows at 416). Decoding the
+        // first 3549 rows of a Plus head against three levels dropped its
+        // stride-64 level.
+        if (static_cast<int>(anchor_cx_.size()) != N && !buildAnchorsFor(N)) {
+            std::cerr << "[NanoDet] no stride set (8/16/32[/64]) gives " << N
+                      << " priors at " << input_width_ << "x" << input_height_ << std::endl;
+            return results;
+        }
         bool need_sigmoid = needsSigmoid_(data, N, cols);
 
         // Collect detections
@@ -145,19 +157,33 @@ public:
     std::string getModelName() const override { return "NanoDet"; }
 
 private:
-    void buildAnchors() {
-        const int strides[] = {8, 16, 32};
-        for (int s : strides) {
-            int h = input_height_ / s;
-            int w = input_width_ / s;
-            for (int y = 0; y < h; ++y) {
-                for (int x = 0; x < w; ++x) {
-                    anchor_cx_.push_back((x + 0.5f) * s);
-                    anchor_cy_.push_back((y + 0.5f) * s);
-                    anchor_strides_.push_back(static_cast<float>(s));
+    void buildAnchors() { buildAnchorsFor(-1); }
+
+    // Priors at (x + center_offset_) * stride for the first level set whose
+    // grid has `rows` cells (-1: the three-level floor grid). Python's
+    // NanoDetPostprocessor searches the same sets in the same order.
+    bool buildAnchorsFor(int rows) {
+        const std::vector<std::vector<int>> sets = {{8, 16, 32}, {8, 16, 32, 64}};
+        for (const auto& strides : sets) {
+            for (bool use_ceil : {false, true}) {
+                anchor_cx_.clear();
+                anchor_cy_.clear();
+                anchor_strides_.clear();
+                for (int s : strides) {
+                    int h = use_ceil ? (input_height_ + s - 1) / s : input_height_ / s;
+                    int w = use_ceil ? (input_width_ + s - 1) / s : input_width_ / s;
+                    for (int y = 0; y < h; ++y) {
+                        for (int x = 0; x < w; ++x) {
+                            anchor_cx_.push_back((x + center_offset_) * s);
+                            anchor_cy_.push_back((y + center_offset_) * s);
+                            anchor_strides_.push_back(static_cast<float>(s));
+                        }
+                    }
                 }
+                if (rows < 0 || static_cast<int>(anchor_cx_.size()) == rows) return true;
             }
         }
+        return false;
     }
 
     // Helper: check if sigmoid is needed for class scores
@@ -215,6 +241,7 @@ private:
     int num_classes_;
     int reg_max_;
     std::vector<std::string> class_names_;
+    float center_offset_;
     std::vector<float> dfl_weights_;
     std::vector<float> anchor_cx_;
     std::vector<float> anchor_cy_;
