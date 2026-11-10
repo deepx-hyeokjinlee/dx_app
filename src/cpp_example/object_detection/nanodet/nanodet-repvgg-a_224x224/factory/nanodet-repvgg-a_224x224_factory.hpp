@@ -28,7 +28,7 @@ public:
 
     NanodetFactory(float score_threshold = 0.3f,
                    float nms_threshold = 0.45f,
-                   int reg_max = 7)
+                   int reg_max = 10)
         : score_threshold_(score_threshold),
           nms_threshold_(nms_threshold),
           reg_max_(reg_max) {}

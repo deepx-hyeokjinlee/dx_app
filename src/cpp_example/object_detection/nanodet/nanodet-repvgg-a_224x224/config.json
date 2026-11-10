@@ -13,7 +13,7 @@
   "published": true,
   "config": {
     "nms_threshold": 0.45,
-    "reg_max": 7,
+    "reg_max": 10,
     "score_threshold": 0.3
   },
   "registry_config": {
