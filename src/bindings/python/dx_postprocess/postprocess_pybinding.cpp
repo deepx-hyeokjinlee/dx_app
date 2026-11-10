@@ -1702,8 +1702,8 @@ PYBIND11_MODULE(dx_postprocess, m)
 
     // --- Classification ---
     py::class_<ClassificationPostProcess>(m, "ClassificationPostProcess")
-        .def(py::init<int>(),
-            py::arg("top_k") = 5)
+        .def(py::init<int, bool>(),
+            py::arg("top_k") = 5, py::arg("background_class") = false)
         .def("postprocess", [](ClassificationPostProcess& self, py::list ie_output) {
             auto tensors = numpy_to_dxrt_tensors(ie_output);
             std::vector<ClassificationResult> results;

@@ -26,13 +26,16 @@ public:
         : num_classes_(num_classes), top_k_(top_k) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        // Stretch, as the Python config says (it used a letterbox here).
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // The compile JSON's evaluation transform (q-lite-json/2_5_0/inceptionv1_224x224.json):
+        // torchvision Resize(256, bilinear) + CenterCrop(224).
+        auto pre = std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        pre->setCenterCrop(256, 0, 0, cv::INTER_LINEAR, /*pillow=*/true);
+        return pre;
     }
 
     PostprocessorPtr<ClassificationResult> createPostprocessor(
         int /*input_width*/, int /*input_height*/) override {
-        return std::make_unique<EfficientNetPostprocessor>(num_classes_, top_k_);
+        return std::make_unique<EfficientNetPostprocessor>(num_classes_, top_k_, background_class_);
     }
 
     VisualizerPtr<ClassificationResult> createVisualizer() override {
@@ -42,6 +45,7 @@ public:
     void loadConfig(const dxapp::ModelConfig& config) override {
         num_classes_ = config.get<int>("num_classes", num_classes_);
         top_k_ = config.get<int>("top_k", top_k_);
+        background_class_ = config.get<bool>("background_class", background_class_);
     }
 
     std::string getModelName() const override {
@@ -52,6 +56,8 @@ public:
 private:
     int num_classes_;
     int top_k_;
+    // A TF-slim export: 1001 outputs, row 0 is the background class.
+    bool background_class_{true};
 };
 
 }  // namespace v_inceptionv1_224x224

@@ -23,8 +23,8 @@ bool is_already_distribution(const float* data, int size) {
 
 }  // namespace
 
-ClassificationPostProcess::ClassificationPostProcess(int top_k)
-    : top_k_(top_k) {}
+ClassificationPostProcess::ClassificationPostProcess(int top_k, bool background_class)
+    : top_k_(top_k), background_class_(background_class) {}
 
 std::vector<float> ClassificationPostProcess::apply_softmax(
     const float* data, int num_classes) const {
@@ -83,6 +83,13 @@ std::vector<ClassificationResult> ClassificationPostProcess::postprocess(
         is_already_distribution(data, num_classes)
             ? std::vector<float>(data, data + num_classes)
             : apply_softmax(data, num_classes);
+
+    // A leading background row: softmaxed with the rest, then dropped, so the
+    // ids below are the dataset's (see the header).
+    if (background_class_ && num_classes > 2) {
+        probabilities.erase(probabilities.begin());
+        num_classes -= 1;
+    }
 
     // Get top-K indices
     std::vector<int> indices(num_classes);

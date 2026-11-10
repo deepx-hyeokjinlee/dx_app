@@ -12,7 +12,8 @@
   "zoo_canonical": true,
   "published": true,
   "config": {
-    "top_k": 5
+    "top_k": 5,
+    "background_class": true
   },
   "registry_config": {
     "top_k": 5

@@ -55,6 +55,10 @@ class ClassificationPostprocessor(IPostprocessor):
         self.config = config or {}
         self.num_classes = self.config.get('num_classes', 1000)
         self.top_k = self.config.get('top_k', 5)
+        # A leading background row (TF-slim exports: 1001 outputs, row 0 =
+        # background): softmaxed with the rest, then dropped, so class ids are
+        # the dataset's. Without it the ids were one off (inceptionv1).
+        self.background_class = bool(self.config.get('background_class', False))
     
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[ClassificationResult]:
         """
@@ -83,6 +87,8 @@ class ClassificationPostprocessor(IPostprocessor):
             probabilities = values.astype(np.float64)
         else:
             probabilities = self._softmax(values)
+        if self.background_class and probabilities.size > 2:
+            probabilities = probabilities[1:]
         
         # Get top-k (softmax is monotonic: same ranking as the logits)
         k = min(int(self.top_k), probabilities.size)

@@ -88,8 +88,12 @@ inline bool ReadIntegerElement0(const dxrt::Tensor& tensor, int* value) {
 // ============================================================================
 class EfficientNetPostprocessor : public IPostprocessor<ClassificationResult> {
 public:
-    EfficientNetPostprocessor(int num_classes = 1000, int top_k = 5)
-        : num_classes_(num_classes), top_k_(top_k) {}
+    /// background_class: the head has a leading background row (TF-slim, 1001
+    /// outputs for 1000 classes): it is softmaxed with the rest and dropped,
+    /// and class ids are the dataset's. Without it this read the first
+    /// num_classes rows -- background included, the last class cut off.
+    EfficientNetPostprocessor(int num_classes = 1000, int top_k = 5, bool background_class = false)
+        : num_classes_(num_classes), top_k_(top_k), background_class_(background_class) {}
 
     std::vector<ClassificationResult> process(const dxrt::TensorPtrs& outputs,
                                               const PreprocessContext& /*ctx*/) override {
@@ -103,8 +107,9 @@ public:
         // postprocessor ranks the array it is given.
         const int64_t elements = detail::TensorElementCount(*output_tensor);
         if (elements <= 0) return results;
+        const int offset = background_class_ ? 1 : 0;
         const int classes =
-            static_cast<int>(std::min<int64_t>(num_classes_, elements));
+            static_cast<int>(std::min<int64_t>(num_classes_, elements - offset));
         if (classes <= 0) return results;
 
         if (output_tensor->type() == dxrt::DataType::FLOAT) {
@@ -114,11 +119,13 @@ public:
             // already produced is returned unchanged (guards against double
             // softmax); raw logits are converted with dxapp::softmax.
             std::vector<float> probabilities;
-            if (detail::IsAlreadyDistribution(data, classes)) {
-                probabilities.assign(data, data + classes);
+            const int rows = classes + offset;
+            if (detail::IsAlreadyDistribution(data, rows)) {
+                probabilities.assign(data, data + rows);
             } else {
-                probabilities = dxapp::softmax(std::vector<float>(data, data + classes));
+                probabilities = dxapp::softmax(std::vector<float>(data, data + rows));
             }
+            probabilities.erase(probabilities.begin(), probabilities.begin() + offset);
 
             // Create index array and sort by probability (descending). This
             // is the same order as sorting the raw logits - softmax is
@@ -177,6 +184,7 @@ private:
 
     int num_classes_;
     int top_k_;
+    bool background_class_{false};
 };
 
 }  // namespace dxapp
