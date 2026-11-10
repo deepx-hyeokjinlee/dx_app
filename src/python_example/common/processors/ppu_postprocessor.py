@@ -75,7 +75,8 @@ class PPUPostprocessor(IPostprocessor):
         self.config = config or {}
         self._model_type = model_type
 
-        self.score_threshold = self.config.get('conf_threshold', 0.25)
+        # config.json spells it score_threshold (the C++ factories read that key); conf_threshold is kept as the older spelling.
+        self.score_threshold = self.config.get('score_threshold', self.config.get('conf_threshold', 0.25))
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
 
         # Allow caller to override per-model anchors and strides via config
@@ -230,8 +231,8 @@ class YOLOv8PPUPostprocessor(IPostprocessor):
         self.input_width = input_width
         self.input_height = input_height
         self.config = config or {}
-        self.score_threshold = self.config.get('conf_threshold',
-                                               self.config.get('score_threshold', 0.4))
+        self.score_threshold = self.config.get('score_threshold',
+                                               self.config.get('conf_threshold', 0.4))
         self.nms_threshold = self.config.get('nms_threshold', 0.5)
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[DetectionResult]:
@@ -345,7 +346,8 @@ class SCRFDPPUPostprocessor(IPostprocessor):
         self.input_width = input_width
         self.input_height = input_height
         self.config = config or {}
-        self.score_threshold = self.config.get('conf_threshold', 0.3)
+        # config.json spells it score_threshold (the C++ factories read that key); conf_threshold is kept as the older spelling.
+        self.score_threshold = self.config.get('score_threshold', self.config.get('conf_threshold', 0.3))
         self.nms_threshold = self.config.get('nms_threshold', 0.4)
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[FaceResult]:
@@ -476,7 +478,8 @@ class YOLOv5PosePPUPostprocessor(IPostprocessor):
         self.input_width = input_width
         self.input_height = input_height
         self.config = config or {}
-        self.score_threshold = self.config.get('conf_threshold', 0.25)
+        # config.json spells it score_threshold (the C++ factories read that key); conf_threshold is kept as the older spelling.
+        self.score_threshold = self.config.get('score_threshold', self.config.get('conf_threshold', 0.25))
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[PoseResult]:
@@ -616,8 +619,8 @@ class YOLOv10PPUPostprocessor(IPostprocessor):
         self.input_width = input_width
         self.input_height = input_height
         self.config = config or {}
-        self.score_threshold = self.config.get('conf_threshold',
-                                               self.config.get('score_threshold', 0.4))
+        self.score_threshold = self.config.get('score_threshold',
+                                               self.config.get('conf_threshold', 0.4))
         self.nms_threshold = self.config.get('nms_threshold', 0.5)
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[DetectionResult]:
@@ -716,8 +719,8 @@ class YOLOXPPUPostprocessor(IPostprocessor):
         self.input_width = input_width
         self.input_height = input_height
         self.config = config or {}
-        self.score_threshold = self.config.get('conf_threshold',
-                                               self.config.get('score_threshold', 0.25))
+        self.score_threshold = self.config.get('score_threshold',
+                                               self.config.get('conf_threshold', 0.25))
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
 
     def process(self, outputs: List[np.ndarray], ctx: PreprocessContext) -> List[DetectionResult]:

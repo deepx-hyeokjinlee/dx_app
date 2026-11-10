@@ -56,7 +56,8 @@ class YOLOv5Postprocessor(IPostprocessor):
         self.config = config or {}
         
         self.obj_threshold = self.config.get('obj_threshold', 0.25)
-        self.conf_threshold = self.config.get('conf_threshold', 0.3)
+        # config.json spells it score_threshold (the C++ factories read that key); conf_threshold is kept as the older spelling.
+        self.conf_threshold = self.config.get('score_threshold', self.config.get('conf_threshold', 0.3))
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
         self.num_classes = self.config.get('num_classes', 80)
         self.max_nms_candidates = int(self.config.get('max_nms_candidates', 1000))
@@ -409,7 +410,8 @@ class YOLOv8Postprocessor(IPostprocessor):
         self.input_height = input_height
         self.config = config or {}
         
-        self.conf_threshold = self.config.get('conf_threshold', 0.3)
+        # config.json spells it score_threshold (the C++ factories read that key); conf_threshold is kept as the older spelling.
+        self.conf_threshold = self.config.get('score_threshold', self.config.get('conf_threshold', 0.3))
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
         self.num_classes = self.config.get('num_classes', 80)
         self.max_nms_candidates = int(self.config.get('max_nms_candidates', 1000))
@@ -623,7 +625,8 @@ class YOLOXPostprocessor(IPostprocessor):
         self.config = config or {}
 
         self.obj_threshold = self.config.get('obj_threshold', 0.25)
-        self.conf_threshold = self.config.get('conf_threshold', 0.3)
+        # config.json spells it score_threshold (the C++ factories read that key); conf_threshold is kept as the older spelling.
+        self.conf_threshold = self.config.get('score_threshold', self.config.get('conf_threshold', 0.3))
         self.nms_threshold = self.config.get('nms_threshold', 0.45)
         self.num_classes = self.config.get('num_classes', 80)
 
