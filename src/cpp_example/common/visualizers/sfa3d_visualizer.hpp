@@ -24,8 +24,11 @@ public:
                  const std::vector<Detection3DResult>& results,
                  const PreprocessContext& /*ctx*/) override {
         cv::Mat bev = prepareBevFrame(frame);
-        // Display-only mirror: model BEV keeps +y on the right; flip raster before overlays.
-        cv::flip(bev, bev, 1);
+        // Display only: the model's raster runs forward DOWN (row = x / res) with
+        // +y on the right; the panel shows forward UP and +y (left) on the left,
+        // so the raster turns 180 degrees -- what SFA3D's own demo does
+        // (cv::ROTATE_180). Overlays map metres to that panel themselves.
+        cv::flip(bev, bev, -1);
         bev = drawBevBoxes(bev, results, panel_size_, panel_size_, class_names_);
 
         if (source_path_.empty() || !isLidarInputPath(source_path_)) {

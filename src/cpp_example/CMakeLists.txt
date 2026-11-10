@@ -328,6 +328,7 @@ if(DXAPP_BUILD_COMMON_TESTS)
         ${PROJECT_ROOT}/src/postprocess/yolov5/yolov5_postprocess.cpp
         ${PROJECT_ROOT}/src/postprocess/yolov7/yolov7_postprocess.cpp
         ${PROJECT_ROOT}/src/postprocess/efficientdet/efficientdet_postprocess.cpp
+        ${PROJECT_ROOT}/src/postprocess/sfa3d/sfa3d_postprocess.cpp
     )
     target_compile_options(common_unit_test PRIVATE ${COMMON_COMPILE_FLAGS})
     target_compile_definitions(common_unit_test PRIVATE ${COMMON_COMPILE_DEFINITIONS})
@@ -341,6 +342,7 @@ if(DXAPP_BUILD_COMMON_TESTS)
         ${PROJECT_ROOT}/src/postprocess/yolov5
         ${PROJECT_ROOT}/src/postprocess/yolov7
         ${PROJECT_ROOT}/src/postprocess/efficientdet
+        ${PROJECT_ROOT}/src/postprocess/sfa3d
     )
     target_link_libraries(common_unit_test ${COMMON_LIBS})
     if(NOT MSVC)

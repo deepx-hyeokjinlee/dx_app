@@ -79,6 +79,7 @@
 #include "common/utility/camera.hpp"
 #include "common/utility/common_util.hpp"
 #include "common/utility/frame_reorder.hpp"
+#include "common/utility/lidar_util.hpp"
 #include "common/utility/labels.hpp"
 #include "common/utility/ordered_queue.hpp"
 #include "common/utility/roi_crop.hpp"
@@ -87,6 +88,7 @@
 #include "common/utility/verify_serialize.hpp"
 #include "common/visualizers/pose_visualizer.hpp"
 #include "common/visualizers/retrieval_visualizer.hpp"
+#include "sfa3d_postprocess.h"
 // header-only so this binary tests the CLI's own handler (see its file comment)
 #include "multi_model_graph/graph_cli_interrupt.hpp"
 #include "panoptic_driving_perception/yolopv2/yolopv2_384x640/factory/yolopv2_384x640_factory.hpp"
@@ -785,6 +787,73 @@ void TestBoxesAndKeypointsClipToTheImage() {
 
 /// A class map comes back in image coordinates, letterbox padding cut (scaled for
 /// a head smaller than the input), as the Python tree's class_map_to_original.
+// SFA3D's BEV (maudzung/SFA3D makeBEVMap): row = floor(x / res) forward DOWN,
+// col = floor(y / res) + 304, the cell's HIGHEST point gives intensity (raw)
+// and height ((z - z_min) / 4.0), density = min(1, log(n + 1) / log 64).
+void TestSfa3dBevFollowsUpstream() {
+    const float res = 50.0f / 608.0f;
+    cv::Mat pts = (cv::Mat_<float>(7, 4) <<
+        10.0f, 0.0f, 0.0f, 0.5f,      // top of a 2-point cell
+        10.0f, 0.0f, -1.0f, 0.9f,     // lower: its intensity must not win
+        5.0f, -25.0f, -2.7f, 0.2f,    // y == y_min -> col 0; height 0.03 / 4 * 255 = 1.9
+        20.0f, 3.0f, 1.0f, 0.3f,      // tie on z with the next: the first stays
+        20.0f, 3.0f, 1.0f, 0.7f,
+        50.0f, 0.0f, 0.0f, 1.0f,      // x == x_max: row 608, cropped as upstream
+        60.0f, 0.0f, 0.0f, 1.0f);     // outside the window
+    const cv::Mat bev = dxapp::pointcloudToBEV(pts);
+    COMMON_CHECK(bev.rows == 608 && bev.cols == 608 && bev.type() == CV_8UC3);
+    const int row = static_cast<int>(std::floor(10.0f / res));
+    const cv::Vec3b a = bev.at<cv::Vec3b>(row, 304);
+    COMMON_CHECK(row == 121);
+    COMMON_CHECK(a[0] == 128);  // 0.5 * 255 = 127.5, nearest-even
+    COMMON_CHECK(a[1] == 174);  // (0 + 2.73) / 4.0 * 255 = 174.04
+    COMMON_CHECK(a[2] == 67);   // log(3) / log(64) * 255 = 67.36
+    const cv::Vec3b b = bev.at<cv::Vec3b>(static_cast<int>(std::floor(5.0f / res)), 0);
+    // 0.2f * 255 = 51.0000003; 1.9125; log(2) / log(64) * 255 = 42.50000000000001 (double)
+    COMMON_CHECK(b[0] == 51 && b[1] == 2 && b[2] == 43);
+    const cv::Vec3b c = bev.at<cv::Vec3b>(static_cast<int>(std::floor(20.0f / res)),
+                                          static_cast<int>(std::floor(3.0f / res)) + 304);
+    COMMON_CHECK(c[0] == 77);   // the FIRST point's 0.3f: 0.30000001 * 255 = 76.500003
+    int lit = 0;
+    for (int r = 0; r < bev.rows; ++r)
+        for (int col = 0; col < bev.cols; ++col)
+            if (bev.at<cv::Vec3b>(r, col) != cv::Vec3b(0, 0, 0)) ++lit;
+    COMMON_CHECK(lit == 3);
+}
+
+// SFA3D decode (evaluation_utils.py): 3x3 peak suppression, x = (row +
+// offset[1]) * res, y = -25 + (col + offset[0]) * res, z = z_coor - 2.73
+// (bottom), yaw = -atan2(direction[0], direction[1]).
+void TestSfa3dDecodesUpstreamConventions() {
+    const int h = 152, w = 152, hw = h * w;
+    std::vector<float> hm(3 * hw, -10.f), off(2 * hw, 0.f), dir(2 * hw, 0.f),
+        z(hw, 0.f), dim(3 * hw, 0.f);
+    const int r = 10, c = 20, i = r * w + c;
+    hm[hw + i] = 10.f;          // class 1 (Car)
+    hm[hw + i + 1] = 9.f;       // its neighbour: suppressed
+    off[i] = 0.25f; off[hw + i] = 0.5f;
+    dir[i] = 1.f; dir[hw + i] = 0.f;
+    z[i] = 2.5f;
+    dim[i] = 1.5f; dim[hw + i] = 1.6f; dim[2 * hw + i] = 3.9f;
+    auto tensor = [](const char* name, int ch, std::vector<float>& data) {
+        std::vector<int64_t> shape{1, ch, 152, 152};
+        return std::make_shared<dxrt::Tensor>(name, shape, dxrt::DataType::FLOAT, data.data());
+    };
+    dxrt::TensorPtrs outs{tensor("hm", 3, hm), tensor("off", 2, off), tensor("dir", 2, dir),
+                          tensor("z", 1, z), tensor("dim", 3, dim)};
+    SFA3DPostProcess post(608, 608, 0.3f, 0.2f);
+    const auto res = post.postprocess(outs);
+    COMMON_CHECK(res.size() == 1);
+    if (res.size() != 1) return;
+    const float cell = 50.0f / 152.0f;
+    COMMON_CHECK(res[0].class_id == 1);
+    COMMON_CHECK(std::fabs(res[0].x3d - (10.5f * cell)) < 1e-4f);
+    COMMON_CHECK(std::fabs(res[0].y3d - (-25.0f + 20.25f * cell)) < 1e-4f);
+    COMMON_CHECK(std::fabs(res[0].z3d - (2.5f - 2.73f)) < 1e-5f);
+    COMMON_CHECK(std::fabs(res[0].yaw - (-static_cast<float>(M_PI) / 2.0f)) < 1e-5f);
+    COMMON_CHECK(std::fabs(res[0].dim_l - 3.9f) < 1e-6f);
+}
+
 void TestClassMapGoesBackToTheImage() {
     dxapp::PreprocessContext ctx;
     ctx.pad_x = 0; ctx.pad_y = 16; ctx.scale = 0.32f;
@@ -3290,6 +3359,8 @@ int main() {
     TestLetterboxRoundsLikePython();
     TestBoxesAndKeypointsClipToTheImage();
     TestClassMapGoesBackToTheImage();
+    TestSfa3dBevFollowsUpstream();
+    TestSfa3dDecodesUpstreamConventions();
     TestClipTextTokenizerMergesAndPads();
     TestClipTextProjectsTheEotRowThroughLnFinal();
     TestClipTextMissingAssetsNameTheExportCommand();

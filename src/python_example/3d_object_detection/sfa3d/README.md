@@ -164,9 +164,9 @@ Sample data: `sample/kitti/{velodyne,calib,image_2,label_2}/`
 
 ## 7. Visualization (BEV)
 
-- The **model-input BEV** is not modified (preprocessor grid: +y maps to the right column).
-- For **display only**, the BEV raster is flipped horizontally first, then boxes, the legend, and labels are drawn in display coordinates `col = (y_max - y)`.
-- Panel titles (for example `"BEV"`) are drawn after the flip, so the text is not mirrored.
+- The **model-input BEV** is SFA3D's own map (maudzung/SFA3D `makeBEVMap`): x [0, 50] m runs DOWN the rows (`row = floor(x / res)`), +y maps to the right column, and the channels are [intensity, height, density] of each cell's highest point.
+- For **display only**, the raster is turned 180 degrees (forward up, +y to the left, as SFA3D's own demo shows it), then boxes, the legend, and labels are drawn in display coordinates `row = (x_max - x)`, `col = (y_max - y)`.
+- Panel titles (for example `"BEV"`) are drawn after the turn, so the text is not mirrored.
 - When both calib (`--calib-dir`) and a camera image (`--image2-dir`) are present, a Cam+Box (perspective projection) view is rendered as well.
 
 ---

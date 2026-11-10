@@ -34,8 +34,11 @@ class SFA3DVisualizer(IVisualizer):
 
     def visualize(self, frame: np.ndarray, results: List[Any]) -> np.ndarray:
         bev = self._prepare_bev_frame(frame)
-        # Display-only mirror: model BEV keeps +y on the right; flip raster before overlays.
-        bev = cv2.flip(bev, 1)
+        # Display only: the model's raster runs forward DOWN (row = x / res) with
+        # +y on the right; the panel shows forward UP and +y (left) on the left,
+        # so the raster turns 180 degrees -- what SFA3D's own demo does
+        # (cv2.ROTATE_180). Overlays map metres to that panel themselves.
+        bev = cv2.flip(bev, -1)
         bev = draw_bev_boxes(
             bev, results,
             width=self._panel_size, height=self._panel_size,
