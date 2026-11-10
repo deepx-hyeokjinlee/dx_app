@@ -34,7 +34,7 @@ public:
           reg_max_(reg_max) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        return std::make_unique<DetectionPreprocessor>(input_width, input_height);
+        return std::make_unique<DetectionPreprocessor>(input_width, input_height, /*color_conversion=*/-1);
     }
 
     PostprocessorPtr<DetectionResult> createPostprocessor(

@@ -24,7 +24,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$ROOT" || exit 2
 
 CHECKS=(guard-graph-boundary guard-factory-uniqueness guard-model-registry
-        guard-variant-scope codegen-strict codegen-check-docs header-odr
+        guard-variant-scope guard-classifier-preprocessing guard-channel-order
+        codegen-strict codegen-check-docs header-odr
         cxx14-headers cross-compile python-compile workflow-yaml tests-scripts)
 
 if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python" ]; then
@@ -115,6 +116,8 @@ run_check() {
         guard-graph-boundary) "$PYTHON" scripts/check_graph_boundary.py ;;
         guard-factory-uniqueness) "$PYTHON" scripts/check_factory_uniqueness.py ;;
         guard-model-registry) "$PYTHON" scripts/check_model_registry.py ;;
+        guard-classifier-preprocessing) "$PYTHON" scripts/sync_classifier_preprocessing.py > /dev/null ;;
+        guard-channel-order) "$PYTHON" scripts/sync_channel_order.py ;;
         guard-variant-scope)
             "$PYTHON" scripts/generate_cpp_family_layout.py --variant-scope src/cpp_example --check ;;
         codegen-strict)

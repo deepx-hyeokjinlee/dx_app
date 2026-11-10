@@ -22,7 +22,8 @@ class LetterboxPreprocessor(IPreprocessor):
     
     def __init__(self, input_width: int, input_height: int,
                  pad_color: Tuple[int, int, int] = (114, 114, 114),
-                 store_original: bool = False):
+                 store_original: bool = False,
+                 bgr: bool = False):
         """
         Initialize preprocessor.
 
@@ -39,6 +40,7 @@ class LetterboxPreprocessor(IPreprocessor):
         self._input_height = input_height
         self._pad_color = pad_color
         self._store_original = store_original
+        self._bgr = bool(bgr)
     
     def _letterbox(self, img: np.ndarray) -> Tuple[np.ndarray, float, Tuple[int, int]]:
         """
@@ -95,8 +97,9 @@ class LetterboxPreprocessor(IPreprocessor):
         if self._store_original:
             ctx.original_image = input_image.copy()  # BGR original for color restoration
 
-        # Convert BGR to RGB
-        rgb = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
+        # Convert BGR to RGB -- unless the model was trained on cv2's BGR
+        # (bgr=True: YOLOX, NanoDet; the C++ factories pass color code -1)
+        rgb = input_image if self._bgr else cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
         
         # Apply letterbox
         result, gain, pad = self._letterbox(rgb)

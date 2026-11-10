@@ -33,7 +33,14 @@
     ],
     "class": "SimpleResizePreprocessor",
     "config_overrides": {},
-    "kwargs": {}
+    "kwargs": {
+      "crop_resize": {
+        "short": 256,
+        "interpolation": "bilinear",
+        "resampler": "opencv"
+      },
+      "bgr": true
+    }
   },
   "postprocessor": {
     "args": [

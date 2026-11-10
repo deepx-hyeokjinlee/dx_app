@@ -33,7 +33,7 @@ public:
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
         // default: retinaface_mobilenet-0.25_640x640
-        return std::make_unique<DetectionPreprocessor>(input_width, input_height);
+        return std::make_unique<DetectionPreprocessor>(input_width, input_height, /*color_conversion=*/-1);
     }
 
     PostprocessorPtr<FaceDetectionResult> createPostprocessor(

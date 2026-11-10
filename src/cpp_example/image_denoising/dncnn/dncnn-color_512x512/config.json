@@ -29,9 +29,7 @@
     ],
     "class": "SimpleResizePreprocessor",
     "config_overrides": {},
-    "kwargs": {
-      "bgr": true
-    }
+    "kwargs": {}
   },
   "postprocessor": {
     "args": [

@@ -77,9 +77,15 @@ inline void makeLetterboxImage(const cv::Mat& image, cv::Mat& output,
     cv::Mat resized;
     cv::resize(image, resized, cv::Size(new_width, new_height));
 
-    // Convert color space
+    // Convert color space; a negative code keeps the camera's BGR (models
+    // trained on cv2 images: YOLOX, NanoDet, ...), as SimpleResizePreprocessor
+    // already does. cv::cvtColor would throw on it.
     cv::Mat converted;
-    cv::cvtColor(resized, converted, color_conversion);
+    if (color_conversion >= 0) {
+        cv::cvtColor(resized, converted, color_conversion);
+    } else {
+        converted = resized;
+    }
 
     // Asymmetric padding (matching original: remainder goes to bottom/right)
     int top = ctx.pad_y;

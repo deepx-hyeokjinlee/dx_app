@@ -36,7 +36,9 @@
     ],
     "class": "LetterboxPreprocessor",
     "config_overrides": {},
-    "kwargs": {}
+    "kwargs": {
+      "bgr": true
+    }
   },
   "postprocessor": {
     "args": [
