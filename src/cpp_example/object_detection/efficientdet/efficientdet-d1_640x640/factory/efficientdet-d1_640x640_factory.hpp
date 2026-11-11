@@ -30,7 +30,9 @@ public:
           nms_threshold_(nms_threshold) {}
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // Letterbox (aspect kept), as automl evaluates: COCO val2017 200 images
+        // d1 44.56 vs 43.01 stretch, d2 47.37 vs 45.80 mAP.
+        return std::make_unique<DetectionPreprocessor>(input_width, input_height);
     }
 
     PostprocessorPtr<DetectionResult> createPostprocessor(

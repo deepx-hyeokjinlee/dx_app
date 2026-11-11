@@ -33,7 +33,7 @@
         "token": "input_height"
       }
     ],
-    "class": "SimpleResizePreprocessor",
+    "class": "LetterboxPreprocessor",
     "config_overrides": {},
     "kwargs": {}
   },
