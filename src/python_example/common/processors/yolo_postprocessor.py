@@ -65,11 +65,14 @@ class YOLOv5Postprocessor(IPostprocessor):
         # Allow per-model anchor/stride override via config
         custom_anchors = self.config.get('anchors', None)
         if custom_anchors is not None:
-            self.ANCHORS = custom_anchors
+            # int(): a config.json can only give the strides as STRING keys; a
+            # string never matches the integer stride below and the scale was
+            # skipped silently (as PPUPostprocessor already guards).
+            self.ANCHORS = {int(k): v for k, v in custom_anchors.items()}
         custom_strides = self.config.get('strides', None)
         if custom_strides is not None:
             self.STRIDES = custom_strides
-    
+
     @staticmethod
     def _sigmoid(x: np.ndarray) -> np.ndarray:
         return 1.0 / (1.0 + np.exp(-np.clip(x, -50, 50)))
