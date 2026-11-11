@@ -188,22 +188,21 @@ private:
         }
     }
 
-    // Detect box format from data range
+    // Detect box format from the structure of ALL rows: decoded corners are
+    // ordered (x2 > x1, y2 > y1) in every row, SSD anchor deltas are not
+    // (100 % vs 3-21 % measured). A share of negative values depended on the
+    // image and misread decoded crowd frames as deltas.
     int detectBoxFormat_(const float* boxes_data, int num_proposals) const {
-        int neg_count = 0;
-        int sample = std::min(num_proposals * 4, 4000);
-        for (int i = 0; i < sample; ++i) {
-            if (boxes_data[i] < 0.0f) neg_count++;
+        if (num_proposals <= 0) return 0;
+        int ordered = 0;
+        float max_abs = 0.0f;
+        for (int i = 0; i < num_proposals; ++i) {
+            const float* b = boxes_data + static_cast<size_t>(i) * 4;
+            if (b[2] > b[0] && b[3] > b[1]) ordered++;
+            for (int k = 0; k < 4; ++k) max_abs = std::max(max_abs, std::abs(b[k]));
         }
-        float neg_ratio = static_cast<float>(neg_count) / sample;
-        if (neg_ratio > 0.1f) return 2;  // SSD deltas
-
-        // Check if normalized [0,1] or pixel coordinates
-        float abs_sum = 0.0f;
-        for (int i = 0; i < std::min(sample, 1000); ++i)
-            abs_sum += std::abs(boxes_data[i]);
-        float avg_abs = abs_sum / std::min(sample, 1000);
-        return (avg_abs < 2.0f) ? 0 : 1;  // 0=normalized, 1=pixel
+        if (static_cast<float>(ordered) < 0.9f * static_cast<float>(num_proposals)) return 2;  // SSD deltas
+        return (max_abs <= 2.0f) ? 0 : 1;  // 0=normalized, 1=pixel
     }
 
     void decodeBox_(const float* raw, int box_idx, float& x1, float& y1, float& x2, float& y2) const {

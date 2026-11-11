@@ -96,15 +96,16 @@ class ULFGPostprocessor(IPostprocessor):
         2. Pixel [x1,y1,x2,y2] → pass through
         3. SSD deltas [dcx,dcy,dw,dh] → decode with prior boxes
 
-        SSD deltas are detected when box values include negatives
-        (normalized and pixel coords are non-negative for valid boxes).
+        The encoding is read off the structure of every row: decoded corners
+        are ordered (x2 > x1 and y2 > y1) in every row, SSD anchor deltas are
+        not (100 % vs 3-21 % measured on rfb/slim-320, rfb-640 and the _nopp
+        exports). A share of negative values depended on the image content.
         """
-        # SSD delta detection: if many values are negative, these are anchor deltas
-        neg_ratio = np.mean(boxes_raw < 0)
-        if neg_ratio > 0.1:
+        ordered = np.mean((boxes_raw[:, 2] > boxes_raw[:, 0]) & (boxes_raw[:, 3] > boxes_raw[:, 1]))
+        if ordered < 0.9:
             return self._decode_ssd_deltas(boxes_raw)
 
-        if np.percentile(np.abs(boxes_raw), 95) < 2.0:
+        if np.max(np.abs(boxes_raw)) <= 2.0:
             return (
                 boxes_raw[:, 0] * self.input_width,
                 boxes_raw[:, 1] * self.input_height,

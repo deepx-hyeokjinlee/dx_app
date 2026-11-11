@@ -69,18 +69,20 @@ std::vector<ULFGFDResult> ULFGFDPostProcess::postprocess(const dxrt::TensorPtrs&
     const float* score_ptr = static_cast<const float*>(scores_t->data());
     const float* box_ptr   = static_cast<const float*>(boxes_t->data());
 
-    // Detect box format:
-    // 1. Normalized [x1,y1,x2,y2] in [0,1] → max_val <= 2.0, few negatives
-    // 2. Pixel [x1,y1,x2,y2] → max_val > 2.0
-    // 3. SSD deltas [dcx,dcy,dw,dh] → many negative values (anchor offsets)
+    // Detect box format from the structure of ALL rows, not a value sample:
+    // decoded corners [x1,y1,x2,y2] are ordered (x2 > x1, y2 > y1) in every
+    // row (100 % measured on rfb/slim-320 and rfb-640); SSD anchor deltas
+    // [dcx,dcy,dw,dh] are not (3-21 %, the _nopp exports). Counting values
+    // below -0.01 in the first 200 misread a DECODED rfb-320 tensor on
+    // sample_crowd (21 > 20) as deltas and decoded it twice.
+    int ordered = 0;
     float max_box_val = 0.0f;
-    int neg_count = 0;
-    int sample_count = std::min(n * 4, 200);
-    for (int i = 0; i < sample_count; ++i) {
-        max_box_val = std::max(max_box_val, std::abs(box_ptr[i]));
-        if (box_ptr[i] < -0.01f) neg_count++;
+    for (int i = 0; i < n; ++i) {
+        const float* b = box_ptr + static_cast<size_t>(i) * 4;
+        if (b[2] > b[0] && b[3] > b[1]) ordered++;
+        for (int k = 0; k < 4; ++k) max_box_val = std::max(max_box_val, std::abs(b[k]));
     }
-    bool is_ssd_delta = (neg_count > sample_count / 10);  // >10% negative → likely deltas
+    bool is_ssd_delta = n > 0 && static_cast<float>(ordered) < 0.9f * static_cast<float>(n);
     bool normalized = (!is_ssd_delta && max_box_val <= 2.0f);
 
     // Generate SSD priors if needed (ULFG 320×240 config)
