@@ -219,7 +219,7 @@ private:
                                           const PreprocessContext& ctx) const {
         float ow = static_cast<float>(ctx.original_width);
         float oh = static_cast<float>(ctx.original_height);
-        if (ctx.pad_x == 0 && ctx.pad_y == 0) {
+        if (ctx.pad_x == 0 && ctx.pad_y == 0 && !ctx.pad_edge) {
             float sx = ow / input_width_, sy = oh / input_height_;
             return { std::max(0.0f, std::min(x1 * sx, ow)),
                      std::max(0.0f, std::min(y1 * sy, oh)),

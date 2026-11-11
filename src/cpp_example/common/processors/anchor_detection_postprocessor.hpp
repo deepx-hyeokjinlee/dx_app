@@ -192,6 +192,13 @@ public:
     void set_anchors(const std::map<int, std::vector<std::pair<int,int>>>& anchors) {
         if (!anchors.empty()) anchors_by_strides_ = anchors;
     }
+    /// The box coding of a raw cell. false (default): Ultralytics yolov3/v5/v7,
+    /// centre (2*sig(t) - 0.5 + grid) * stride, size (2*sig(t))^2 * anchor.
+    /// true: the original YOLOv3 head GluonCV keeps, centre (sig(t) + grid) *
+    /// stride, size exp(t) * anchor. yolov3-gluon decoded the Ultralytics way
+    /// scored 30.2 mAP on 200 COCO val2017 images, the YOLOv3 way 40.9.
+    void set_yolov3_box_coding(bool on) { yolov3_box_coding_ = on; }
+    bool get_yolov3_box_coding() const { return yolov3_box_coding_; }
     const std::vector<std::string>& get_cpu_output_names() const { return cpu_output_names_; }
     const std::vector<std::string>& get_npu_output_names() const { return npu_output_names_; }
 
@@ -209,6 +216,7 @@ private:
     std::vector<std::string> cpu_output_names_;
     std::vector<std::string> npu_output_names_;
     std::map<int, std::vector<std::pair<int,int>>> anchors_by_strides_;
+    bool yolov3_box_coding_ = false;
 
     static float sigmoid(float x) { return postprocess_utils::sigmoid(x); }
 
@@ -246,10 +254,18 @@ private:
             int bi = ((a * (num_classes_ + 5)) + i) * gx_sz * gy_sz + gy * gx_sz + gx;
             bx[i] = data[bi];
         }
-        float cx = (sigmoid(bx[0]) * 2.f - 0.5f + gx) * stride;
-        float cy = (sigmoid(bx[1]) * 2.f - 0.5f + gy) * stride;
-        float w  = std::pow(sigmoid(bx[2]) * 2.f, 2.f) * aw;
-        float h  = std::pow(sigmoid(bx[3]) * 2.f, 2.f) * ah;
+        float cx, cy, w, h;
+        if (yolov3_box_coding_) {
+            cx = (sigmoid(bx[0]) + gx) * stride;
+            cy = (sigmoid(bx[1]) + gy) * stride;
+            w  = std::exp(std::min(bx[2], 10.f)) * aw;
+            h  = std::exp(std::min(bx[3], 10.f)) * ah;
+        } else {
+            cx = (sigmoid(bx[0]) * 2.f - 0.5f + gx) * stride;
+            cy = (sigmoid(bx[1]) * 2.f - 0.5f + gy) * stride;
+            w  = std::pow(sigmoid(bx[2]) * 2.f, 2.f) * aw;
+            h  = std::pow(sigmoid(bx[3]) * 2.f, 2.f) * ah;
+        }
 
         out.confidence = max_conf;
         out.class_id   = max_cls;

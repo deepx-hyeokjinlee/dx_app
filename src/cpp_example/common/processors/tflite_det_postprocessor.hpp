@@ -95,7 +95,7 @@ public:
             float y2 = ymax * input_height_;
 
             // Scale to original image
-            if (ctx.pad_x == 0 && ctx.pad_y == 0) {
+            if (ctx.pad_x == 0 && ctx.pad_y == 0 && !ctx.pad_edge) {
                 float sx = static_cast<float>(ctx.original_width) / input_width_;
                 float sy = static_cast<float>(ctx.original_height) / input_height_;
                 x1 *= sx; y1 *= sy; x2 *= sx; y2 *= sy;

@@ -65,7 +65,7 @@ class TFLiteDetectionPostprocessor(IPostprocessor):
 
             # Scale to original image coordinates
             # TFLite models typically use simple_resize (no letterbox)
-            if hasattr(ctx, 'pad_x') and ctx.pad_x == 0 and ctx.pad_y == 0:
+            if hasattr(ctx, 'pad_x') and ctx.pad_x == 0 and ctx.pad_y == 0 and not getattr(ctx, 'pad_edge', False):
                 # simple_resize: scale directly to original dimensions
                 x1 = xmin * ctx.original_width
                 y1 = ymin * ctx.original_height

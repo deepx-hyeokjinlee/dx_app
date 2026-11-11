@@ -72,6 +72,21 @@ class YOLOv5Postprocessor(IPostprocessor):
         custom_strides = self.config.get('strides', None)
         if custom_strides is not None:
             self.STRIDES = custom_strides
+        # How a raw cell becomes a box: "yolov5" (Ultralytics, the default) or
+        # "yolov3", the original head GluonCV keeps -- centre (sig(t) + grid) *
+        # stride, size exp(t) * anchor. yolov3-gluon decoded as yolov5 scored
+        # 30.2 mAP on 200 COCO val2017 images, as yolov3 40.9.
+        self.box_coding = self.config.get('box_coding', 'yolov5')
+        if self.box_coding not in ('yolov5', 'yolov3'):
+            raise ValueError(f"box_coding must be 'yolov5' or 'yolov3', not {self.box_coding!r}")
+
+    def _yolov3_box(self, data, gx, gy, stride, anchor_w, anchor_h):
+        """The original YOLOv3 coding on [A, C, H, W] logits (see box_coding)."""
+        cx = (self._sigmoid(data[:, 0:1, :, :]) + gx) * stride
+        cy = (self._sigmoid(data[:, 1:2, :, :]) + gy) * stride
+        w = np.exp(np.minimum(data[:, 2:3, :, :], 10.0)) * anchor_w
+        h = np.exp(np.minimum(data[:, 3:4, :, :], 10.0)) * anchor_h
+        return cx, cy, w, h
 
     @staticmethod
     def _sigmoid(x: np.ndarray) -> np.ndarray:
@@ -144,6 +159,8 @@ class YOLOv5Postprocessor(IPostprocessor):
             anchor_h = np.array([a[1] for a in anchors], dtype=np.float32).reshape(num_anchors, 1, 1, 1)
             w = (tw * 2.0) ** 2 * anchor_w
             h = (th * 2.0) ** 2 * anchor_h
+            if self.box_coding == 'yolov3':
+                cx, cy, w, h = self._yolov3_box(data, gx, gy, stride, anchor_w, anchor_h)
             
             # Objectness and class scores
             obj = self._sigmoid(data[:, 4:5, :, :])               # [A, 1, H, W]
@@ -202,6 +219,8 @@ class YOLOv5Postprocessor(IPostprocessor):
             anchor_h = np.array([a[1] for a in anchors], dtype=np.float32).reshape(num_anchors, 1, 1, 1)
             w = (tw * 2.0) ** 2 * anchor_w
             h = (th * 2.0) ** 2 * anchor_h
+            if self.box_coding == 'yolov3':
+                cx, cy, w, h = self._yolov3_box(data, gx, gy, stride, anchor_w, anchor_h)
 
             obj = self._sigmoid(data[:, 4:5, :, :])
             cls = self._sigmoid(data[:, 5:5+self.num_classes, :, :])

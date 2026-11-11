@@ -20,6 +20,9 @@ class PreprocessContext:
     """
     pad_x: int = 0
     pad_y: int = 0
+    # A letterbox with the image at the top-left (pad_location="edge"): both pads
+    # are 0, which the postprocessors otherwise read as "stretched, no letterbox".
+    pad_edge: bool = False
     # Uniform scale (used for letterbox-preserving preprocessors). For
     # non-uniform resizing (stretch), prefer `scale_x`/`scale_y` below.
     scale: float = 1.0

@@ -64,8 +64,18 @@ inline void makeLetterboxImage(const cv::Mat& image, cv::Mat& output,
                                int target_width, int target_height,
                                int color_conversion,
                                PreprocessContext& ctx,
-                               int pad_value = 114) {
+                               int pad_value = 114,
+                               bool pad_edge = false) {
     calculateLetterboxParams(image.cols, image.rows, target_width, target_height, ctx);
+    // pad_edge: the image at the top-left and all padding right/bottom -- the
+    // compile JSONs' `pad_location: edge`, as automl EfficientDet and GluonCV
+    // evaluate (Python LetterboxPreprocessor(pad_location="edge")). The
+    // postprocessors un-letterbox through ctx.pad_x/pad_y, so they follow.
+    ctx.pad_edge = pad_edge;
+    if (pad_edge) {
+        ctx.pad_x = 0;
+        ctx.pad_y = 0;
+    }
 
     // New dimensions after scaling (the same rule as calculateLetterboxParams)
     const double gain = std::min(static_cast<double>(target_width) / image.cols,

@@ -38,7 +38,7 @@ inline cv::Mat classMapToOriginal(const cv::Mat& class_map, const PreprocessCont
     if (ctx.original_width <= 0 || ctx.original_height <= 0 || class_map.empty()) return class_map;
     const cv::Size orig(ctx.original_width, ctx.original_height);
     cv::Mat resized;
-    if (ctx.pad_x == 0 && ctx.pad_y == 0) {
+    if (ctx.pad_x == 0 && ctx.pad_y == 0 && !ctx.pad_edge) {
         if (class_map.cols == orig.width && class_map.rows == orig.height) return class_map;
         cv::resize(class_map, resized, orig, 0, 0, cv::INTER_NEAREST);
         return resized;
@@ -410,7 +410,7 @@ inline void scaleInstanceSegResults(std::vector<InstanceSegmentationResult>& res
         // Crop padding from mask, then resize to original image size (matching original)
         if (seg.mask.empty() || ctx.original_width <= 0 || ctx.original_height <= 0) continue;
         cv::Mat cropped_mask = seg.mask;
-        if (ctx.pad_x > 0 || ctx.pad_y > 0) {
+        if (ctx.pad_x > 0 || ctx.pad_y > 0 || ctx.pad_edge) {
             int unpad_w = seg.mask.cols - 2 * ctx.pad_x;
             int unpad_h = seg.mask.rows - 2 * ctx.pad_y;
             if (unpad_w > 0 && unpad_h > 0) {

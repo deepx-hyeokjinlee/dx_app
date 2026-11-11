@@ -67,7 +67,7 @@ class SSDPostprocessor(IPostprocessor):
     def _scale_box(self, box: np.ndarray, ctx: PreprocessContext) -> np.ndarray:
         """Scale box from model input space back to original image space."""
         box = box.copy()
-        if hasattr(ctx, 'pad_x') and ctx.pad_x == 0 and ctx.pad_y == 0:
+        if hasattr(ctx, 'pad_x') and ctx.pad_x == 0 and ctx.pad_y == 0 and not getattr(ctx, 'pad_edge', False):
             sx = ctx.original_width / self.input_width
             sy = ctx.original_height / self.input_height
             box[0] = np.clip(box[0] * sx, 0, ctx.original_width)

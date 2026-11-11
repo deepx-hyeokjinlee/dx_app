@@ -31,15 +31,17 @@ public:
     DetectionPreprocessor(int input_width = 640, 
                           int input_height = 640,
                           int color_conversion = cv::COLOR_BGR2RGB,
-                          int pad_value = 114)
+                          int pad_value = 114,
+                          bool pad_edge = false)
         : input_width_(input_width), 
           input_height_(input_height),
           color_conversion_(color_conversion),
-          pad_value_(pad_value) {}
+          pad_value_(pad_value),
+          pad_edge_(pad_edge) {}
 
     void process(const cv::Mat& input, cv::Mat& output, PreprocessContext& ctx) override {
         makeLetterboxImage(input, output, input_width_, input_height_,
-                          color_conversion_, ctx, pad_value_);
+                          color_conversion_, ctx, pad_value_, pad_edge_);
     }
 
     int getInputWidth() const override { return input_width_; }
@@ -51,6 +53,7 @@ private:
     int input_height_;
     int color_conversion_;
     int pad_value_;
+    bool pad_edge_;  // image top-left, padding right/bottom (makeLetterboxImage)
 };
 
 }  // namespace dxapp

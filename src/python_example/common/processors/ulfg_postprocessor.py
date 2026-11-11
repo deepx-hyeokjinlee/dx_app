@@ -129,7 +129,7 @@ class ULFGPostprocessor(IPostprocessor):
 
     def _scale_box(self, x1, y1, x2, y2, ctx):
         """Scale a single box back to original image coordinates."""
-        if ctx.pad_x == 0 and ctx.pad_y == 0:
+        if ctx.pad_x == 0 and ctx.pad_y == 0 and not getattr(ctx, 'pad_edge', False):
             # Use per-axis scale from preprocessor context for correct
             # inverse mapping (handles non-square resize like 320×240).
             if hasattr(ctx, 'scale_x') and hasattr(ctx, 'scale_y') and ctx.scale_x > 0 and ctx.scale_y > 0:

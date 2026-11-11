@@ -309,7 +309,7 @@ def yolov8seg_cpp_visualize(image: np.ndarray, results,
     h, w = image.shape[:2]
     output = image.copy()
 
-    has_padding = ctx is not None and (ctx.pad_x > 0 or ctx.pad_y > 0)
+    has_padding = ctx is not None and (ctx.pad_x > 0 or ctx.pad_y > 0 or getattr(ctx, 'pad_edge', False))
 
     for i, mask in enumerate(masks):
         if i >= len(detections):

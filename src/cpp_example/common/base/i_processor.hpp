@@ -33,6 +33,9 @@ namespace dxapp {
 struct PreprocessContext {
     int pad_x{0};
     int pad_y{0};
+    // A letterbox with the image at the top-left (makeLetterboxImage pad_edge):
+    // both pads are 0, which the postprocessors otherwise read as "stretched".
+    bool pad_edge{false};
     float scale{1.0f};
     float scale_x{0.0f};
     float scale_y{0.0f};

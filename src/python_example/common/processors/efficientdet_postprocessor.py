@@ -308,7 +308,7 @@ class EfficientDetPostprocessor(IPostprocessor):
         keep = np.array(indices).reshape(-1)
 
         # Scale to original coordinates
-        if ctx.pad_x == 0 and ctx.pad_y == 0:
+        if ctx.pad_x == 0 and ctx.pad_y == 0 and not getattr(ctx, 'pad_edge', False):
             sx = ctx.original_width / self.input_width
             sy = ctx.original_height / self.input_height
         else:
@@ -388,7 +388,7 @@ class EfficientDetPostprocessor(IPostprocessor):
 
         # Scale back to original coordinates
         # EfficientDet typically uses simple_resize preprocessing
-        if ctx.pad_x == 0 and ctx.pad_y == 0:
+        if ctx.pad_x == 0 and ctx.pad_y == 0 and not getattr(ctx, 'pad_edge', False):
             sx = ctx.original_width / self.input_width
             sy = ctx.original_height / self.input_height
         else:

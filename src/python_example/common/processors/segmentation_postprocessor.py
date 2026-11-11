@@ -189,7 +189,7 @@ def class_map_to_original(class_map: np.ndarray, ctx: PreprocessContext,
     if ctx is None or ctx.original_width <= 0 or ctx.original_height <= 0:
         return class_map
     ow, oh = int(ctx.original_width), int(ctx.original_height)
-    if ctx.pad_x == 0 and ctx.pad_y == 0:
+    if ctx.pad_x == 0 and ctx.pad_y == 0 and not getattr(ctx, 'pad_edge', False):
         if class_map.shape[1] == ow and class_map.shape[0] == oh:
             return class_map
         return cv2.resize(class_map.astype(np.float32), (ow, oh),

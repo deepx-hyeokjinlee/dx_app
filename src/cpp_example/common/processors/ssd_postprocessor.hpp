@@ -158,7 +158,7 @@ public:
             float y2 = decoded[idx][3];
 
             // Scale to original image (SSD uses simple resize, no letterbox)
-            if (ctx.pad_x == 0 && ctx.pad_y == 0) {
+            if (ctx.pad_x == 0 && ctx.pad_y == 0 && !ctx.pad_edge) {
                 float sx = static_cast<float>(ctx.original_width) / input_width_;
                 float sy = static_cast<float>(ctx.original_height) / input_height_;
                 x1 = std::max(0.0f, std::min(x1 * sx, static_cast<float>(ctx.original_width)));

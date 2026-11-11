@@ -202,7 +202,7 @@ inline cv::Mat drawSegmentation(const cv::Mat& frame,
     int unpad_h = segmentation.height - 2 * ctx.pad_y;
     
     cv::Mat unpadded_mask;
-    if (ctx.pad_x > 0 || ctx.pad_y > 0) {
+    if (ctx.pad_x > 0 || ctx.pad_y > 0 || ctx.pad_edge) {
         cv::Rect crop_region(ctx.pad_x, ctx.pad_y, unpad_w, unpad_h);
         unpadded_mask = mask_image(crop_region).clone();
     } else {

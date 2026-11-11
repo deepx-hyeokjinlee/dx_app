@@ -47,7 +47,7 @@ namespace detail {
 inline void scaleBox(std::vector<float>& box, const PreprocessContext& ctx) {
     if (box.size() < 4) return;
 
-    if (ctx.pad_x == 0 && ctx.pad_y == 0 && ctx.scale_x > 0 && ctx.scale_y > 0) {
+    if (ctx.pad_x == 0 && ctx.pad_y == 0 && !ctx.pad_edge && ctx.scale_x > 0 && ctx.scale_y > 0) {
         // SimpleResize: per-axis scaling
         box[0] = box[0] / ctx.scale_x;
         box[1] = box[1] / ctx.scale_y;
@@ -73,7 +73,7 @@ inline void scaleBox(std::vector<float>& box, const PreprocessContext& ctx) {
  * @brief Scale a single keypoint from preprocessed to original coords.
  */
 inline void scaleKeypoint(Keypoint& kp, const PreprocessContext& ctx) {
-    if (ctx.pad_x == 0 && ctx.pad_y == 0 && ctx.scale_x > 0 && ctx.scale_y > 0) {
+    if (ctx.pad_x == 0 && ctx.pad_y == 0 && !ctx.pad_edge && ctx.scale_x > 0 && ctx.scale_y > 0) {
         kp.x = kp.x / ctx.scale_x;
         kp.y = kp.y / ctx.scale_y;
     } else {

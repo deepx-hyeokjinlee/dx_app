@@ -23,7 +23,8 @@ class LetterboxPreprocessor(IPreprocessor):
     def __init__(self, input_width: int, input_height: int,
                  pad_color: Tuple[int, int, int] = (114, 114, 114),
                  store_original: bool = False,
-                 bgr: bool = False):
+                 bgr: bool = False,
+                 pad_location: str = "center"):
         """
         Initialize preprocessor.
 
@@ -35,7 +36,15 @@ class LetterboxPreprocessor(IPreprocessor):
                 ``ctx.original_image`` (color restoration only). Off by default —
                 the copy costs ~0.5-1.1 ms/frame at 1080p and no model that uses
                 letterbox reads it.
+            pad_location: "center" (Ultralytics: the image centred, padding split)
+                or "edge" (the image at the top-left, all padding right/bottom --
+                the compile JSONs' ``pad_location: edge``, automl EfficientDet's
+                and GluonCV's evaluation). The postprocessors un-letterbox through
+                ``ctx.pad_x``/``ctx.pad_y``, so they follow either.
         """
+        if pad_location not in ("center", "edge"):
+            raise ValueError(f"pad_location must be 'center' or 'edge', not {pad_location!r}")
+        self._pad_edge = pad_location == "edge"
         self._input_width = input_width
         self._input_height = input_height
         self._pad_color = pad_color
@@ -71,6 +80,9 @@ class LetterboxPreprocessor(IPreprocessor):
         # Add border
         top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
         left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+        if self._pad_edge:
+            top, bottom = 0, top + bottom
+            left, right = 0, left + right
         
         img = cv2.copyMakeBorder(
             img, top, bottom, left, right,
@@ -108,6 +120,7 @@ class LetterboxPreprocessor(IPreprocessor):
         ctx.scale = gain
         ctx.pad_y = pad[0]  # top
         ctx.pad_x = pad[1]  # left
+        ctx.pad_edge = self._pad_edge
         
         return result, ctx
     

@@ -100,6 +100,9 @@ public:
         impl_.set_anchors(anchors);
     }
 
+    /// The original YOLOv3 box coding (AnchorYOLOPostProcess::set_yolov3_box_coding).
+    void setYolov3BoxCoding(bool on) { impl_.set_yolov3_box_coding(on); }
+
 private:
     AnchorYOLOPostProcess impl_;
     Preset preset_;

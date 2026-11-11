@@ -136,7 +136,7 @@ private:
     // Helper: scale a box from input space to original image space
     void scaleBoxCoords(const PreprocessContext& ctx,
                         float& x1, float& y1, float& x2, float& y2) const {
-        if (ctx.pad_x == 0 && ctx.pad_y == 0) {
+        if (ctx.pad_x == 0 && ctx.pad_y == 0 && !ctx.pad_edge) {
             float sx = static_cast<float>(ctx.original_width)  / input_width_;
             float sy = static_cast<float>(ctx.original_height) / input_height_;
             x1 *= sx; y1 *= sy; x2 *= sx; y2 *= sy;
