@@ -34,13 +34,20 @@ public:
 
     PostprocessorPtr<DetectionResult> createPostprocessor(
         int input_width, int input_height, bool is_ort_configured = false) override {
-        return std::make_unique<YOLOv5Postprocessor>(
+        auto post = std::make_unique<YOLOv5Postprocessor>(
             input_width, input_height,
             obj_threshold_, score_threshold_, nms_threshold_,
             is_ort_configured,
             num_classes_,
             class_names_
         );
+        // The raw heads (ORT off) need the YOLOv7 P5 anchors, not YOLOv5's: newton's
+        // decoder on 200 COCO val2017 images scored 40.90 mAP with them, 19.17
+        // with YOLOv5's (the ORT tail decodes in-graph and needs neither).
+        post->setAnchors({{8, {{12, 16}, {19, 36}, {40, 28}}},
+                          {16, {{36, 75}, {76, 55}, {72, 146}}},
+                          {32, {{142, 110}, {192, 243}, {459, 401}}}});
+        return post;
     }
 
     VisualizerPtr<DetectionResult> createVisualizer() override {
