@@ -21,6 +21,11 @@ above the stretch (resnet18 52.18 -> 56.91, mobilenetv2 55.01 -> 59.53).
                                               createPreprocessor()
   --check   exits 1 when any of those disagrees with the snapshot (default).
 
+  config/classifier_preprocessing_measured.json
+      classifiers whose compile JSON gives no resize + crop: the transform that
+      scored best on ImageNetV2 (10 000 images, paired with the stretch). Used
+      only where the compile JSON specifies no crop.
+
 Mapping (resize step -> crop_resize):
   {mode: torchvision, size: S, interpolation: I}  {"short": S, "interpolation": i,
                                                     "resampler": "pillow"}
@@ -42,6 +47,7 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SNAPSHOT = os.path.join(ROOT, "config", "modelzoo_compile_preprocessing.json")
+MEASURED = os.path.join(ROOT, "config", "classifier_preprocessing_measured.json")
 FACTORY_LINE = "return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);"
 
 
@@ -86,6 +92,11 @@ def crop_resize_for(steps: list, input_w: int, input_h: int):
     return None, f"resize mode {mode!r} not handled"
 
 
+def describe(cr: dict, crop: int) -> str:
+    size = f"short side {cr['short']}" if cr.get("short") else f"{cr['width']}x{cr['height']}"
+    return f"{cr['resampler']} {cr['interpolation']} resize ({size}) + CenterCrop({crop})"
+
+
 def factory_call(cr: dict) -> str:
     interp = "cv::INTER_CUBIC" if cr["interpolation"] == "bicubic" else "cv::INTER_LINEAR"
     return (f"pre->setCenterCrop({cr.get('short', 0)}, {cr.get('width', 0)}, {cr.get('height', 0)}, "
@@ -112,17 +123,29 @@ def main() -> int:
             f.write("\n")
         print(f"snapshot: {len(snap)} compile JSONs -> {os.path.relpath(SNAPSHOT, ROOT)}")
     snap = json.load(open(SNAPSHOT))
+    measured = {k: v for k, v in json.load(open(MEASURED)).items() if not k.startswith("_")}
 
-    wrong, applied, skipped, no_json = [], 0, {}, []
+    wrong, applied, skipped, no_json, from_measured = [], 0, {}, [], 0
     for py_cfg, cpp_cfg, factories in variants():
         cfg = json.load(open(py_cfg))
         dxnn = cfg["dxnn_file"]
-        if dxnn not in snap:
-            no_json.append(dxnn)
-            continue
-        cr, why = crop_resize_for(snap[dxnn], int(cfg["input_width"]), int(cfg["input_height"]))
+        is_measured = False
+        if dxnn in snap:
+            cr, why = crop_resize_for(snap[dxnn], int(cfg["input_width"]), int(cfg["input_height"]))
+        else:
+            cr, why = None, "no compile JSON published"
+        if cr is None and dxnn in measured:
+            m = measured[dxnn]
+            cr = m["crop_resize"]
+            top1 = m["imagenetv2_10k_top1"]
+            why = (f"measured (the compile JSON gives no crop), ImageNetV2 10k top-1:\n"
+                   f"// {top1['stretch']:.2f} stretch -> {top1['crop']:.2f} with "
+                   f"{describe(cr, int(cfg['input_width']))}")
+            is_measured = True
+        elif cr is not None:
+            why = f"the compile JSON's evaluation transform (q-lite-json/2_5_0/{dxnn[:-5]}.json):\n// {why}"
         if cr is None:
-            skipped[dxnn] = why
+            (no_json.append(dxnn) if dxnn not in snap else skipped.__setitem__(dxnn, why))
             continue
         for path in (py_cfg, cpp_cfg):
             c = json.load(open(path))
@@ -149,8 +172,9 @@ def main() -> int:
                     wrong.append(f"{os.path.relpath(factories[0], ROOT)}: createPreprocessor not in the expected form")
                     continue
                 ind = block.group(1) or block.group(2)
-                new = (f"\n{ind}// The compile JSON's evaluation transform (q-lite-json/2_5_0/{dxnn[:-5]}.json):\n"
-                       f"{ind}// {crop_resize_for(snap[dxnn], int(cfg['input_width']), int(cfg['input_height']))[1]}.\n"
+                lines = why.replace("\n// ", "\n").split("\n")
+                lines[0] = lines[0][0].upper() + lines[0][1:]
+                new = ("".join(f"\n{ind}// {l}" for l in lines[:-1]) + f"\n{ind}// {lines[-1]}.\n"
                        f"{ind}auto pre = std::make_unique<SimpleResizePreprocessor>(input_width, input_height);\n"
                        f"{ind}{call}\n{ind}return pre;")
                 src = src[:block.start()] + new + src[block.end():]
@@ -160,8 +184,10 @@ def main() -> int:
                 wrong.append(f"{os.path.relpath(factories[0], ROOT)}: missing `{call}`")
                 continue
         applied += 1
+        from_measured += is_measured
 
-    print(f"classifiers following their compile JSON's resize + crop: {applied}")
+    print(f"classifiers with a resize + centre crop: {applied} "
+          f"({applied - from_measured} from the compile JSON, {from_measured} measured)")
     print(f"no compile JSON published: {len(no_json)}; JSON without resize+crop: {len(skipped)}")
     for dxnn, why in sorted(skipped.items()):
         print(f"  skip {dxnn}: {why}")

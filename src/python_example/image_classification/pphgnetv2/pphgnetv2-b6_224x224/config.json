@@ -32,7 +32,13 @@
         "token": "input_height"
       }
     ],
-    "kwargs": {},
+    "kwargs": {
+      "crop_resize": {
+        "interpolation": "bilinear",
+        "resampler": "opencv",
+        "short": 256
+      }
+    },
     "config_overrides": {}
   },
   "postprocessor": {

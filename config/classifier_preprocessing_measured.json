@@ -1,0 +1,531 @@
+{
+ "ConvNeXtTiny224_1k.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 70.59,
+   "stretch": 68.56
+  }
+ },
+ "DenseNet-1.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "opencv",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 65.87,
+   "stretch": 63.94
+  }
+ },
+ "EfficientNetB0-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 64.44,
+   "stretch": 61.31
+  }
+ },
+ "EfficientNetB1-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 274
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 67.12,
+   "stretch": 65.05
+  }
+ },
+ "EfficientNetB3-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 343
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 70.27,
+   "stretch": 68.62
+  }
+ },
+ "MobileNetV1-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 224
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 57.75,
+   "stretch": 54.91
+  }
+ },
+ "OSNet0_25-1.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 46.52,
+   "stretch": 43.17
+  }
+ },
+ "OSNet0_5-1.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 232
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 56.56,
+   "stretch": 54.79
+  }
+ },
+ "ResNeSt50-1.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 69.86,
+   "stretch": 68.05
+  }
+ },
+ "ResNet101-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 70.3,
+   "stretch": 67.83
+  }
+ },
+ "ResNet101-3.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 72.23,
+   "stretch": 70.49
+  }
+ },
+ "ResNet101-4.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 232
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 72.26,
+   "stretch": 70.63
+  }
+ },
+ "ResNet101V1-1.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 64.41,
+   "stretch": 61.86
+  }
+ },
+ "ResNet152-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 232
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 71.24,
+   "stretch": 69.01
+  }
+ },
+ "ResNet34-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 61.02,
+   "stretch": 56.84
+  }
+ },
+ "ResNet50-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 65.33,
+   "stretch": 62.75
+  }
+ },
+ "ResNet50-8.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 63.81,
+   "stretch": 59.92
+  }
+ },
+ "ResNet50-9.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 69.47,
+   "stretch": 66.89
+  }
+ },
+ "VGG11BN-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 57.99,
+   "stretch": 53.67
+  }
+ },
+ "VGG13BN-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 59.44,
+   "stretch": 54.91
+  }
+ },
+ "VGG16BN-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 60.72,
+   "stretch": 58.15
+  }
+ },
+ "VGG19BN-2.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 61.96,
+   "stretch": 59.94
+  }
+ },
+ "WideResNet101-1.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 70.97,
+   "stretch": 68.95
+  }
+ },
+ "WideResNet50-3.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 70.37,
+   "stretch": 67.67
+  }
+ },
+ "_about": "Classifiers whose compile JSON gives no resize + centre crop (no JSON, an empty loader, or a plain resize). Each was scored on 1 000 ImageNetV2 matched-frequency images with the stretch and six standard evaluation transforms; the best transform, when >= 1 top-1 above the stretch, was re-scored on all 10 000 images (dx_app's own C++ SimpleResizePreprocessor, paired). Every one of the 48 held its gain. scripts/sync_classifier_preprocessing.py applies these after the compile JSON, which wins when it specifies a crop.",
+ "beit-b-p16_384x384.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "opencv",
+   "short": 439
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 76.63,
+   "stretch": 76.26
+  }
+ },
+ "efficientformer-l1_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 66.69,
+   "stretch": 63.89
+  }
+ },
+ "efficientformerv2-s1_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 65.41,
+   "stretch": 62.1
+  }
+ },
+ "efficientformerv2-s2_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 68.86,
+   "stretch": 66.11
+  }
+ },
+ "levit-128_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 61.86,
+   "stretch": 58.68
+  }
+ },
+ "levit-128s_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 63.38,
+   "stretch": 59.55
+  }
+ },
+ "mobilenetv3-small_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 54.47,
+   "stretch": 49.06
+  }
+ },
+ "pphgnet-base_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 75.6,
+   "stretch": 74.03
+  }
+ },
+ "pphgnet-small_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 69.54,
+   "stretch": 67.24
+  }
+ },
+ "pphgnet-tiny_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 67.71,
+   "stretch": 64.77
+  }
+ },
+ "pphgnetv2-b0_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 64.71,
+   "stretch": 61.19
+  }
+ },
+ "pphgnetv2-b1_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 66.65,
+   "stretch": 63.49
+  }
+ },
+ "pphgnetv2-b2_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 70.42,
+   "stretch": 68.13
+  }
+ },
+ "pphgnetv2-b3_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 72.06,
+   "stretch": 69.8
+  }
+ },
+ "pphgnetv2-b4_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 232
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 73.14,
+   "stretch": 71.34
+  }
+ },
+ "pphgnetv2-b6_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "opencv",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 76.1,
+   "stretch": 74.47
+  }
+ },
+ "pplcnetv2-base_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 63.89,
+   "stretch": 61.47
+  }
+ },
+ "pplcnetv2-large_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "opencv",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 66.63,
+   "stretch": 63.86
+  }
+ },
+ "pplcnetv2-small_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 249
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 58.91,
+   "stretch": 56.42
+  }
+ },
+ "resmlp12_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 58.37,
+   "stretch": 53.46
+  }
+ },
+ "resmlp36_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 63.05,
+   "stretch": 59.44
+  }
+ },
+ "vit-b-p16_224x224_bn.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 67.03,
+   "stretch": 64.82
+  }
+ },
+ "vit-b-p16_384x384.dxnn": {
+  "crop_resize": {
+   "interpolation": "bicubic",
+   "resampler": "pillow",
+   "short": 427
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 70.26,
+   "stretch": 69.2
+  }
+ },
+ "vit-t-p16_224x224.dxnn": {
+  "crop_resize": {
+   "interpolation": "bilinear",
+   "resampler": "opencv",
+   "short": 256
+  },
+  "imagenetv2_10k_top1": {
+   "crop": 55.59,
+   "stretch": 51.9
+  }
+ }
+}

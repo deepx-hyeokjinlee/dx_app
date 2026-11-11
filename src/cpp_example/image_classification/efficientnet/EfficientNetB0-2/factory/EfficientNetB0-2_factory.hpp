@@ -29,8 +29,11 @@ public:
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
         // default: EfficientNetB0-2
-        // Stretch, as the Python config says (it used a letterbox here).
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // Measured (the compile JSON gives no crop), ImageNetV2 10k top-1:
+        // 61.31 stretch -> 64.44 with pillow bicubic resize (short side 256) + CenterCrop(224).
+        auto pre = std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        pre->setCenterCrop(256, 0, 0, cv::INTER_CUBIC, /*pillow=*/true);
+        return pre;
     }
 
     PostprocessorPtr<ClassificationResult> createPostprocessor(

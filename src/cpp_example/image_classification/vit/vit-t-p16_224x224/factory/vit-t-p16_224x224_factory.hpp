@@ -29,8 +29,11 @@ public:
 
     PreprocessorPtr createPreprocessor(int input_width, int input_height) override {
         // default: vit-b-p16_224x224
-        // Stretch, as the Python config says (it used a letterbox here).
-        return std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        // Measured (the compile JSON gives no crop), ImageNetV2 10k top-1:
+        // 51.90 stretch -> 55.59 with opencv bilinear resize (short side 256) + CenterCrop(224).
+        auto pre = std::make_unique<SimpleResizePreprocessor>(input_width, input_height);
+        pre->setCenterCrop(256, 0, 0, cv::INTER_LINEAR, /*pillow=*/false);
+        return pre;
     }
 
     PostprocessorPtr<ClassificationResult> createPostprocessor(
